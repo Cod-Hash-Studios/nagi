@@ -83,6 +83,20 @@ just ci
 
 Do not open a PR that bypasses failing tests, formatting, or build errors.
 
+## Issue references in commits
+
+If your PR relates to a GitHub issue, reference it in the commit body with `refs #<issue-number>`.
+
+Example:
+
+```text
+fix: handle pane focus
+
+refs #128
+```
+
+Do not use GitHub closing keywords like `fixes #128`, `closes #128`, or `resolves #128` in normal PR commits. Herdr closes released issues after a release is published, not when unreleased commits land on `master`.
+
 ## PR scope
 
 Small bug fixes that clearly match the existing design are good candidates for PRs after approval.
