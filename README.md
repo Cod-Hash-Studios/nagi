@@ -328,7 +328,12 @@ just check       # formatting, tests, and maintenance checks
 
 ## license
 
-agpl-3.0: free to use, modify, and distribute. modified versions must be open-sourced under the same license.
+Herdr is dual-licensed:
+
+1. Open source: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
+2. Commercial: commercial licenses are available for organizations that cannot comply with AGPL.
+
+Contact: hey@herdr.dev
 
 ## pi, ghostty, and shift+enter
 
