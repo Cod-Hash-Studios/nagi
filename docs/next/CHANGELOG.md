@@ -7,7 +7,7 @@
 - Added Kilo Code CLI automatic detection for idle, working, and blocked terminal states. (#270)
 
 ### Changed
-- Removed the automatic GitHub star prompt from `herdr update`.
+- Native agent session restore is now enabled by default for supported panes with current official integrations. Set `[session] resume_agents_on_restore = false` to disable it.
 
 ### Fixed
 - Pane input no longer waits behind the PTY actor's idle read poll, restoring responsive typing at quiet shell prompts. (#379)

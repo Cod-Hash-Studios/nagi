@@ -336,7 +336,7 @@ impl HeadlessServer {
 
             // 6. Handle scheduled tasks.
             let now = Instant::now();
-            if self.handle_scheduled_tasks_headless(now) {
+            if self.handle_scheduled_tasks_headless(now, needs_render) {
                 needs_render = true;
             }
 
@@ -490,6 +490,17 @@ impl HeadlessServer {
     }
 
     fn resize_shared_runtime_to_effective_size(&mut self) {
+        self.resize_shared_runtime_to_effective_size_with_pending_agent_resumes(true);
+    }
+
+    fn resize_shared_runtime_to_effective_size_before_input(&mut self) {
+        self.resize_shared_runtime_to_effective_size_with_pending_agent_resumes(false);
+    }
+
+    fn resize_shared_runtime_to_effective_size_with_pending_agent_resumes(
+        &mut self,
+        start_pending_agent_resumes: bool,
+    ) {
         if self.foreground_client_id.is_none() {
             return;
         }
@@ -521,6 +532,20 @@ impl HeadlessServer {
         // even if the next rendered buffer compares equal to its cached frame.
         for client in self.clients.values_mut() {
             client.request_full_redraw();
+        }
+        if !start_pending_agent_resumes {
+            self.app.pending_agent_resume_deadline = None;
+            return;
+        }
+        let now = Instant::now();
+        self.app.sync_pending_agent_resume_deadline(now);
+        if self
+            .app
+            .start_pending_agent_resumes(self.app.pending_agent_resume_due(now))
+        {
+            for client in self.clients.values_mut() {
+                client.request_full_redraw();
+            }
         }
     }
 
@@ -998,7 +1023,11 @@ impl HeadlessServer {
         }
 
         if self.foreground_client_id == Some(client_id) {
-            self.app.set_host_terminal_theme(client.host_terminal_theme)
+            let changed = self.app.set_host_terminal_theme(client.host_terminal_theme);
+            if changed {
+                self.resize_shared_runtime_to_effective_size_before_input();
+            }
+            changed
         } else {
             false
         }
@@ -1092,7 +1121,7 @@ impl HeadlessServer {
 
         let foreground_changed = self.promote_client_to_foreground(client_id);
         if foreground_changed {
-            self.resize_shared_runtime_to_effective_size();
+            self.resize_shared_runtime_to_effective_size_before_input();
         }
         if let Some(client) = self.clients.get_mut(&client_id) {
             client.request_semantic_redraw_after_input();
@@ -1650,6 +1679,8 @@ impl HeadlessServer {
             .state
             .direct_attach_resize_locks
             .insert(real_terminal_id.clone());
+        self.app
+            .start_pending_agent_resume_for_terminal(&real_terminal_id, rows, cols, true);
         if let Some(runtime) = self.app.terminal_runtimes.get(&real_terminal_id) {
             runtime.resize(rows, cols, cell_size.width_px, cell_size.height_px);
         }
@@ -1798,7 +1829,7 @@ impl HeadlessServer {
                     false
                 };
                 if foreground_changed {
-                    self.resize_shared_runtime_to_effective_size();
+                    self.resize_shared_runtime_to_effective_size_before_input();
                 }
                 let theme_changed = self.update_client_host_theme_from_events(client_id, &events);
                 self.app
@@ -2446,7 +2477,7 @@ impl HeadlessServer {
     ///
     /// Similar to `App::handle_scheduled_tasks` but without resize polling
     /// (the server doesn't have a terminal to resize).
-    fn handle_scheduled_tasks_headless(&mut self, now: Instant) -> bool {
+    fn handle_scheduled_tasks_headless(&mut self, now: Instant, geometry_dirty: bool) -> bool {
         let mut changed = false;
 
         self.app.sync_headless_animation_timer(now);
@@ -2544,6 +2575,14 @@ impl HeadlessServer {
             changed = true;
         }
 
+        if geometry_dirty || self.foreground_client_id.is_none() {
+            self.app.pending_agent_resume_deadline = None;
+        } else {
+            self.app.sync_pending_agent_resume_deadline(now);
+            changed |= self
+                .app
+                .start_pending_agent_resumes(self.app.pending_agent_resume_due(now));
+        }
         self.app.sync_headless_animation_timer(now);
         changed
     }
@@ -3691,7 +3730,7 @@ next_tab = ""
             Some("short lived")
         );
 
-        assert!(server.handle_scheduled_tasks_headless(deadline + Duration::from_millis(1)));
+        assert!(server.handle_scheduled_tasks_headless(deadline + Duration::from_millis(1), false));
 
         assert_eq!(server.app.agent_metadata_deadline, None);
         assert_eq!(
@@ -3719,6 +3758,188 @@ next_tab = ""
                         } if custom_status.is_none()
                     )
             }));
+    }
+
+    #[tokio::test]
+    async fn headless_scheduled_tasks_do_not_start_pending_agent_resume_when_geometry_dirty() {
+        let mut server = test_headless_server();
+        let workspace = crate::workspace::Workspace::test_new("restored");
+        let pane_id = workspace.tabs[0].root_pane;
+        let terminal_id = workspace.terminal_id(pane_id).cloned().unwrap();
+        server.app.state.view.pane_infos = workspace.tabs[0]
+            .layout
+            .panes(ratatui::layout::Rect::new(0, 0, 100, 30));
+        server.app.state.workspaces = vec![workspace];
+        server.app.state.active = Some(0);
+        server.app.state.ensure_test_terminals();
+        server.clients.insert(
+            1,
+            ClientConnection::new(
+                (100, 30),
+                crate::kitty_graphics::HostCellSize::default(),
+                server.app.state.host_terminal_theme,
+                Some(true),
+                1,
+                RenderEncoding::SemanticFrame,
+                None,
+            ),
+        );
+        server.foreground_client_id = Some(1);
+        server.effective_size = (100, 30);
+        server.app.state.host_terminal_theme = crate::terminal_theme::TerminalTheme {
+            foreground: Some(crate::terminal_theme::RgbColor {
+                r: 220,
+                g: 220,
+                b: 220,
+            }),
+            background: Some(crate::terminal_theme::RgbColor {
+                r: 20,
+                g: 20,
+                b: 20,
+            }),
+        };
+        server
+            .app
+            .state
+            .terminals
+            .get_mut(&terminal_id)
+            .expect("test terminal should exist")
+            .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
+            agent: "codex".into(),
+            argv: vec!["/bin/sh".into(), "-c".into(), "sleep 5".into()],
+            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+        });
+        server.app.pending_agent_resume_deadline = Some(Instant::now() - Duration::from_millis(1));
+
+        assert!(!server.handle_scheduled_tasks_headless(Instant::now(), true));
+        assert!(server.app.terminal_runtimes.get(&terminal_id).is_none());
+        assert!(server
+            .app
+            .state
+            .terminals
+            .get(&terminal_id)
+            .expect("test terminal should still exist")
+            .pending_agent_resume_plan
+            .is_some());
+        assert!(server.app.pending_agent_resume_deadline.is_none());
+    }
+
+    #[tokio::test]
+    async fn headless_scheduled_tasks_do_not_start_pending_agent_resume_without_foreground_client()
+    {
+        let mut server = test_headless_server();
+        let workspace = crate::workspace::Workspace::test_new("restored");
+        let pane_id = workspace.tabs[0].root_pane;
+        let terminal_id = workspace.terminal_id(pane_id).cloned().unwrap();
+        server.app.state.view.pane_infos = workspace.tabs[0]
+            .layout
+            .panes(ratatui::layout::Rect::new(0, 0, 80, 24));
+        server.app.state.workspaces = vec![workspace];
+        server.app.state.active = Some(0);
+        server.app.state.ensure_test_terminals();
+        server.foreground_client_id = None;
+        server.effective_size = (80, 24);
+        server.app.state.host_terminal_theme = crate::terminal_theme::TerminalTheme {
+            foreground: Some(crate::terminal_theme::RgbColor {
+                r: 220,
+                g: 220,
+                b: 220,
+            }),
+            background: Some(crate::terminal_theme::RgbColor {
+                r: 20,
+                g: 20,
+                b: 20,
+            }),
+        };
+        server
+            .app
+            .state
+            .terminals
+            .get_mut(&terminal_id)
+            .expect("test terminal should exist")
+            .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
+            agent: "codex".into(),
+            argv: vec!["/bin/sh".into(), "-c".into(), "sleep 5".into()],
+            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+        });
+        server.app.pending_agent_resume_deadline = Some(Instant::now() - Duration::from_millis(1));
+
+        assert!(!server.handle_scheduled_tasks_headless(Instant::now(), false));
+        assert!(server.app.terminal_runtimes.get(&terminal_id).is_none());
+        assert!(server
+            .app
+            .state
+            .terminals
+            .get(&terminal_id)
+            .expect("test terminal should still exist")
+            .pending_agent_resume_plan
+            .is_some());
+        assert!(server.app.pending_agent_resume_deadline.is_none());
+    }
+
+    #[tokio::test]
+    async fn headless_pre_input_resize_does_not_start_pending_agent_resume() {
+        let mut server = test_headless_server();
+        let workspace = crate::workspace::Workspace::test_new("restored");
+        let pane_id = workspace.tabs[0].root_pane;
+        let terminal_id = workspace.terminal_id(pane_id).cloned().unwrap();
+        server.app.state.view.pane_infos = workspace.tabs[0]
+            .layout
+            .panes(ratatui::layout::Rect::new(0, 0, 100, 30));
+        server.app.state.workspaces = vec![workspace];
+        server.app.state.active = Some(0);
+        server.app.state.ensure_test_terminals();
+        server.clients.insert(
+            1,
+            ClientConnection::new(
+                (100, 30),
+                crate::kitty_graphics::HostCellSize::default(),
+                server.app.state.host_terminal_theme,
+                Some(true),
+                1,
+                RenderEncoding::SemanticFrame,
+                None,
+            ),
+        );
+        server.foreground_client_id = Some(1);
+        server.effective_size = (100, 30);
+        server.app.state.host_terminal_theme = crate::terminal_theme::TerminalTheme {
+            foreground: Some(crate::terminal_theme::RgbColor {
+                r: 220,
+                g: 220,
+                b: 220,
+            }),
+            background: Some(crate::terminal_theme::RgbColor {
+                r: 20,
+                g: 20,
+                b: 20,
+            }),
+        };
+        server
+            .app
+            .state
+            .terminals
+            .get_mut(&terminal_id)
+            .expect("test terminal should exist")
+            .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
+            agent: "codex".into(),
+            argv: vec!["/bin/sh".into(), "-c".into(), "sleep 5".into()],
+            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+        });
+        server.app.pending_agent_resume_deadline = Some(Instant::now() - Duration::from_millis(1));
+
+        server.resize_shared_runtime_to_effective_size_before_input();
+
+        assert!(server.app.terminal_runtimes.get(&terminal_id).is_none());
+        assert!(server
+            .app
+            .state
+            .terminals
+            .get(&terminal_id)
+            .expect("test terminal should still exist")
+            .pending_agent_resume_plan
+            .is_some());
+        assert!(server.app.pending_agent_resume_deadline.is_none());
     }
 
     #[test]
