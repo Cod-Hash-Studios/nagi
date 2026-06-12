@@ -223,6 +223,9 @@ impl App {
             );
             return false;
         };
+        let public_pane_id = self
+            .find_pane(pane_id)
+            .and_then(|(ws_idx, _)| self.public_pane_id(ws_idx, pane_id));
 
         let runtime = match crate::terminal::TerminalRuntime::spawn(
             pane_id,
@@ -235,6 +238,7 @@ impl App {
             self.event_tx.clone(),
             self.render_notify.clone(),
             self.render_dirty.clone(),
+            public_pane_id.as_deref(),
         ) {
             Ok(runtime) => runtime,
             Err(err) => {

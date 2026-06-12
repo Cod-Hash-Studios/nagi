@@ -599,6 +599,9 @@ impl App {
         let Some((ws_idx, pane_id)) = self.parse_pane_id(&params.pane_id) else {
             return pane_not_found(id, &params.pane_id);
         };
+        let Some(public_pane_id) = self.public_pane_id(ws_idx, pane_id) else {
+            return pane_not_found(id, &params.pane_id);
+        };
         let Some((pane, workspace_id)) = self.lookup_runtime(ws_idx, pane_id) else {
             return pane_not_found(id, &params.pane_id);
         };
@@ -630,7 +633,7 @@ impl App {
             id,
             ResponseResult::PaneRead {
                 read: PaneReadResult {
-                    pane_id: params.pane_id,
+                    pane_id: public_pane_id,
                     workspace_id,
                     tab_id: self.public_tab_id(ws_idx, tab_idx).unwrap(),
                     source: params.source,
@@ -887,6 +890,10 @@ impl App {
         let Some((ws_idx, pane_id)) = self.parse_pane_id(&target.pane_id) else {
             return pane_not_found(id, &target.pane_id);
         };
+        let Some(public_pane_id) = self.public_pane_id(ws_idx, pane_id) else {
+            return pane_not_found(id, &target.pane_id);
+        };
+        let workspace_id = self.public_workspace_id(ws_idx);
         if self.state.close_pane_would_close_workspace(ws_idx, pane_id)
             && self.state.confirm_implicit_worktree_group_close(ws_idx)
         {
@@ -896,7 +903,6 @@ impl App {
                 "closing this pane would close a worktree group",
             );
         }
-        let workspace_id = self.state.workspaces[ws_idx].id.clone();
         let terminal_id = self.state.terminal_id_for_pane(ws_idx, pane_id);
         let should_close_workspace = {
             let Some(ws) = self.state.workspaces.get_mut(ws_idx) else {
@@ -911,7 +917,7 @@ impl App {
             self.emit_event(EventEnvelope {
                 event: EventKind::PaneClosed,
                 data: EventData::PaneClosed {
-                    pane_id: target.pane_id.clone(),
+                    pane_id: public_pane_id,
                     workspace_id: workspace_id.clone(),
                 },
             });
@@ -926,7 +932,7 @@ impl App {
             self.emit_event(EventEnvelope {
                 event: EventKind::PaneClosed,
                 data: EventData::PaneClosed {
-                    pane_id: target.pane_id,
+                    pane_id: public_pane_id,
                     workspace_id,
                 },
             });

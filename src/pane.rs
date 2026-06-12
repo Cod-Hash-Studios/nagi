@@ -1323,6 +1323,7 @@ impl PaneRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         Self::spawn_with_initial_history(
             pane_id,
@@ -1336,9 +1337,12 @@ impl PaneRuntime {
             events,
             render_notify,
             render_dirty,
+            public_pane_id,
         )
     }
 
+    // Runtime construction needs to thread PTY size, environment, theme, and render hooks together.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn spawn_with_initial_history(
         pane_id: PaneId,
         rows: u16,
@@ -1351,12 +1355,13 @@ impl PaneRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         let mut cmd = pane_shell_command_builder(shell_config)?;
         cmd.cwd(cwd);
         cmd.env(crate::HERDR_ENV_VAR, crate::HERDR_ENV_VALUE);
         apply_pane_terminal_env(&mut cmd);
-        crate::integration::apply_pane_env(&mut cmd, pane_id);
+        crate::integration::apply_pane_env(&mut cmd, pane_id, public_pane_id);
         Self::spawn_command_builder(
             pane_id,
             rows,
@@ -1375,6 +1380,8 @@ impl PaneRuntime {
         )
     }
 
+    // Runtime construction needs to thread PTY size, environment, theme, and render hooks together.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_shell_command(
         pane_id: PaneId,
         rows: u16,
@@ -1387,6 +1394,7 @@ impl PaneRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         let mut cmd = CommandBuilder::new("/bin/sh");
         cmd.arg("-c");
@@ -1394,7 +1402,7 @@ impl PaneRuntime {
         cmd.cwd(cwd);
         cmd.env(crate::HERDR_ENV_VAR, crate::HERDR_ENV_VALUE);
         apply_pane_terminal_env(&mut cmd);
-        crate::integration::apply_pane_env(&mut cmd, pane_id);
+        crate::integration::apply_pane_env(&mut cmd, pane_id, public_pane_id);
         for (key, value) in extra_env {
             cmd.env(key, value);
         }
@@ -1424,6 +1432,7 @@ impl PaneRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         let Some((program, args)) = argv.split_first() else {
             return Err(std::io::Error::new(
@@ -1438,7 +1447,7 @@ impl PaneRuntime {
         cmd.cwd(cwd);
         cmd.env(crate::HERDR_ENV_VAR, crate::HERDR_ENV_VALUE);
         apply_pane_terminal_env(&mut cmd);
-        crate::integration::apply_pane_env(&mut cmd, pane_id);
+        crate::integration::apply_pane_env(&mut cmd, pane_id, public_pane_id);
         Self::spawn_command_builder(
             pane_id,
             rows,

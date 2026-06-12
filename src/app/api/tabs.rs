@@ -98,9 +98,13 @@ impl App {
                 );
                 if let Some(label) = label {
                     let workspace_id = self.state.workspaces[ws_idx].id.clone();
-                    let tab_id = self
-                        .public_tab_id(ws_idx, tab_idx)
-                        .unwrap_or_else(|| format!("{}:{}", workspace_id, tab_idx + 1));
+                    let tab_id = self.public_tab_id(ws_idx, tab_idx).unwrap_or_else(|| {
+                        format!(
+                            "{}:t{}",
+                            workspace_id,
+                            crate::workspace::encode_public_number(tab_idx + 1)
+                        )
+                    });
                     if let Some(tab) = self
                         .state
                         .workspaces
@@ -186,6 +190,10 @@ impl App {
         let Some((ws_idx, tab_idx)) = self.parse_tab_id(&target.tab_id) else {
             return tab_not_found(id, &target.tab_id);
         };
+        let Some(tab_id) = self.public_tab_id(ws_idx, tab_idx) else {
+            return tab_not_found(id, &target.tab_id);
+        };
+        let workspace_id = self.public_workspace_id(ws_idx);
         let terminal_ids = self.state.terminal_ids_for_tab(ws_idx, tab_idx);
         let Some(ws) = self.state.workspaces.get_mut(ws_idx) else {
             return tab_not_found(id, &target.tab_id);
@@ -210,8 +218,8 @@ impl App {
         self.emit_event(EventEnvelope {
             event: EventKind::TabClosed,
             data: EventData::TabClosed {
-                tab_id: target.tab_id,
-                workspace_id: self.public_workspace_id(ws_idx),
+                tab_id,
+                workspace_id,
             },
         });
 

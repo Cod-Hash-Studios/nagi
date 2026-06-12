@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Public workspace, tab, and pane ids are now short stable handles such as `w1`, `w1:t1`, and `w1:p1`; closed tab and pane ids no longer retarget later resources. (#569)
+
 ## [0.6.10] - 2026-06-11
 
 This is a hotfix release for v0.6.9. See the v0.6.9 notes for the full feature release.
@@ -652,7 +655,7 @@ This is a hotfix for v0.6.3. See the v0.6.3 notes for the full feature release.
 ### Added
 - Added a local Unix socket API for controlling running herdr sessions, including workspace and pane management, pane reads, text/key input, pane splitting, and output waits.
 - Added event subscriptions over the socket API for workspace and pane lifecycle events, pane output matches, and agent state changes.
-- Added CLI wrappers on top of the socket API with `herdr workspace ...`, `herdr pane ...`, and `herdr wait ...`, using compact public ids like `1` and `1-2` for scripting and agent orchestration.
+- Added CLI wrappers on top of the socket API with `herdr workspace ...`, `herdr pane ...`, and `herdr wait ...`, using compact public ids for scripting and agent orchestration.
 - Added a settings popup with mouse support for changing themes, sound alerts, and toast notifications from inside herdr.
 - Added 9 built-in themes: catppuccin, tokyo night, dracula, nord, gruvbox, one dark, solarized, kanagawa, and rosé pine.
 - Added interactive pane scrollbars, manual sidebar resizing, and upstream git ahead/behind indicators in the workspace sidebar.

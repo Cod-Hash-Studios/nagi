@@ -88,6 +88,7 @@ impl TerminalRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         crate::pane::PaneRuntime::spawn(
             pane_id,
@@ -100,10 +101,13 @@ impl TerminalRuntime {
             events,
             render_notify,
             render_dirty,
+            public_pane_id,
         )
         .map(Self)
     }
 
+    // Wrapper mirrors pane runtime construction arguments.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_with_initial_history(
         pane_id: PaneId,
         rows: u16,
@@ -116,6 +120,7 @@ impl TerminalRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         crate::pane::PaneRuntime::spawn_with_initial_history(
             pane_id,
@@ -129,10 +134,13 @@ impl TerminalRuntime {
             events,
             render_notify,
             render_dirty,
+            public_pane_id,
         )
         .map(Self)
     }
 
+    // Wrapper mirrors pane runtime construction arguments.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_shell_command(
         pane_id: PaneId,
         rows: u16,
@@ -145,6 +153,7 @@ impl TerminalRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         crate::pane::PaneRuntime::spawn_shell_command(
             pane_id,
@@ -158,6 +167,7 @@ impl TerminalRuntime {
             events,
             render_notify,
             render_dirty,
+            public_pane_id,
         )
         .map(Self)
     }
@@ -173,6 +183,7 @@ impl TerminalRuntime {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<Self> {
         crate::pane::PaneRuntime::spawn_argv_command(
             pane_id,
@@ -185,6 +196,7 @@ impl TerminalRuntime {
             events,
             render_notify,
             render_dirty,
+            public_pane_id,
         )
         .map(Self)
     }

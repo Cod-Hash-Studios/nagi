@@ -1024,7 +1024,7 @@ mod tests {
         let request = Request {
             id: "req_hook".into(),
             method: Method::PaneReportAgent(PaneReportAgentParams {
-                pane_id: "1-1".into(),
+                pane_id: "w1:p1".into(),
                 source: "herdr:pi".into(),
                 agent: "pi".into(),
                 state: PaneAgentState::Working,
@@ -1046,7 +1046,7 @@ mod tests {
         let request = Request {
             id: "req_session".into(),
             method: Method::PaneReportAgentSession(PaneReportAgentSessionParams {
-                pane_id: "1-1".into(),
+                pane_id: "w1:p1".into(),
                 source: "herdr:claude".into(),
                 agent: "claude".into(),
                 seq: Some(42),
@@ -1065,7 +1065,7 @@ mod tests {
         let request = Request {
             id: "req_metadata".into(),
             method: Method::PaneReportMetadata(PaneReportMetadataParams {
-                pane_id: "1-1".into(),
+                pane_id: "w1:p1".into(),
                 source: "user:claude-title".into(),
                 agent: Some("claude".into()),
                 applies_to_source: Some("herdr:claude".into()),
@@ -1092,7 +1092,7 @@ mod tests {
         let request = Request {
             id: "req_clear".into(),
             method: Method::PaneClearAgentAuthority(PaneClearAgentAuthorityParams {
-                pane_id: "1-1".into(),
+                pane_id: "w1:p1".into(),
                 source: Some("herdr:pi".into()),
                 seq: Some(42),
             }),
@@ -1108,7 +1108,7 @@ mod tests {
         let request = Request {
             id: "req_release".into(),
             method: Method::PaneReleaseAgent(PaneReleaseAgentParams {
-                pane_id: "1-1".into(),
+                pane_id: "w1:p1".into(),
                 source: "herdr:pi".into(),
                 agent: "pi".into(),
                 seq: Some(42),
@@ -1315,8 +1315,8 @@ mod tests {
         let event = EventEnvelope {
             event: EventKind::PaneOutputChanged,
             data: EventData::PaneOutputChanged {
-                pane_id: "p_1".into(),
-                workspace_id: "w_1".into(),
+                pane_id: "w1:p1".into(),
+                workspace_id: "w1".into(),
                 revision: 42,
             },
         };
@@ -1380,12 +1380,12 @@ mod tests {
         let event = SubscriptionEventEnvelope {
             event: SubscriptionEventKind::PaneOutputMatched,
             data: SubscriptionEventData::PaneOutputMatched(PaneOutputMatchedEvent {
-                pane_id: "p_1_1".into(),
+                pane_id: "w1:p1".into(),
                 matched_line: "auth: received".into(),
                 read: PaneReadResult {
-                    pane_id: "p_1_1".into(),
-                    workspace_id: "w_1".into(),
-                    tab_id: "t_1_1".into(),
+                    pane_id: "w1:p1".into(),
+                    workspace_id: "w1".into(),
+                    tab_id: "w1:t1".into(),
                     source: ReadSource::Recent,
                     format: ReadFormat::Text,
                     text: "auth: received\n".into(),
@@ -1437,13 +1437,13 @@ mod tests {
             id: "req_worktree".into(),
             result: ResponseResult::WorktreeCreated {
                 workspace: WorkspaceInfo {
-                    workspace_id: "w_1".into(),
+                    workspace_id: "w1".into(),
                     number: 2,
                     label: "herdr".into(),
                     focused: true,
                     pane_count: 1,
                     tab_count: 1,
-                    active_tab_id: "w_1:1".into(),
+                    active_tab_id: "w1:t1".into(),
                     agent_status: AgentStatus::Unknown,
                     worktree: Some(WorkspaceWorktreeInfo {
                         repo_key: "/repo/herdr/.git".into(),
@@ -1454,8 +1454,8 @@ mod tests {
                     }),
                 },
                 tab: TabInfo {
-                    tab_id: "w_1:1".into(),
-                    workspace_id: "w_1".into(),
+                    tab_id: "w1:t1".into(),
+                    workspace_id: "w1".into(),
                     number: 1,
                     label: "herdr".into(),
                     focused: true,
@@ -1463,10 +1463,10 @@ mod tests {
                     agent_status: AgentStatus::Unknown,
                 },
                 root_pane: PaneInfo {
-                    pane_id: "w_1-1".into(),
+                    pane_id: "w1:p1".into(),
                     terminal_id: "term_1".into(),
-                    workspace_id: "w_1".into(),
-                    tab_id: "w_1:1".into(),
+                    workspace_id: "w1".into(),
+                    tab_id: "w1:t1".into(),
                     focused: true,
                     cwd: Some("/worktrees/herdr/worktree-api".into()),
                     foreground_cwd: None,
@@ -1487,7 +1487,7 @@ mod tests {
                     is_detached: false,
                     is_prunable: false,
                     is_linked_worktree: true,
-                    open_workspace_id: Some("w_1".into()),
+                    open_workspace_id: Some("w1".into()),
                     label: "herdr".into(),
                 },
             },
@@ -1505,8 +1505,8 @@ mod tests {
             id: "req_2".into(),
             result: ResponseResult::TabCreated {
                 tab: TabInfo {
-                    tab_id: "w_1:2".into(),
-                    workspace_id: "w_1".into(),
+                    tab_id: "w1:t2".into(),
+                    workspace_id: "w1".into(),
                     number: 2,
                     label: "review".into(),
                     focused: false,
@@ -1514,10 +1514,10 @@ mod tests {
                     agent_status: AgentStatus::Unknown,
                 },
                 root_pane: PaneInfo {
-                    pane_id: "w_1-3".into(),
+                    pane_id: "w1:p3".into(),
                     terminal_id: "term_example".into(),
-                    workspace_id: "w_1".into(),
-                    tab_id: "w_1:2".into(),
+                    workspace_id: "w1".into(),
+                    tab_id: "w1:t2".into(),
                     focused: false,
                     cwd: Some("/tmp/review".into()),
                     foreground_cwd: None,

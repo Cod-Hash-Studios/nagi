@@ -122,9 +122,13 @@ impl App {
             self.state.mode = Mode::Terminal;
         }
         let workspace_id = self.state.workspaces[ws_idx].id.clone();
-        let tab_id = self
-            .public_tab_id(ws_idx, idx)
-            .unwrap_or_else(|| format!("{}:{}", workspace_id, idx + 1));
+        let tab_id = self.public_tab_id(ws_idx, idx).unwrap_or_else(|| {
+            format!(
+                "{}:t{}",
+                workspace_id,
+                crate::workspace::encode_public_number(idx + 1)
+            )
+        });
         let root_pane = self.state.workspaces[ws_idx].tabs[idx].root_pane.raw();
         crate::logging::tab_created(&workspace_id, &tab_id, root_pane);
         self.schedule_session_save();

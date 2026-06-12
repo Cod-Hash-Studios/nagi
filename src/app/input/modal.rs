@@ -355,7 +355,7 @@ fn next_new_tab_default_name(state: &AppState) -> String {
     state
         .active
         .and_then(|i| state.workspaces.get(i))
-        .map(|ws| (ws.tabs.len() + 1).to_string())
+        .map(|ws| ws.next_public_tab_number.to_string())
         .unwrap_or_else(|| "1".to_string())
 }
 
@@ -1288,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    fn closing_first_auto_tab_resets_remaining_auto_tab_and_next_prompt() {
+    fn closing_first_auto_tab_keeps_remaining_auto_tab_number_and_next_prompt() {
         let mut state = state_with_workspaces(&["test"]);
         open_new_tab_dialog(&mut state);
         handle_rename_key(
@@ -1303,11 +1303,11 @@ mod tests {
         state.workspaces[0].close_tab(0);
         state.workspaces[0].switch_tab(0);
 
-        assert_eq!(state.workspaces[0].tabs[0].display_name(), "1");
+        assert_eq!(state.workspaces[0].tabs[0].display_name(), "2");
         assert!(state.workspaces[0].tabs[0].custom_name.is_none());
 
         open_new_tab_dialog(&mut state);
-        assert_eq!(state.name_input, "2");
+        assert_eq!(state.name_input, "3");
     }
 
     #[test]

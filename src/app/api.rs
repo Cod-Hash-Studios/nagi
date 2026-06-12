@@ -327,6 +327,7 @@ impl App {
         let Some((ws_idx, pane_state)) = self.find_pane(pane_id) else {
             return false;
         };
+        let public_pane_id = self.public_pane_id(ws_idx, pane_id);
         let terminal_id = pane_state.attached_terminal_id.clone();
         let Some(terminal) = self.state.terminals.get(&terminal_id) else {
             return false;
@@ -349,6 +350,7 @@ impl App {
             self.event_tx.clone(),
             self.render_notify.clone(),
             self.render_dirty.clone(),
+            public_pane_id.as_deref(),
         ) {
             Ok(runtime) => runtime,
             Err(err) => {
@@ -1236,6 +1238,7 @@ mod tests {
             events,
             std::sync::Arc::new(tokio::sync::Notify::new()),
             std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            None,
         )
         .unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -1327,6 +1330,7 @@ mod tests {
             events,
             std::sync::Arc::new(tokio::sync::Notify::new()),
             std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            None,
         )
         .unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);

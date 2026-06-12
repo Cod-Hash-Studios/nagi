@@ -1937,7 +1937,7 @@ fn tab_management_commands_work() {
         .as_str()
         .unwrap()
         .to_string();
-    assert_eq!(second_tab_id, format!("{workspace_id}:2"));
+    assert_eq!(second_tab_id, format!("{workspace_id}:t2"));
 
     let listed_tabs = run_cli(&socket_path, &["tab", "list", "--workspace", &workspace_id]);
     assert!(listed_tabs.status.success());
@@ -2209,15 +2209,13 @@ fn pane_run_read_and_wait_commands_work() {
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
-    let created = send_request(
+    send_request(
         &socket_path,
         &format!(
             r#"{{"id":"req_cli_1","method":"workspace.create","params":{{"cwd":"{}","focus":true}}}}"#,
             base.display()
         ),
     );
-    assert!(created["result"]["workspace"]["workspace_id"].is_string());
-
     let create = run_cli(
         &socket_path,
         &[
@@ -2461,7 +2459,7 @@ fn closing_workspace_terminates_processes_inside_it() {
 }
 
 #[test]
-fn workspace_ids_are_stable_and_pane_numbers_stay_compact() {
+fn workspace_ids_and_public_pane_ids_are_stable() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
@@ -2485,7 +2483,7 @@ fn workspace_ids_are_stable_and_pane_numbers_stay_compact() {
     );
     assert_eq!(
         split_12_json["result"]["pane"]["pane_id"],
-        format!("{ws1_id}-2")
+        format!("{ws1_id}:p2")
     );
 
     let split_13_json = run_cli_json(
@@ -2494,7 +2492,7 @@ fn workspace_ids_are_stable_and_pane_numbers_stay_compact() {
     );
     assert_eq!(
         split_13_json["result"]["pane"]["pane_id"],
-        format!("{ws1_id}-3")
+        format!("{ws1_id}:p3")
     );
 
     let ws2_json = run_cli_json(
@@ -2520,7 +2518,7 @@ fn workspace_ids_are_stable_and_pane_numbers_stay_compact() {
     );
     assert_eq!(
         ws2_split_json["result"]["pane"]["pane_id"],
-        format!("{ws2_id}-2")
+        format!("{ws2_id}:p2")
     );
 
     let ws3_json = run_cli_json(
@@ -2565,7 +2563,7 @@ fn workspace_ids_are_stable_and_pane_numbers_stay_compact() {
     let ws3_panes_json = run_cli_json(&socket_path, &["pane", "list", "--workspace", &ws3_id]);
     assert_eq!(
         ws3_panes_json["result"]["panes"][0]["pane_id"],
-        format!("{ws3_id}-1")
+        format!("{ws3_id}:p1")
     );
 
     let close_middle = run_cli(&socket_path, &["pane", "close", &format!("{ws1_id}-2")]);
@@ -2582,7 +2580,33 @@ fn workspace_ids_are_stable_and_pane_numbers_stay_compact() {
         .iter()
         .map(|pane| pane["pane_id"].as_str().unwrap().to_string())
         .collect();
-    assert_eq!(pane_ids, vec![format!("{ws1_id}-1"), format!("{ws1_id}-2")]);
+    assert_eq!(
+        pane_ids,
+        vec![format!("{ws1_id}:p1"), format!("{ws1_id}:p3")]
+    );
+
+    let closed_lookup = run_cli(&socket_path, &["pane", "get", &format!("{ws1_id}:p2")]);
+    assert!(
+        !closed_lookup.status.success(),
+        "closed pane id should not retarget: {}",
+        String::from_utf8_lossy(&closed_lookup.stdout)
+    );
+
+    let split_14_json = run_cli_json(
+        &socket_path,
+        &[
+            "pane",
+            "split",
+            &format!("{ws1_id}:p1"),
+            "--direction",
+            "right",
+            "--no-focus",
+        ],
+    );
+    assert_eq!(
+        split_14_json["result"]["pane"]["pane_id"],
+        format!("{ws1_id}:p4")
+    );
 
     cleanup_spawned_herdr(herdr, base);
 }
@@ -2604,7 +2628,10 @@ fn pane_shell_gets_herdr_socket_and_pane_env() {
             base.display()
         ),
     );
-    assert!(created["result"]["workspace"]["workspace_id"].is_string());
+    let pane_id = created["result"]["root_pane"]["pane_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let env_capture = base.join("pane-env.txt");
     let ran = run_cli(
@@ -2626,7 +2653,7 @@ fn pane_shell_gets_herdr_socket_and_pane_env() {
     while Instant::now() < deadline {
         if env_capture.exists() {
             text = fs::read_to_string(&env_capture).unwrap();
-            if text.contains(&socket_path.display().to_string()) && text.contains("p_") {
+            if text.contains(&socket_path.display().to_string()) && text.contains(&pane_id) {
                 break;
             }
         }
@@ -2637,7 +2664,7 @@ fn pane_shell_gets_herdr_socket_and_pane_env() {
         text.contains(&socket_path.display().to_string()),
         "env file was: {text:?}"
     );
-    assert!(text.contains("p_"), "env file was: {text:?}");
+    assert!(text.contains(&pane_id), "env file was: {text:?}");
 
     cleanup_spawned_herdr(herdr, base);
 }
@@ -2734,7 +2761,7 @@ fn wait_agent_status_exits_immediately_when_status_already_matches() {
         .as_str()
         .unwrap()
         .to_string();
-    let pane_id = format!("{workspace_id}-1");
+    let pane_id = format!("{workspace_id}:p1");
 
     let reported = send_request(
         &socket_path,

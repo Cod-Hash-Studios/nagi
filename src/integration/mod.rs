@@ -360,9 +360,18 @@ pub(crate) struct HermesUninstallResult {
     pub updated_config: bool,
 }
 
-pub(crate) fn apply_pane_env(cmd: &mut CommandBuilder, pane_id: PaneId) {
+pub(crate) fn apply_pane_env(
+    cmd: &mut CommandBuilder,
+    pane_id: PaneId,
+    public_pane_id: Option<&str>,
+) {
     cmd.env(crate::api::SOCKET_PATH_ENV_VAR, crate::api::socket_path());
-    cmd.env(HERDR_PANE_ID_ENV_VAR, format!("p_{}", pane_id.raw()));
+    cmd.env(
+        HERDR_PANE_ID_ENV_VAR,
+        public_pane_id
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("p_{}", pane_id.raw())),
+    );
 }
 
 pub(crate) const INSTALL_WARNING_PREFIX: &str = "warning:";

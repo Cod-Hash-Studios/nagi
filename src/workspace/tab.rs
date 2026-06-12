@@ -57,6 +57,7 @@ impl Tab {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<(Self, TerminalState, TerminalRuntime)> {
         Self::new_with_runtime(
             number,
@@ -70,6 +71,7 @@ impl Tab {
             render_notify,
             render_dirty,
             None,
+            public_pane_id,
         )
     }
 
@@ -84,6 +86,7 @@ impl Tab {
         events: mpsc::Sender<AppEvent>,
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<(Self, TerminalState, TerminalRuntime)> {
         Self::new_with_runtime(
             number,
@@ -97,6 +100,7 @@ impl Tab {
             render_notify,
             render_dirty,
             Some(argv),
+            public_pane_id,
         )
     }
 
@@ -113,6 +117,7 @@ impl Tab {
         render_notify: Arc<Notify>,
         render_dirty: Arc<AtomicBool>,
         argv: Option<&[String]>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<(Self, TerminalState, TerminalRuntime)> {
         let (layout, root_id) = TileLayout::new();
         let runtime = if let Some(argv) = argv {
@@ -127,6 +132,7 @@ impl Tab {
                 events.clone(),
                 render_notify.clone(),
                 render_dirty.clone(),
+                public_pane_id,
             )?
         } else {
             TerminalRuntime::spawn(
@@ -140,6 +146,7 @@ impl Tab {
                 events.clone(),
                 render_notify.clone(),
                 render_dirty.clone(),
+                public_pane_id,
             )?
         };
 
@@ -195,6 +202,7 @@ impl Tab {
         scrollback_limit_bytes: usize,
         host_terminal_theme: crate::terminal_theme::TerminalTheme,
         shell_config: crate::pane::PaneShellConfig<'_>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<NewPane> {
         self.split_focused_with_runtime(
             direction,
@@ -206,6 +214,7 @@ impl Tab {
             host_terminal_theme,
             shell_config,
             None,
+            public_pane_id,
         )
     }
 
@@ -219,6 +228,7 @@ impl Tab {
         scrollback_limit_bytes: usize,
         host_terminal_theme: crate::terminal_theme::TerminalTheme,
         shell_config: crate::pane::PaneShellConfig<'_>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<NewPane> {
         self.split_focused_with_runtime(
             direction,
@@ -230,6 +240,7 @@ impl Tab {
             host_terminal_theme,
             shell_config,
             None,
+            public_pane_id,
         )
     }
 
@@ -243,6 +254,7 @@ impl Tab {
         extra_env: &[(String, String)],
         scrollback_limit_bytes: usize,
         host_terminal_theme: crate::terminal_theme::TerminalTheme,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<NewPane> {
         self.split_focused_with_runtime(
             direction,
@@ -254,6 +266,7 @@ impl Tab {
             host_terminal_theme,
             crate::pane::PaneShellConfig::new("", crate::config::ShellModeConfig::NonLogin),
             Some(SplitCommand::Shell { command, extra_env }),
+            public_pane_id,
         )
     }
 
@@ -266,6 +279,7 @@ impl Tab {
         argv: &[String],
         scrollback_limit_bytes: usize,
         host_terminal_theme: crate::terminal_theme::TerminalTheme,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<NewPane> {
         self.split_focused_with_runtime(
             direction,
@@ -277,6 +291,7 @@ impl Tab {
             host_terminal_theme,
             crate::pane::PaneShellConfig::new("", crate::config::ShellModeConfig::NonLogin),
             Some(SplitCommand::Argv { argv }),
+            public_pane_id,
         )
     }
 
@@ -291,6 +306,7 @@ impl Tab {
         host_terminal_theme: crate::terminal_theme::TerminalTheme,
         shell_config: crate::pane::PaneShellConfig<'_>,
         command: Option<SplitCommand<'_>>,
+        public_pane_id: Option<&str>,
     ) -> std::io::Result<NewPane> {
         let previous_focus = self.layout.focused();
         let new_id = match ratio {
@@ -318,6 +334,7 @@ impl Tab {
                     self.events.clone(),
                     self.render_notify.clone(),
                     self.render_dirty.clone(),
+                    public_pane_id,
                 )
             }
             Some(SplitCommand::Argv { argv }) => TerminalRuntime::spawn_argv_command(
@@ -331,6 +348,7 @@ impl Tab {
                 self.events.clone(),
                 self.render_notify.clone(),
                 self.render_dirty.clone(),
+                public_pane_id,
             ),
             None => TerminalRuntime::spawn(
                 new_id,
@@ -343,6 +361,7 @@ impl Tab {
                 self.events.clone(),
                 self.render_notify.clone(),
                 self.render_dirty.clone(),
+                public_pane_id,
             ),
         };
         let runtime = match runtime {

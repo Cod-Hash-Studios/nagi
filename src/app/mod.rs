@@ -2799,14 +2799,14 @@ mod tests {
             id: "req_2".into(),
             method: crate::api::schema::Method::WorkspaceFocus(
                 crate::api::schema::WorkspaceTarget {
-                    workspace_id: "w_1".into(),
+                    workspace_id: "w1".into(),
                 },
             ),
         };
         let pane_rename = crate::api::schema::Request {
             id: "req_3".into(),
             method: crate::api::schema::Method::PaneRename(crate::api::schema::PaneRenameParams {
-                pane_id: "w_1-1".into(),
+                pane_id: "w1:p1".into(),
                 label: Some("logs".into()),
             }),
         };
@@ -2825,7 +2825,7 @@ mod tests {
         let pane_swap = crate::api::schema::Request {
             id: "req_6".into(),
             method: crate::api::schema::Method::PaneSwap(crate::api::schema::PaneSwapParams {
-                pane_id: Some("w_1-1".into()),
+                pane_id: Some("w1:p1".into()),
                 direction: Some(crate::api::schema::PaneDirection::Right),
                 ..crate::api::schema::PaneSwapParams::default()
             }),
@@ -2834,7 +2834,7 @@ mod tests {
             id: "req_7".into(),
             method: crate::api::schema::Method::PaneFocusDirection(
                 crate::api::schema::PaneFocusDirectionParams {
-                    pane_id: Some("w_1-1".into()),
+                    pane_id: Some("w1:p1".into()),
                     direction: crate::api::schema::PaneDirection::Right,
                 },
             ),
@@ -2842,7 +2842,7 @@ mod tests {
         let pane_resize = crate::api::schema::Request {
             id: "req_8".into(),
             method: crate::api::schema::Method::PaneResize(crate::api::schema::PaneResizeParams {
-                pane_id: Some("w_1-1".into()),
+                pane_id: Some("w1:p1".into()),
                 direction: crate::api::schema::PaneDirection::Right,
                 amount: Some(0.05),
             }),

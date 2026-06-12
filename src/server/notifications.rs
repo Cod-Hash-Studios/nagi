@@ -124,6 +124,7 @@ mod tests {
             events,
             std::sync::Arc::new(tokio::sync::Notify::new()),
             std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            None,
         )
         .unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);

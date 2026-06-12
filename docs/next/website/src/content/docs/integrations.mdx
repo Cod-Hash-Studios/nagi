@@ -231,7 +231,7 @@ Integrations can report a short visual label without changing the semantic state
 For example, an agent can remain semantically `working` while showing `indexing` in the UI.
 
 ```bash
-herdr pane report-agent 1-1 \
+herdr pane report-agent w1:p1 \
   --source custom:docs \
   --agent docs-bot \
   --state working \
@@ -264,7 +264,7 @@ herdr agent list
 Read a pane when you need to verify what Herdr can see:
 
 ```bash
-herdr pane read 1-1 --source recent --lines 50
+herdr pane read w1:p1 --source recent --lines 50
 ```
 
 If integration state looks wrong, first confirm the agent is running inside Herdr and that the relevant hook or plugin was installed for the same user account.
