@@ -325,7 +325,7 @@ pub(super) fn render_tab_bar(app: &AppState, frame: &mut Frame, area: Rect) {
         let style = if active {
             let base = Style::default().fg(panel_contrast_fg(p)).bg(p.accent);
             if tab.is_auto_named() {
-                base.add_modifier(Modifier::DIM)
+                base
             } else {
                 base.add_modifier(Modifier::BOLD)
             }
@@ -437,6 +437,31 @@ mod tests {
             app.workspaces[0].tab_display_name(custom_tab).as_deref(),
             Some("test")
         );
+    }
+
+    #[test]
+    fn active_auto_named_tab_keeps_readable_weight() {
+        let mut app = AppState::test_new();
+        let ws = Workspace::test_new("test");
+
+        app.workspaces = vec![ws];
+        app.active = Some(0);
+        app.view.tab_bar_rect = Rect::new(0, 0, 30, 1);
+        let view = compute_tab_bar_view(&app.workspaces[0], app.view.tab_bar_rect, 0, true, false);
+        app.view.tab_hit_areas = view.tab_hit_areas;
+
+        let backend = TestBackend::new(30, 1);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| render_tab_bar(&app, frame, app.view.tab_bar_rect))
+            .unwrap();
+
+        let tab_rect = app.view.tab_hit_areas[0];
+        let style = terminal.backend().buffer()[(tab_rect.x + 1, tab_rect.y)].style();
+
+        assert_eq!(style.bg, Some(app.palette.accent));
+        assert!(!style.add_modifier.contains(Modifier::DIM));
+        assert!(!style.add_modifier.contains(Modifier::BOLD));
     }
 
     #[test]
