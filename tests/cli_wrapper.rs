@@ -1031,6 +1031,7 @@ fn help_commands_exit_successfully() {
         &["--help"],
         &["api", "-h"],
         &["api", "schema", "-h"],
+        &["completion", "-h"],
         &["status", "-h"],
         &["server", "-h"],
         &["workspace", "-h"],
@@ -1057,6 +1058,46 @@ fn help_commands_exit_successfully() {
             String::from_utf8_lossy(&output.stderr)
         );
     }
+}
+
+#[test]
+fn completion_command_prints_zsh_script_without_session_startup() {
+    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+        .args(["completion", "zsh"])
+        .env_remove("HERDR_SOCKET_PATH")
+        .env_remove("HERDR_CLIENT_SOCKET_PATH")
+        .env_remove("HERDR_ENV")
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "status={:?} stderr={}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("#compdef herdr"), "stdout: {stdout}");
+    assert!(
+        stdout.contains("bash elvish fish powershell zsh"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("'--direction[]:DIRECTION:(right down)'"),
+        "pane split/plugin pane open should complete --direction right|down without requiring equals: {stdout}"
+    );
+    assert!(
+        !stdout.contains("--cwd=[]"),
+        "zsh completions should not suggest equals-style values unsupported by most manual parsers: {stdout}"
+    );
+    assert!(
+        !stdout.contains("--direction=[]"),
+        "zsh completions should not suggest equals-style direction values: {stdout}"
+    );
+    assert!(
+        !stdout.contains("live-handoff"),
+        "internal server handoff command should not be completed: {stdout}"
+    );
 }
 
 #[test]
