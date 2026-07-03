@@ -1278,6 +1278,8 @@ async fn run_client_loop(
     #[cfg(windows)]
     let _ = config.mouse_scroll_lines;
     let draw_host_cursor = attach_escape.is_none() && should_draw_host_cursor(config.host_cursor);
+    #[cfg(unix)]
+    let is_remote_client = is_remote_client_process();
 
     let mut state = ClientState {
         blit_encoder: render_ansi::BlitEncoder::new(),
@@ -1409,7 +1411,11 @@ async fn run_client_loop(
                     }
                     data
                 };
-                if should_bridge_clipboard_image_paste(&data, state.remote_image_paste_key) {
+                if should_bridge_clipboard_image_paste(
+                    &data,
+                    is_remote_client,
+                    state.remote_image_paste_key,
+                ) {
                     if let Some(image) = crate::platform::read_clipboard_image() {
                         if image.bytes.len() > MAX_CLIPBOARD_IMAGE_PAYLOAD {
                             warn!(
@@ -1761,10 +1767,11 @@ fn sound_from_notify_message(message: &str) -> Option<crate::sound::Sound> {
 #[cfg(unix)]
 fn should_bridge_clipboard_image_paste(
     data: &[u8],
+    is_remote_client: bool,
     remote_image_paste_key: Option<(crossterm::event::KeyCode, crossterm::event::KeyModifiers)>,
 ) -> bool {
     if data == b"\x1b[200~\x1b[201~" {
-        return true;
+        return is_remote_client;
     }
 
     let Some(remote_image_paste_key) = remote_image_paste_key else {
@@ -2080,21 +2087,37 @@ mod tests {
     #[test]
     fn clipboard_image_paste_bridge_triggers_on_configured_key_and_empty_paste() {
         let ctrl_v = crate::config::parse_key_combo("ctrl+v").unwrap();
-        assert!(should_bridge_clipboard_image_paste(&[0x16], Some(ctrl_v)));
+        assert!(should_bridge_clipboard_image_paste(
+            &[0x16],
+            true,
+            Some(ctrl_v)
+        ));
         assert!(should_bridge_clipboard_image_paste(
             b"\x1b[118;5u",
+            true,
             Some(ctrl_v)
         ));
         assert!(should_bridge_clipboard_image_paste(
             b"\x1b[200~\x1b[201~",
+            true,
             None
         ));
         assert!(!should_bridge_clipboard_image_paste(
-            b"\x1b[200~text\x1b[201~",
+            b"\x1b[200~\x1b[201~",
+            false,
             Some(ctrl_v)
         ));
-        assert!(!should_bridge_clipboard_image_paste(&[0x16], None));
-        assert!(!should_bridge_clipboard_image_paste(b"v", Some(ctrl_v)));
+        assert!(!should_bridge_clipboard_image_paste(
+            b"\x1b[200~text\x1b[201~",
+            true,
+            Some(ctrl_v)
+        ));
+        assert!(!should_bridge_clipboard_image_paste(&[0x16], true, None));
+        assert!(!should_bridge_clipboard_image_paste(
+            b"v",
+            true,
+            Some(ctrl_v)
+        ));
     }
 
     #[test]
