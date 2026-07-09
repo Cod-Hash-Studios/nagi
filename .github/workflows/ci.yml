@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  RUST_TOOLCHAIN_VERSION: 1.96.1
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -59,12 +62,17 @@ jobs:
 
       - name: Install Rust
         if: matrix.kind == 'unix'
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+          components: rustfmt,clippy
 
       - name: Install Rust
         if: matrix.kind == 'windows'
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # v1
         with:
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+          components: rustfmt,clippy
           targets: x86_64-pc-windows-msvc
 
       - name: Install Rust tools
