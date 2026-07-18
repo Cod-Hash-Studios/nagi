@@ -1,3 +1,8 @@
+#![allow(
+    dead_code,
+    reason = "the durable attention model is tested ahead of the public mission cockpit"
+)]
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
