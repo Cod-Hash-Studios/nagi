@@ -5,8 +5,8 @@ usage() {
   cat <<'USAGE'
 usage: scripts/seed_navigator_demo.sh [--allow-main]
 
-Seeds a running nagi server with navigator demo workspaces, tabs, panes,
-and fake agent states for recording the session navigator.
+Seeds a running nagi server with deterministic demo workspaces, tabs, panes,
+and simulated agent states for recording the agent cockpit.
 
 Environment:
   NAGI_NAV_SOCKET_PATH  API socket to target. Defaults to $HOME/.config/nagi-dev/nagi.sock.
@@ -158,7 +158,7 @@ for item in "${done_panes[@]}"; do
 done
 
 cat <<EOF
-Seeded navigator demo data via $NAGI_SOCKET_PATH
+Seeded agent cockpit demo data via $NAGI_SOCKET_PATH
 
 Workspaces:
   $API_WS api     agents: blocked codex, working claude, idle shell; logs: working deploy
@@ -166,5 +166,5 @@ Workspaces:
   $DOCS_WS docs   release: done codex, working codex
   $INFRA_WS infra ops: blocked hermes, idle ssh
 
-Test in navigator: / then b, w, i, d, a, or normal text.
+Open the cockpit with Ctrl+B, then G. Filter with b, w, i, d, a, or search with /.
 EOF

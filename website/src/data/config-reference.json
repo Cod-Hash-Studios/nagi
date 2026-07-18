@@ -269,7 +269,7 @@
           "key": "keys.goto",
           "type": "keybinding",
           "default": "\"prefix+g\"",
-          "description": "Open the session navigator."
+          "description": "Open the agent cockpit."
         },
         {
           "key": "keys.navigate_workspace_up",
