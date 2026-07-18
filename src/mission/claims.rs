@@ -62,10 +62,18 @@ pub struct WorktreeLease {
 
 impl WorktreeLease {
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "proof scope inspection is staged until public mission closure"
+    )]
     pub fn checkout_root(&self) -> &Path {
         &self.key.checkout_root
     }
 
+    #[allow(
+        dead_code,
+        reason = "proof scope inspection is staged until public mission closure"
+    )]
     pub(crate) fn matches_scope(
         &self,
         mission_id: &str,
@@ -187,6 +195,10 @@ impl WorktreeClaimRegistry {
         }
     }
 
+    #[allow(
+        dead_code,
+        reason = "lease inspection is staged until public mission closure"
+    )]
     pub(crate) fn is_current(&self, lease: &WorktreeLease) -> Result<bool, WorktreeClaimError> {
         let claims = self
             .inner
@@ -211,6 +223,10 @@ impl WorktreeClaimRegistry {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "lease ownership inspection is staged until the mission cockpit is public"
+    )]
     pub fn owner(&self, checkout_root: &Path) -> Option<LeaseOwner> {
         let checkout_root = std::fs::canonicalize(checkout_root).ok()?;
         let claims = self.inner.lock().ok()?;
