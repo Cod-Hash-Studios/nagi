@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::{agent_label, parse_agent_label, Agent};
 
 pub(crate) const MANIFEST_ENGINE_VERSION: u32 = 2;
-const DEFAULT_CATALOG_URL: &str = "https://github.com/Cod-Hash-Studios/nagi";
+const DEFAULT_CATALOG_URL: &str = "https://raw.githubusercontent.com/Cod-Hash-Studios/nagi/main/website/agent-detection/index.toml";
 const CATALOG_URL_ENV: &str = "NAGI_AGENT_DETECTION_MANIFEST_CATALOG_URL";
 const MAX_FETCH_BYTES: usize = 256 * 1024;
 
@@ -549,6 +549,22 @@ fn now_nanos() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_catalog_url_matches_the_versioned_nagi_catalog() {
+        assert_eq!(
+            DEFAULT_CATALOG_URL,
+            "https://raw.githubusercontent.com/Cod-Hash-Studios/nagi/main/website/agent-detection/index.toml"
+        );
+        let catalog = parse_catalog(include_str!("../../website/agent-detection/index.toml"))
+            .expect("checked-in Nagi manifest catalog should parse");
+        assert!(!catalog.is_empty());
+        assert_eq!(
+            join_url(&base_url(DEFAULT_CATALOG_URL).unwrap(), "codex.toml").unwrap(),
+            "https://raw.githubusercontent.com/Cod-Hash-Studios/nagi/main/website/agent-detection/codex.toml"
+        );
+    }
+
     fn remote_manifest(version: &str, contains: &str) -> String {
         format!(
             r#"
