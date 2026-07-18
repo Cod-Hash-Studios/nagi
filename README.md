@@ -86,7 +86,8 @@ variables. It does not reuse an existing Herdr session.
 
 ## Run the cockpit demo
 
-Build Nagi, then start an isolated development server:
+Build Nagi, make sure `jq` is installed, then start an isolated development
+server:
 
 ```bash
 cargo run -- server
