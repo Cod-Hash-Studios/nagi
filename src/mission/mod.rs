@@ -11,3 +11,6 @@ pub(crate) mod run_state;
 pub(crate) mod runtime;
 pub(crate) mod store;
 pub(crate) mod verifier;
+
+#[cfg(test)]
+mod tests;

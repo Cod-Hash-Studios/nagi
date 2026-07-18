@@ -1919,6 +1919,352 @@
           ],
           "type": "object"
         },
+        "MissionCheck": {
+          "oneOf": [
+            {
+              "properties": {
+                "args": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "covers": {
+                  "items": {
+                    "format": "uint",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "cwd": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "id": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "include_ignored": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "command",
+                  "type": "string"
+                },
+                "program": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "relevant_paths": {
+                  "items": {
+                    "$ref": "#/schemas/request/$defs/MissionPathRule"
+                  },
+                  "type": "array"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "required_artifacts": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "program",
+                "args",
+                "cwd",
+                "relevant_paths",
+                "required_artifacts",
+                "required",
+                "covers"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "allow_override": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "covers": {
+                  "items": {
+                    "format": "uint",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:-]+$",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "manual",
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "reviewers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "reviewers",
+                "required",
+                "covers"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "MissionConfigureParams": {
+          "properties": {
+            "checks": {
+              "items": {
+                "$ref": "#/schemas/request/$defs/MissionCheck"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mission_id",
+            "checks"
+          ],
+          "type": "object"
+        },
+        "MissionCreateParams": {
+          "properties": {
+            "acceptance_criteria": {
+              "items": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "type": "array"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "objective": {
+              "maxLength": 8192,
+              "minLength": 1,
+              "type": "string"
+            },
+            "repository_path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "mission_id",
+            "title",
+            "repository_path",
+            "objective",
+            "acceptance_criteria"
+          ],
+          "type": "object"
+        },
+        "MissionPathRule": {
+          "oneOf": [
+            {
+              "properties": {
+                "type": {
+                  "const": "all",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "exact",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "path"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "prefix": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "prefix",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "prefix"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "MissionProvider": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "open_code"
+          ],
+          "type": "string"
+        },
+        "MissionProviderMode": {
+          "enum": [
+            "managed",
+            "passthrough"
+          ],
+          "type": "string"
+        },
+        "MissionRespondParams": {
+          "additionalProperties": false,
+          "properties": {
+            "answers": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "attention_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "decision": {
+              "$ref": "#/schemas/request/$defs/MissionResponseDecision"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mission_id",
+            "run_id",
+            "attention_id",
+            "decision"
+          ],
+          "type": "object"
+        },
+        "MissionResponseDecision": {
+          "enum": [
+            "approve_once",
+            "approve_for_session",
+            "deny",
+            "answer"
+          ],
+          "type": "string"
+        },
+        "MissionStartParams": {
+          "additionalProperties": false,
+          "properties": {
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/schemas/request/$defs/MissionProviderMode"
+            },
+            "provider": {
+              "$ref": "#/schemas/request/$defs/MissionProvider"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "worktree_path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "mission_id",
+            "run_id",
+            "provider",
+            "mode"
+          ],
+          "type": "object"
+        },
+        "MissionTarget": {
+          "properties": {
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "mission_id"
+          ],
+          "type": "object"
+        },
         "NotificationShowParams": {
           "properties": {
             "body": {
@@ -4079,6 +4425,102 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/NotificationShowParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.create",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionCreateParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.list",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/EmptyParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.get",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.configure",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionConfigureParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.start",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionStartParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.respond",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionRespondParams"
             }
           },
           "required": [
@@ -6685,6 +7127,162 @@
             }
           ]
         },
+        "MissionInfo": {
+          "properties": {
+            "acceptance_criteria": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "check_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "closure_configured": {
+              "type": "boolean"
+            },
+            "mission_id": {
+              "type": "string"
+            },
+            "objective": {
+              "type": "string"
+            },
+            "repository_path": {
+              "type": "string"
+            },
+            "run": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/MissionRunInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "$ref": "#/schemas/success_response/$defs/MissionStatus"
+            },
+            "title": {
+              "type": "string"
+            },
+            "unresolved_attention_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "updated_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "mission_id",
+            "title",
+            "repository_path",
+            "objective",
+            "acceptance_criteria",
+            "closure_configured",
+            "check_count",
+            "status",
+            "unresolved_attention_count",
+            "updated_at_millis"
+          ],
+          "type": "object"
+        },
+        "MissionProvider": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "open_code"
+          ],
+          "type": "string"
+        },
+        "MissionProviderMode": {
+          "enum": [
+            "managed",
+            "passthrough"
+          ],
+          "type": "string"
+        },
+        "MissionRunInfo": {
+          "properties": {
+            "base_revision": {
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/schemas/success_response/$defs/MissionProviderMode"
+            },
+            "provider": {
+              "$ref": "#/schemas/success_response/$defs/MissionProvider"
+            },
+            "run_id": {
+              "type": "string"
+            },
+            "worktree_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id",
+            "provider",
+            "mode",
+            "worktree_path",
+            "base_revision"
+          ],
+          "type": "object"
+        },
+        "MissionStatus": {
+          "enum": [
+            "draft",
+            "preparing",
+            "active",
+            "review_required",
+            "ready_to_close",
+            "blocked",
+            "failed",
+            "archived"
+          ],
+          "type": "string"
+        },
+        "MissionSummary": {
+          "properties": {
+            "mission_id": {
+              "type": "string"
+            },
+            "repository_path": {
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/schemas/success_response/$defs/MissionStatus"
+            },
+            "title": {
+              "type": "string"
+            },
+            "unresolved_attention_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "updated_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "mission_id",
+            "title",
+            "repository_path",
+            "status",
+            "unresolved_attention_count",
+            "updated_at_millis"
+          ],
+          "type": "object"
+        },
         "NotificationShowReason": {
           "enum": [
             "shown",
@@ -8031,6 +8629,117 @@
               "required": [
                 "type",
                 "snapshot"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mission": {
+                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                },
+                "type": {
+                  "const": "mission_info",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mission"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "created": {
+                  "type": "boolean"
+                },
+                "mission": {
+                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                },
+                "type": {
+                  "const": "mission_created",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mission",
+                "created"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "configured": {
+                  "type": "boolean"
+                },
+                "mission": {
+                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                },
+                "type": {
+                  "const": "mission_configured",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mission",
+                "configured"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mission": {
+                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                },
+                "type": {
+                  "const": "mission_run_started",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mission"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "attention_id": {
+                  "type": "string"
+                },
+                "mission_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "mission_response_queued",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mission_id",
+                "attention_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "missions": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/MissionSummary"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "mission_list",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "missions"
               ],
               "type": "object"
             },

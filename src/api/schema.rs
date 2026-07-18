@@ -4,6 +4,7 @@ pub mod agents;
 pub mod common;
 pub mod events;
 pub mod integrations;
+pub mod missions;
 pub mod panes;
 pub mod plugins;
 pub mod response;
@@ -17,6 +18,7 @@ pub use agents::*;
 pub use common::*;
 pub use events::*;
 pub use integrations::*;
+pub use missions::*;
 pub use panes::*;
 pub use plugins::*;
 pub use response::*;
@@ -57,6 +59,18 @@ pub enum Method {
     ServerReloadAgentManifests(EmptyParams),
     #[serde(rename = "notification.show")]
     NotificationShow(NotificationShowParams),
+    #[serde(rename = "mission.create")]
+    MissionCreate(MissionCreateParams),
+    #[serde(rename = "mission.list")]
+    MissionList(EmptyParams),
+    #[serde(rename = "mission.get")]
+    MissionGet(MissionTarget),
+    #[serde(rename = "mission.configure")]
+    MissionConfigure(MissionConfigureParams),
+    #[serde(rename = "mission.start")]
+    MissionStart(MissionStartParams),
+    #[serde(rename = "mission.respond")]
+    MissionRespond(MissionRespondParams),
     #[serde(rename = "client.window_title.set")]
     ClientWindowTitleSet(ClientWindowTitleSetParams),
     #[serde(rename = "client.window_title.clear")]

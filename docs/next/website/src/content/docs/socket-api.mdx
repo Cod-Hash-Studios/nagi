@@ -41,6 +41,7 @@ The socket API can:
 - create, list, focus, rename, and close tabs
 - list, inspect, split, swap, focus, resize, rename, read, close, and send input to panes
 - list, inspect, read, send to, rename, focus, start, and attach agents through CLI helpers
+- create, configure, inspect, and start durable read-only missions
 - report custom agent state from hooks and plugins
 - subscribe to events and wait for output or state changes
 - install and uninstall built-in integrations
@@ -107,11 +108,235 @@ Raw socket method names use dot notation:
 | Popup | `popup.close` |
 | Layout | `layout.export`, `layout.apply`, `layout.set_split_ratio` |
 | Agent | `agent.list`, `agent.get`, `agent.read`, `agent.explain`, `agent.send`, `agent.rename`, `agent.focus`, `agent.start` |
+| Mission | `mission.create`, `mission.list`, `mission.get`, `mission.configure`, `mission.start`, `mission.respond` |
 | Events | `events.subscribe`, `events.wait` |
 | Integrations | `integration.install`, `integration.uninstall` |
 | Plugins | `plugin.link`, `plugin.list`, `plugin.unlink`, `plugin.enable`, `plugin.disable`, `plugin.action.list`, `plugin.action.invoke`, `plugin.log.list`, `plugin.pane.open`, `plugin.pane.focus`, `plugin.pane.close` |
 
 Some CLI commands are conveniences around these methods. For example, `herdr agent wait` resolves an agent target and then subscribes to pane agent state events.
+
+## Missions
+
+Missions are durable, server-owned task records. A mission binds an objective
+and acceptance criteria to one Git repository, an immutable closure plan, one
+run, and any unresolved attention items. Mission state survives a server
+restart.
+
+The raw API flow is:
+
+1. `mission.create` records the objective and acceptance criteria.
+2. `mission.configure` maps every acceptance criterion to required checks.
+3. `mission.start` claims a checkout and starts the managed provider.
+4. `mission.get` or `mission.list` observes the durable state.
+5. `mission.respond` is present but intentionally refuses public provider responses.
+
+### Create, list, and inspect
+
+`mission.create` requires:
+
+| Field | Contract |
+| --- | --- |
+| `mission_id` | 1-128 ASCII letters, digits, `_`, `.`, `:`, or `-`. |
+| `title` | 1-256 characters. |
+| `repository_path` | Absolute path to the root of an existing Git checkout. |
+| `objective` | 1-8192 characters. |
+| `acceptance_criteria` | 1-16 non-empty entries, each at most 1024 characters. Order is significant. |
+
+```json
+{
+  "id": "mission-create-1",
+  "method": "mission.create",
+  "params": {
+    "mission_id": "login-redirect",
+    "title": "Preserve the login redirect",
+    "repository_path": "/home/me/project",
+    "objective": "Return users to the page they requested after login.",
+    "acceptance_criteria": [
+      "The redirect integration test passes",
+      "An invalid redirect cannot leave the application origin"
+    ]
+  }
+}
+```
+
+The response has `type: "mission_created"`, a full `mission`, and `created`.
+Repeating the exact request is safe and returns `created: false`. Reusing the id
+with a different definition returns `mission_conflict`.
+
+`mission.list` takes `{}` and returns `type: "mission_list"`. Each summary
+contains `mission_id`, `title`, `repository_path`, `status`,
+`unresolved_attention_count`, and `updated_at_millis`; it deliberately omits
+the objective, criteria, and run details. Use `mission.get` for the full record:
+
+```json
+{"id":"mission-list-1","method":"mission.list","params":{}}
+{"id":"mission-get-1","method":"mission.get","params":{"mission_id":"login-redirect"}}
+```
+
+A full `MissionInfo` contains the definition plus `closure_configured`,
+`check_count`, `status`, optional `run`, `unresolved_attention_count`, and
+`updated_at_millis`. Status values are `draft`, `preparing`, `active`,
+`review_required`, `ready_to_close`, `blocked`, `failed`, and `archived`. When
+present, `run` contains `run_id`, `provider`, `mode`, `worktree_path`, and
+`base_revision`. Native provider session ids are intentionally not exposed.
+
+### Configure the closure plan
+
+`mission.configure` accepts 1-32 command or manual checks. `covers` contains
+zero-based indexes into the mission's `acceptance_criteria`. Check ids must be
+unique, at least one check must be required, and the required checks must
+collectively cover every criterion. Configure the plan before starting a run.
+
+```json
+{
+  "id": "mission-configure-1",
+  "method": "mission.configure",
+  "params": {
+    "mission_id": "login-redirect",
+    "checks": [
+      {
+        "kind": "command",
+        "id": "redirect-tests",
+        "program": "cargo",
+        "args": ["test", "redirect"],
+        "cwd": ".",
+        "relevant_paths": [
+          {"type": "prefix", "prefix": "src"},
+          {"type": "exact", "path": "tests/redirect.rs"}
+        ],
+        "required_artifacts": [],
+        "include_ignored": false,
+        "required": true,
+        "covers": [0, 1]
+      }
+    ]
+  }
+}
+```
+
+Command checks use an executable `program` and argv `args`, not a shell command
+string. `cwd`, artifact paths, and `exact`/`prefix` rules are relative to the
+claimed checkout and cannot be absolute or contain `..`. Path prefixes are
+component-aware: `src` matches `src/auth.rs`, not `src2/auth.rs`.
+`relevant_paths: []` and `{"type":"all"}` both select the whole checkout.
+Ignored files are excluded unless `include_ignored` is true. `required_artifacts`
+lists files that must be present in the verified workspace.
+
+A manual check has this shape:
+
+```json
+{
+  "kind": "manual",
+  "id": "security-review",
+  "reviewers": ["maintainer"],
+  "allow_override": false,
+  "required": true,
+  "covers": [1]
+}
+```
+
+Manual checks require at least one reviewer id. `allow_override` defaults to
+false. `include_ignored` and `allow_override` are the only optional check
+fields; send the other fields even when their arrays are empty.
+
+The response has `type: "mission_configured"`, a full `mission`, and
+`configured`. Repeating the same check set returns `configured: false`.
+Configuration is immutable: a different check set returns `mission_conflict`.
+
+### Start a read-only run
+
+```json
+{
+  "id": "mission-start-1",
+  "method": "mission.start",
+  "params": {
+    "mission_id": "login-redirect",
+    "run_id": "login-redirect-run-1",
+    "provider": "codex",
+    "mode": "managed",
+    "worktree_path": "/home/me/project-worktrees/login-redirect"
+  }
+}
+```
+
+`worktree_path` is optional and defaults to `repository_path`. It must identify
+a checkout of the mission repository. Herdr takes an exclusive mission lease
+for that checkout, so two mission writers cannot use it concurrently. The
+checkout's current Git `HEAD` becomes the run's immutable `base_revision`.
+
+Every socket API start is read-only. Codex uses its read-only sandbox. Claude
+Code uses a hermetic read-only provider profile: permission mode `plan`, safe
+mode, a strict empty MCP configuration, and only `Read`, `Glob`, `Grep`, and
+`AskUserQuestion` tools. This excludes write, shell, and externally configured
+MCP tools from that Claude process.
+
+`mission.start` has no write-consent boolean, token, or equivalent JSON field,
+and rejects unknown fields. The socket API cannot elevate a run to write
+access. A future write flow is reserved for direct interactive confirmation in
+the TUI mission cockpit; it is not a currently available public capability.
+Recovered runs also resume read-only.
+
+The current build supports `provider: "codex"` and `provider: "claude_code"`
+with `mode: "managed"`. The wire enum reserves `open_code`, and the mode enum
+reserves `passthrough`, but those combinations currently return an availability
+error. Do not use a reserved value as feature detection.
+
+The immediate response has `type: "mission_run_started"` and a full mission in
+`preparing` state. Provider readiness moves it to `active` asynchronously. A
+completed provider turn moves it to `review_required`, not directly to
+`ready_to_close`; provider self-reporting is not proof of acceptance.
+
+### Public responses require interactive consent
+
+`mission.respond` keeps a typed request shape in the socket schema:
+
+```json
+{
+  "id": "mission-respond-1",
+  "method": "mission.respond",
+  "params": {
+    "mission_id": "login-redirect",
+    "run_id": "login-redirect-run-1",
+    "attention_id": "attention:...",
+    "decision": "deny"
+  }
+}
+```
+
+For every well-formed public call, the server returns
+`interactive_consent_required`. It does not inspect the requested decision for
+authorization, record a response attempt, send a provider command, or resolve
+the attention item. `mission.list` and `mission.get` expose only the number of
+unresolved attention items, not provider prompts or response tokens.
+
+There is no socket API boolean, bearer token, or alternate JSON payload that
+can bypass this guard. Provider approvals and answers are reserved for a future
+interactive confirmation flow in the TUI mission cockpit; that flow is not a
+currently available public capability.
+
+### Mission errors
+
+In addition to `invalid_request` for malformed JSON or missing/wrongly typed
+fields, mission methods can return:
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_mission` | A mission id, text field, repository field, or criteria set is invalid. |
+| `invalid_repository` | The repository/worktree is unavailable, is not Git, or is not the required checkout root. |
+| `mission_not_found` | The target mission does not exist. |
+| `mission_conflict` | An idempotent create/configure call conflicts with the durable definition. |
+| `invalid_closure` | Checks are invalid, do not cover every criterion, or were not configured before start. |
+| `provider_unavailable` | The requested provider is unavailable. |
+| `provider_mode_unavailable` | The requested provider mode is not implemented. |
+| `run_conflict` | The run id is already active in the server. |
+| `invalid_run` | The run id cannot be used for its durable worktree claim. |
+| `provider_start_failed` | The provider process or its initial command could not start. |
+| `interactive_consent_required` | Public `mission.respond` is guarded and has produced no effect; an interactive cockpit confirmation would be required. |
+| `mission_runtime_error` | A durable state, ownership, worktree lease, or journal invariant rejected the operation. |
+
+Treat unknown codes as non-success and preserve the server's `message` for
+diagnostics. Do not retry `mission.respond` with invented consent fields or
+tokens; the public method is intentionally non-authorizing.
 
 `session.snapshot` returns a one-time bootstrap snapshot for clients that keep
 their own local runtime cache. The response includes version/protocol metadata,

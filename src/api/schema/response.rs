@@ -6,6 +6,7 @@ use super::events::EventEnvelope;
 use super::integrations::{
     IntegrationInstallResult, IntegrationTarget, IntegrationUninstallResult,
 };
+use super::missions::{MissionInfo, MissionSummary};
 use super::panes::{
     LayoutDescription, PaneEdgesResult, PaneFocusDirectionResult, PaneInfo, PaneLayoutSnapshot,
     PaneMoveResult, PaneNeighborResult, PaneProcessInfo, PaneReadResult, PaneResizeResult,
@@ -50,6 +51,27 @@ pub enum ResponseResult {
     },
     SessionSnapshot {
         snapshot: Box<SessionSnapshot>,
+    },
+    MissionInfo {
+        mission: MissionInfo,
+    },
+    MissionCreated {
+        mission: MissionInfo,
+        created: bool,
+    },
+    MissionConfigured {
+        mission: MissionInfo,
+        configured: bool,
+    },
+    MissionRunStarted {
+        mission: MissionInfo,
+    },
+    MissionResponseQueued {
+        mission_id: String,
+        attention_id: String,
+    },
+    MissionList {
+        missions: Vec<MissionSummary>,
     },
     WorkspaceInfo {
         workspace: WorkspaceInfo,

@@ -17,11 +17,11 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 #[cfg(unix)]
-const HANDOFF_VERSION: u32 = 1;
+const HANDOFF_VERSION: u32 = 2;
 #[cfg(unix)]
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(unix)]
-const OWNED_ACK_TIMEOUT: Duration = Duration::from_millis(500);
+const OWNED_ACK_TIMEOUT: Duration = READY_TIMEOUT;
 #[cfg(unix)]
 pub(crate) const MAX_FDS_PER_HANDOFF: usize = 64;
 #[cfg(unix)]
@@ -37,6 +37,7 @@ pub(crate) struct HandoffManifest {
     pub source_protocol: u32,
     pub expected_version: Option<String>,
     pub expected_protocol: Option<u32>,
+    pub mission_fence: crate::mission::store::HandoffFence,
     pub snapshot: crate::persist::SessionSnapshot,
     pub panes: Vec<crate::handoff_runtime::HandoffRuntimeState>,
 }
@@ -101,29 +102,27 @@ pub(crate) fn spawn_handoff_import(
 
 #[cfg(unix)]
 pub(crate) fn cleanup_failed_import_child(child: &mut Child) {
+    if let Err(err) = terminate_import_child(child) {
+        warn!(pid = child.id(), err = %err, "failed to terminate handoff import server during rollback");
+    }
+}
+
+#[cfg(unix)]
+pub(crate) fn terminate_import_child(child: &mut Child) -> io::Result<()> {
     let pid = child.id();
     match child.try_wait() {
         Ok(Some(status)) => {
             info!(pid, status = %status, "handoff import server exited during rollback");
-            return;
+            return Ok(());
         }
         Ok(None) => {}
-        Err(err) => {
-            warn!(pid, err = %err, "failed to inspect handoff import server before rollback");
-        }
+        Err(err) => return Err(err),
     }
 
-    if let Err(err) = child.kill() {
-        warn!(pid, err = %err, "failed to kill handoff import server during rollback");
-    }
-    match child.wait() {
-        Ok(status) => {
-            info!(pid, status = %status, "handoff import server reaped during rollback");
-        }
-        Err(err) => {
-            warn!(pid, err = %err, "failed to reap handoff import server during rollback");
-        }
-    }
+    child.kill()?;
+    let status = child.wait()?;
+    info!(pid, status = %status, "handoff import server reaped during rollback");
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -204,23 +203,16 @@ pub(crate) fn report_committed(stream: &mut UnixStream) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-pub(crate) fn wait_owned_ack(stream: &mut UnixStream) {
-    if let Err(err) = stream.set_read_timeout(Some(OWNED_ACK_TIMEOUT)) {
-        warn!(err = %err, "failed to set handoff ownership ack timeout");
-        return;
+pub(crate) fn wait_owned_ack(stream: &mut UnixStream) -> io::Result<()> {
+    stream.set_read_timeout(Some(OWNED_ACK_TIMEOUT))?;
+    let owned = read_line_unbuffered(&mut *stream)?;
+    if owned.trim_end() != "owned" {
+        return Err(io::Error::other(format!(
+            "handoff import sent unexpected ownership acknowledgement: {}",
+            owned.trim_end()
+        )));
     }
-    match read_line_unbuffered(&mut *stream) {
-        Ok(owned) if owned.trim_end() == "owned" => {}
-        Ok(other) => {
-            warn!(
-                response = %other.trim_end(),
-                "handoff import sent unexpected ownership ack after commit"
-            );
-        }
-        Err(err) => {
-            warn!(err = %err, "handoff import ownership ack was not received after commit");
-        }
-    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -302,6 +294,7 @@ pub(crate) fn report_owned(stream: &mut UnixStream) -> io::Result<()> {
 pub(crate) fn manifest_for(
     snapshot: crate::persist::SessionSnapshot,
     panes: Vec<crate::handoff_runtime::HandoffRuntimeState>,
+    mission_fence: crate::mission::store::HandoffFence,
     expected_protocol: Option<u32>,
     expected_version: Option<String>,
 ) -> HandoffManifest {
@@ -311,6 +304,7 @@ pub(crate) fn manifest_for(
         source_protocol: crate::protocol::PROTOCOL_VERSION,
         expected_version,
         expected_protocol,
+        mission_fence,
         snapshot,
         panes,
     }

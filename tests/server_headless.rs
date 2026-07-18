@@ -151,6 +151,19 @@ fn ping_socket(socket_path: &Path) -> String {
     response.trim().to_string()
 }
 
+fn api_request(socket_path: &Path, request: serde_json::Value) -> serde_json::Value {
+    let mut stream = UnixStream::connect(socket_path).expect("should connect to API socket");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    writeln!(stream, "{}", request).unwrap();
+
+    let mut reader = BufReader::new(stream);
+    let mut response = String::new();
+    reader.read_line(&mut response).unwrap();
+    serde_json::from_str(response.trim()).expect("API response should be JSON")
+}
+
 /// Sends a Hello message over the client socket and reads the Welcome response.
 /// Uses bincode v2 wire format: [u32LE length][bincode payload]
 /// bincode v2 standard config uses VarintEncoding:
@@ -432,6 +445,215 @@ fn server_api_responds_to_ping() {
     );
 
     cleanup_spawned_herdr(spawned, base);
+}
+
+#[test]
+fn mission_api_create_list_get_and_restart_round_trip() {
+    let _lock = test_lock();
+    let base = unique_test_dir();
+    let config_home = base.join("config");
+    let runtime_dir = base.join("runtime");
+    let api_socket = runtime_dir.join("herdr.sock");
+    let client_socket = runtime_dir.join("herdr-client.sock");
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .canonicalize()
+        .unwrap();
+
+    let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
+    wait_for_socket(&api_socket, Duration::from_secs(10));
+
+    let create = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-create-1",
+            "method": "mission.create",
+            "params": {
+                "mission_id": "mission-e2e-1",
+                "title": "Fix login redirect",
+                "repository_path": repository,
+                "objective": "Preserve the requested page after login",
+                "acceptance_criteria": ["Redirect integration test passes"]
+            }
+        }),
+    );
+    assert_eq!(create["result"]["type"], "mission_created");
+    assert_eq!(create["result"]["created"], true);
+    assert_eq!(create["result"]["mission"]["status"], "draft");
+
+    let duplicate = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-create-2",
+            "method": "mission.create",
+            "params": {
+                "mission_id": "mission-e2e-1",
+                "title": "Fix login redirect",
+                "repository_path": repository,
+                "objective": "Preserve the requested page after login",
+                "acceptance_criteria": ["Redirect integration test passes"]
+            }
+        }),
+    );
+    assert_eq!(duplicate["result"]["created"], false);
+
+    let invalid_closure = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-configure-invalid",
+            "method": "mission.configure",
+            "params": {
+                "mission_id": "mission-e2e-1",
+                "checks": [{
+                    "kind": "manual",
+                    "id": "unrelated-review",
+                    "reviewers": ["maintainer"],
+                    "required": true,
+                    "covers": []
+                }]
+            }
+        }),
+    );
+    assert_eq!(invalid_closure["error"]["code"], "invalid_closure");
+
+    let configure = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-configure-1",
+            "method": "mission.configure",
+            "params": {
+                "mission_id": "mission-e2e-1",
+                "checks": [{
+                    "kind": "command",
+                    "id": "redirect-test",
+                    "program": "true",
+                    "args": [],
+                    "cwd": ".",
+                    "relevant_paths": [{"type": "all"}],
+                    "required_artifacts": [],
+                    "required": true,
+                    "covers": [0]
+                }]
+            }
+        }),
+    );
+    assert_eq!(configure["result"]["type"], "mission_configured");
+    assert_eq!(configure["result"]["configured"], true);
+    assert_eq!(configure["result"]["mission"]["closure_configured"], true);
+    assert_eq!(configure["result"]["mission"]["check_count"], 1);
+
+    let configure_again = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-configure-2",
+            "method": "mission.configure",
+            "params": {
+                "mission_id": "mission-e2e-1",
+                "checks": [{
+                    "kind": "command",
+                    "id": "redirect-test",
+                    "program": "true",
+                    "args": [],
+                    "cwd": ".",
+                    "relevant_paths": [{"type": "all"}],
+                    "required_artifacts": [],
+                    "required": true,
+                    "covers": [0]
+                }]
+            }
+        }),
+    );
+    assert_eq!(configure_again["result"]["configured"], false);
+
+    let conflict = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-create-3",
+            "method": "mission.create",
+            "params": {
+                "mission_id": "mission-e2e-1",
+                "title": "A conflicting title",
+                "repository_path": repository,
+                "objective": "Preserve the requested page after login",
+                "acceptance_criteria": ["Redirect integration test passes"]
+            }
+        }),
+    );
+    assert_eq!(conflict["error"]["code"], "mission_conflict");
+
+    let invalid_repository = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-create-4",
+            "method": "mission.create",
+            "params": {
+                "mission_id": "mission-e2e-2",
+                "title": "Invalid repository",
+                "repository_path": base.join("missing-repository"),
+                "objective": "This cannot start",
+                "acceptance_criteria": ["Repository exists"]
+            }
+        }),
+    );
+    assert_eq!(invalid_repository["error"]["code"], "invalid_repository");
+
+    let invalid_mission = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-get-invalid",
+            "method": "mission.get",
+            "params": {"mission_id": "../escape"}
+        }),
+    );
+    assert_eq!(invalid_mission["error"]["code"], "invalid_mission");
+
+    let missing_mission = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-get-missing",
+            "method": "mission.get",
+            "params": {"mission_id": "mission-missing"}
+        }),
+    );
+    assert_eq!(missing_mission["error"]["code"], "mission_not_found");
+
+    let list = api_request(
+        &api_socket,
+        serde_json::json!({"id":"mission-list-1","method":"mission.list","params":{}}),
+    );
+    assert_eq!(list["result"]["type"], "mission_list");
+    assert_eq!(list["result"]["missions"].as_array().unwrap().len(), 1);
+    assert!(list["result"]["missions"][0].get("objective").is_none());
+
+    let get = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-get-1",
+            "method": "mission.get",
+            "params": {"mission_id": "mission-e2e-1"}
+        }),
+    );
+    assert_eq!(get["result"]["type"], "mission_info");
+    assert_eq!(
+        get["result"]["mission"]["objective"],
+        "Preserve the requested page after login"
+    );
+    assert_eq!(get["result"]["mission"]["closure_configured"], true);
+    assert_eq!(get["result"]["mission"]["check_count"], 1);
+
+    drop(spawned);
+    let restarted = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
+    wait_for_socket(&api_socket, Duration::from_secs(10));
+    let restored = api_request(
+        &api_socket,
+        serde_json::json!({
+            "id": "mission-get-2",
+            "method": "mission.get",
+            "params": {"mission_id": "mission-e2e-1"}
+        }),
+    );
+    assert_eq!(restored["result"]["mission"], get["result"]["mission"]);
+
+    cleanup_spawned_herdr(restarted, base);
 }
 
 #[test]

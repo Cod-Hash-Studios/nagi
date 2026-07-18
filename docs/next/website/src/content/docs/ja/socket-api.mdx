@@ -37,6 +37,7 @@ herdr api schema --output herdr-api.schema.json
 - タブの作成、一覧、フォーカス、名前変更、クローズ
 - ペインの一覧、調査、分割、入れ替え、フォーカス、リサイズ、名前変更、読み取り、クローズ、入力送信
 - CLI ヘルパーを通じたエージェントの一覧、調査、読み取り、送信、名前変更、フォーカス、起動、アタッチ
+- 永続ミッションの作成、設定、調査、および読み取り専用実行の開始
 - フックやプラグインからのカスタムエージェント状態の報告
 - イベントの購読と、出力や状態変化の待機
 - 組み込みインテグレーションのインストールとアンインストール
@@ -103,11 +104,209 @@ herdr pane read w1:p2 --source recent --lines 50
 | ポップアップ | `popup.close` |
 | レイアウト | `layout.export`、`layout.apply`、`layout.set_split_ratio` |
 | エージェント | `agent.list`、`agent.get`、`agent.read`、`agent.explain`、`agent.send`、`agent.rename`、`agent.focus`、`agent.start` |
+| ミッション | `mission.create`、`mission.list`、`mission.get`、`mission.configure`、`mission.start`、`mission.respond` |
 | イベント | `events.subscribe`、`events.wait` |
 | インテグレーション | `integration.install`、`integration.uninstall` |
 | プラグイン | `plugin.link`、`plugin.list`、`plugin.unlink`、`plugin.enable`、`plugin.disable`、`plugin.action.list`、`plugin.action.invoke`、`plugin.log.list`、`plugin.pane.open`、`plugin.pane.focus`、`plugin.pane.close` |
 
 一部の CLI コマンドは、これらのメソッドの便利ラッパーです。たとえば `herdr agent wait` は、エージェントターゲットを解決してからペインのエージェント状態イベントを購読します。
+
+## ミッション
+
+ミッションは、サーバーが所有する永続的なタスクレコードです。1 つの Git
+リポジトリに、目的、受け入れ条件、変更不能な完了プラン、1 つの実行、未解決の要対応項目を関連付けます。ミッションの状態はサーバー再起動後も残ります。
+
+生の API での流れは次のとおりです:
+
+1. `mission.create` で目的と受け入れ条件を記録します。
+2. `mission.configure` で各受け入れ条件を必須チェックに対応付けます。
+3. `mission.start` でチェックアウトを確保し、管理対象プロバイダーを開始します。
+4. `mission.get` または `mission.list` で永続状態を確認します。
+5. `mission.respond` は存在しますが、公開 API からのプロバイダー応答を意図的に拒否します。
+
+### 作成、一覧、調査
+
+`mission.create` の必須フィールド:
+
+| フィールド | 契約 |
+| --- | --- |
+| `mission_id` | 1-128 文字の ASCII 英数字、`_`、`.`、`:`, `-`。 |
+| `title` | 1-256 文字。 |
+| `repository_path` | 既存の Git チェックアウトのルートを示す絶対パス。 |
+| `objective` | 1-8192 文字。 |
+| `acceptance_criteria` | 1-16 個の空でない項目。各項目は最大 1024 文字。順序には意味があります。 |
+
+```json
+{
+  "id": "mission-create-1",
+  "method": "mission.create",
+  "params": {
+    "mission_id": "login-redirect",
+    "title": "ログイン後のリダイレクトを保持する",
+    "repository_path": "/home/me/project",
+    "objective": "ログイン後、ユーザーを最初に要求したページへ戻す。",
+    "acceptance_criteria": [
+      "リダイレクトの統合テストが成功する",
+      "不正なリダイレクトでアプリケーションのオリジン外へ移動できない"
+    ]
+  }
+}
+```
+
+レスポンスには `type: "mission_created"`、完全な `mission`、`created`
+が含まれます。同じリクエストの繰り返しは安全で、`created: false`
+を返します。同じ id を別の定義で再利用すると `mission_conflict` になります。
+
+`mission.list` は `{}` を受け取り、`type: "mission_list"` を返します。各概要には
+`mission_id`、`title`、`repository_path`、`status`、
+`unresolved_attention_count`、`updated_at_millis` が含まれ、目的、条件、実行詳細は意図的に含まれません。完全なレコードには `mission.get` を使います:
+
+```json
+{"id":"mission-list-1","method":"mission.list","params":{}}
+{"id":"mission-get-1","method":"mission.get","params":{"mission_id":"login-redirect"}}
+```
+
+完全な `MissionInfo` には定義に加え、`closure_configured`、`check_count`、
+`status`、省略可能な `run`、`unresolved_attention_count`、
+`updated_at_millis` が含まれます。状態値は `draft`、`preparing`、`active`、
+`review_required`、`ready_to_close`、`blocked`、`failed`、`archived` です。
+存在する場合、`run` には `run_id`、`provider`、`mode`、`worktree_path`、
+`base_revision` が含まれます。プロバイダー固有のセッション id は意図的に公開されません。
+
+### 完了プランを設定する
+
+`mission.configure` は 1-32 個のコマンドチェックまたは手動チェックを受け取ります。
+`covers` はミッションの `acceptance_criteria` に対するゼロ始まりのインデックスです。
+チェック id は一意で、少なくとも 1 つの必須チェックが必要です。また、必須チェック全体ですべての条件をカバーしなければなりません。実行開始前にプランを設定してください。
+
+```json
+{
+  "id": "mission-configure-1",
+  "method": "mission.configure",
+  "params": {
+    "mission_id": "login-redirect",
+    "checks": [
+      {
+        "kind": "command",
+        "id": "redirect-tests",
+        "program": "cargo",
+        "args": ["test", "redirect"],
+        "cwd": ".",
+        "relevant_paths": [
+          {"type": "prefix", "prefix": "src"},
+          {"type": "exact", "path": "tests/redirect.rs"}
+        ],
+        "required_artifacts": [],
+        "include_ignored": false,
+        "required": true,
+        "covers": [0, 1]
+      }
+    ]
+  }
+}
+```
+
+コマンドチェックは、シェルコマンド文字列ではなく、実行ファイル `program` と argv
+`args` を使います。`cwd`、成果物パス、`exact`/`prefix` ルールは確保したチェックアウトからの相対パスで、絶対パスや `..` は使用できません。パス接頭辞はコンポーネント単位です。`src` は `src/auth.rs` に一致しますが、`src2/auth.rs` には一致しません。
+`relevant_paths: []` と `{"type":"all"}` はどちらもチェックアウト全体を選択します。
+無視対象ファイルは `include_ignored` が true の場合のみ含まれます。
+`required_artifacts` は検証済みワークスペースに存在すべきファイルの一覧です。
+
+手動チェックは次の形式です:
+
+```json
+{
+  "kind": "manual",
+  "id": "security-review",
+  "reviewers": ["maintainer"],
+  "allow_override": false,
+  "required": true,
+  "covers": [1]
+}
+```
+
+手動チェックには 1 つ以上の reviewer id が必要です。`allow_override` の既定値は
+false です。チェックフィールドのうち省略できるのは `include_ignored` と
+`allow_override` だけです。それ以外のフィールドは、配列が空でも送信してください。
+
+レスポンスには `type: "mission_configured"`、完全な `mission`、`configured`
+が含まれます。同じチェック集合を繰り返すと `configured: false` を返します。
+設定は変更不能です。異なるチェック集合は `mission_conflict` になります。
+
+### 読み取り専用実行を開始する
+
+```json
+{
+  "id": "mission-start-1",
+  "method": "mission.start",
+  "params": {
+    "mission_id": "login-redirect",
+    "run_id": "login-redirect-run-1",
+    "provider": "codex",
+    "mode": "managed",
+    "worktree_path": "/home/me/project-worktrees/login-redirect"
+  }
+}
+```
+
+`worktree_path` は省略可能で、既定値は `repository_path` です。ミッションのリポジトリに属するチェックアウトを指定する必要があります。Herdr はそのチェックアウトに排他的なミッションリースを取得するため、2 つのミッションライターが同時に利用することはできません。チェックアウトの現在の Git `HEAD` が、実行の変更不能な `base_revision` になります。
+
+ソケット API から開始する実行は常に読み取り専用です。Codex は読み取り専用サンドボックスを使います。Claude Code は、permission mode `plan`、safe mode、厳格な空の MCP 設定、および `Read`、`Glob`、`Grep`、`AskUserQuestion` だけを許可した、閉じた読み取り専用プロファイルを使います。この Claude プロセスでは、書き込み、シェル、外部設定の MCP ツールを使用できません。
+
+`mission.start` には書き込み同意を表す bool、トークン、または同等の JSON
+フィールドはなく、未知のフィールドは拒否されます。ソケット API から実行を書き込み権限へ昇格することはできません。将来の書き込みフローは TUI ミッションコックピットでの直接かつ対話的な確認だけに予約されており、現在利用できる公開機能ではありません。復旧した実行も読み取り専用で再開します。
+
+現在のビルドは、`provider: "codex"` と `provider: "claude_code"` を
+`mode: "managed"` でサポートします。ワイヤー enum の `open_code` とモード enum
+の `passthrough` は予約されていますが、現在これらの組み合わせは利用不可エラーを返します。予約値を機能検出に使用しないでください。
+
+即時レスポンスには `type: "mission_run_started"` と `preparing` 状態の完全なミッションが含まれます。プロバイダーが準備完了になると、非同期に `active` へ移ります。プロバイダーのターン完了時は、直接 `ready_to_close` ではなく `review_required` へ移ります。プロバイダー自身の報告は、受け入れの証明ではありません。
+
+### 公開レスポンスには対話的な同意が必要
+
+`mission.respond` はソケットスキーマに型付きのリクエスト形式を残しています:
+
+```json
+{
+  "id": "mission-respond-1",
+  "method": "mission.respond",
+  "params": {
+    "mission_id": "login-redirect",
+    "run_id": "login-redirect-run-1",
+    "attention_id": "attention:...",
+    "decision": "deny"
+  }
+}
+```
+
+正しい形式の公開呼び出しは、すべて `interactive_consent_required` を返します。
+サーバーは要求された判断を認可には使わず、応答試行の記録、プロバイダーコマンドの送信、要対応項目の解決を一切行いません。`mission.list` と `mission.get` は未解決の要対応項目数だけを公開し、プロバイダーのプロンプトやレスポンストークンは公開しません。
+
+このガードを回避できるソケット API の bool、bearer token、代替 JSON
+ペイロードはありません。プロバイダーの承認と回答は、将来の TUI ミッションコックピットにおける対話的な確認フローだけに予約されており、現在利用できる公開機能ではありません。
+
+### ミッションエラー
+
+不正な JSON、欠落フィールド、型が違うフィールドに対する `invalid_request`
+に加え、ミッションメソッドは次のコードを返すことがあります:
+
+| コード | 意味 |
+| --- | --- |
+| `invalid_mission` | ミッション id、テキスト、リポジトリフィールド、または条件集合が不正。 |
+| `invalid_repository` | リポジトリ/worktree が利用不可、Git ではない、または必要なチェックアウトルートではない。 |
+| `mission_not_found` | 対象ミッションが存在しない。 |
+| `mission_conflict` | 冪等な create/configure 呼び出しが永続定義と競合した。 |
+| `invalid_closure` | チェックが不正、全条件をカバーしない、または開始前に設定されていない。 |
+| `provider_unavailable` | 指定プロバイダーが利用できない。 |
+| `provider_mode_unavailable` | 指定プロバイダーモードが未実装。 |
+| `run_conflict` | 実行 id がサーバー上ですでにアクティブ。 |
+| `invalid_run` | 実行 id を永続 worktree claim に使用できない。 |
+| `provider_start_failed` | プロバイダープロセスまたは初期コマンドを開始できなかった。 |
+| `interactive_consent_required` | 公開 `mission.respond` はガードされており、何も変更していない。対話的なコックピット確認が必要。 |
+| `mission_runtime_error` | 永続状態、所有権、worktree リース、またはジャーナルの不変条件が操作を拒否した。 |
+
+未知のコードは非成功として扱い、診断用にサーバーの `message` を保持してください。
+独自の同意フィールドやトークンを付けて `mission.respond` を再試行しないでください。公開メソッドは意図的に認可を行いません。
 
 `session.snapshot` は、独自のローカルランタイムキャッシュを持つクライアント向けに、一度限りのブートストラップスナップショットを返します。レスポンスには、バージョン/プロトコルメタデータ、フォーカス中のワークスペース/タブ/ペイン id、ワークスペース、タブ、ペイン、タブレイアウト、エージェントの各レコードが含まれます。これは購読ではありません。取得後はリソースイベントを購読し、そのイベントでローカルキャッシュを更新してください。再接続後やキャッシュが古い可能性がある場合は、`session.snapshot` を再度呼び出します。ワークスペースレコードには、関連付けられた worktree の出自情報も含まれます。リポジトリ全体の worktree 検出には引き続き `worktree.list` を使います。
 
