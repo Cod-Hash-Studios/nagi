@@ -74,6 +74,7 @@ mod kitty_graphics;
 mod layout;
 mod logging;
 mod metadata_tokens;
+mod mission;
 mod pane;
 mod persist;
 mod platform;
