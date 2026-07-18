@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://herdr.dev/sitemap-index.xml
+Sitemap: https://cod-hash-studios.github.io/nagi/sitemap-index.xml

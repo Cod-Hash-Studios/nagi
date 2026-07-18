@@ -1,9 +1,9 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-const repoBlob = 'https://github.com/ogulcancelik/herdr/blob/master/';
+const repoBlob = 'https://github.com/Cod-Hash-Studios/nagi/blob/main/';
 
-function rewriteHerdrLinks() {
+function rewriteNagiLinks() {
   const docsLinks = new Map([
     ['README.md', '/docs/'],
     ['./README.md', '/docs/'],
@@ -48,16 +48,16 @@ function walk(node, visitor) {
 }
 
 export default defineConfig({
-  site: 'https://herdr.dev',
+  site: 'https://cod-hash-studios.github.io/nagi',
   redirects: {
     '/ja': '/ja/docs/',
     '/zh-cn': '/zh-cn/docs/',
   },
   integrations: [
     starlight({
-      title: 'herdr',
+      title: 'nagi',
       description: 'Terminal-native agent runtime and multiplexer.',
-      favicon: '/assets/favicon.png?v=14',
+      favicon: '/assets/favicon.svg',
       defaultLocale: 'root',
       locales: {
         root: { label: 'English', lang: 'en' },
@@ -68,7 +68,7 @@ export default defineConfig({
         {
           icon: 'github',
           label: 'GitHub',
-          href: 'https://github.com/ogulcancelik/herdr',
+          href: 'https://github.com/Cod-Hash-Studios/nagi',
         },
       ],
       components: {
@@ -87,7 +87,7 @@ export default defineConfig({
           tag: 'script',
           content: `(function () {
   try {
-    var KEY = 'herdr-docs-lang';
+    var KEY = 'nagi-docs-lang';
     var path = location.pathname;
     var m = path.match(/^\\/(ja|zh-cn)(?=\\/|$)/);
     var current = m ? m[1] : path.indexOf('/docs') === 0 ? 'en' : null;
@@ -113,7 +113,7 @@ export default defineConfig({
         },
         {
           tag: 'meta',
-          attrs: { property: 'og:image', content: 'https://herdr.dev/assets/og-card-v8.png' },
+          attrs: { property: 'og:image', content: 'https://cod-hash-studios.github.io/nagi/assets/nagi-hero.png' },
         },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
         { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
@@ -121,23 +121,23 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image:alt',
-            content: 'Herdr documentation — One terminal. The whole herd.',
+            content: 'Nagi documentation — One terminal. The whole herd.',
           },
         },
         {
           tag: 'meta',
-          attrs: { name: 'twitter:image', content: 'https://herdr.dev/assets/og-card-v8.png' },
+          attrs: { name: 'twitter:image', content: 'https://cod-hash-studios.github.io/nagi/assets/nagi-hero.png' },
         },
         {
           tag: 'meta',
           attrs: {
             name: 'twitter:image:alt',
-            content: 'Herdr documentation — One terminal. The whole herd.',
+            content: 'Nagi documentation — One terminal. The whole herd.',
           },
         },
       ],
       editLink: {
-        baseUrl: 'https://github.com/ogulcancelik/herdr/edit/master/',
+        baseUrl: 'https://github.com/Cod-Hash-Studios/nagi/edit/main/',
       },
       lastUpdated: true,
       disable404Route: true,
@@ -154,10 +154,10 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Using Herdr',
-          translations: { ja: 'Herdr を使う', 'zh-CN': '使用 Herdr' },
+          label: 'Using Nagi',
+          translations: { ja: 'Nagi を使う', 'zh-CN': '使用 Nagi' },
           items: [
-            { label: 'How to work with Herdr', translations: { ja: 'Herdr での作業の進め方', 'zh-CN': '使用 Herdr 的工作方式' }, slug: 'docs/how-to-work' },
+            { label: 'How to work with Nagi', translations: { ja: 'Nagi での作業の進め方', 'zh-CN': '使用 Nagi 的工作方式' }, slug: 'docs/how-to-work' },
             { label: 'Agents', translations: { ja: 'エージェント', 'zh-CN': '智能体' }, slug: 'docs/agents' },
             { label: 'Session state and restore', translations: { ja: 'セッション状態と復元', 'zh-CN': '会话状态与恢复' }, slug: 'docs/session-state' },
             { label: 'Persistence and remote access', translations: { ja: '永続化とリモートアクセス', 'zh-CN': '持久化与远程访问' }, slug: 'docs/persistence-remote' },
@@ -196,6 +196,6 @@ export default defineConfig({
     }),
   ],
   markdown: {
-    remarkPlugins: [rewriteHerdrLinks],
+    remarkPlugins: [rewriteNagiLinks],
   },
 });
