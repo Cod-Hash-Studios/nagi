@@ -41,7 +41,7 @@ impl Default for UpdateConfig {
         Self {
             channel: default_update_channel(),
             version_check: true,
-            manifest_check: true,
+            manifest_check: false,
         }
     }
 }
@@ -1107,7 +1107,7 @@ mod tests {
         let default_config = Config::default();
         assert_eq!(default_config.update.channel, default_update_channel());
         assert!(default_config.update.version_check);
-        assert!(default_config.update.manifest_check);
+        assert!(!default_config.update.manifest_check);
 
         let toml = r#"
 [update]
