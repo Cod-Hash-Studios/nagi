@@ -2723,8 +2723,8 @@ impl HeadlessServer {
                         crate::mission::store::ResponseFailureCode::TransportClosed,
                         at_millis,
                     );
-                    self.release_managed_run(&run_id);
                 }
+                self.release_managed_run(&run_id);
                 changed
             }
             ProviderEvent::TransportFailed { run_id, .. } | ProviderEvent::Stopped { run_id } => {
@@ -10748,6 +10748,128 @@ next_tab = ""
                 .is_err(),
             "unknown delivery must require reconciliation, never automatic retry"
         );
+    }
+
+    #[test]
+    fn completed_managed_run_releases_its_checkout_for_the_next_mission() {
+        use crate::{
+            managed_provider::{
+                ManagedProviderHandle, ProviderCommand, ProviderEvent, TurnOutcome,
+            },
+            mission::{
+                claims::ClaimRequestId,
+                model::{MissionStatus, ProviderKind, ProviderMode},
+                runtime::{CreateMission, StartRun},
+            },
+        };
+
+        fn git(repo: &std::path::Path, args: &[&str]) {
+            let status = std::process::Command::new("git")
+                .args(args)
+                .current_dir(repo)
+                .status()
+                .expect("run git fixture command");
+            assert!(status.success(), "git fixture command failed: {args:?}");
+        }
+
+        let repository = tempfile::tempdir().unwrap();
+        git(repository.path(), &["init", "-q"]);
+        git(repository.path(), &["config", "user.name", "Test User"]);
+        git(
+            repository.path(),
+            &["config", "user.email", "test@example.invalid"],
+        );
+        std::fs::write(repository.path().join("README.md"), "fixture\n").unwrap();
+        git(repository.path(), &["add", "README.md"]);
+        git(repository.path(), &["commit", "-qm", "fixture"]);
+
+        let mut server = test_headless_server();
+        server
+            .mission_runtime
+            .create_mission(CreateMission {
+                mission_id: "mission-completed".into(),
+                title: "Finish cleanly".into(),
+                repository_path: repository.path().to_string_lossy().into_owned(),
+                objective: "Release the checkout after review begins".into(),
+                acceptance_criteria: vec!["Another mission can use the checkout".into()],
+                at_millis: 1,
+            })
+            .unwrap();
+        configure_test_mission(&mut server.mission_runtime, "mission-completed", 1);
+        let started = server
+            .mission_runtime
+            .start_run(StartRun {
+                mission_id: "mission-completed".into(),
+                run_id: "run-completed".into(),
+                provider: ProviderKind::Codex,
+                mode: ProviderMode::Managed,
+                worktree_path: repository.path().to_string_lossy().into_owned(),
+                request_id: ClaimRequestId::new("request-completed").unwrap(),
+                at_millis: 2,
+            })
+            .unwrap();
+        server
+            .mission_runtime
+            .bind_provider_session("mission-completed", "run-completed", "session-completed", 3)
+            .unwrap();
+        let (handle, mut commands) = ManagedProviderHandle::for_test(1);
+        server.managed_runs.insert(
+            "run-completed".into(),
+            ManagedRun {
+                mission_id: "mission-completed".into(),
+                provider: ProviderKind::Codex,
+                recovered: false,
+                handle,
+                lease: started.lease,
+                responses: HashMap::new(),
+                inflight_responses: HashMap::new(),
+            },
+        );
+
+        assert!(server.handle_provider_event(ProviderEvent::TurnCompleted {
+            run_id: "run-completed".into(),
+            turn_id: "turn-completed".into(),
+            outcome: TurnOutcome::Completed,
+        }));
+        assert_eq!(
+            server
+                .mission_runtime
+                .mission("mission-completed")
+                .unwrap()
+                .status,
+            MissionStatus::ReviewRequired
+        );
+        assert!(!server.managed_runs.contains_key("run-completed"));
+        assert_eq!(commands.try_recv().unwrap(), ProviderCommand::Shutdown);
+
+        server
+            .mission_runtime
+            .create_mission(CreateMission {
+                mission_id: "mission-next".into(),
+                title: "Use the released checkout".into(),
+                repository_path: repository.path().to_string_lossy().into_owned(),
+                objective: "Prove the previous lease was released".into(),
+                acceptance_criteria: vec!["The next run starts".into()],
+                at_millis: 5,
+            })
+            .unwrap();
+        configure_test_mission(&mut server.mission_runtime, "mission-next", 5);
+        let next = server
+            .mission_runtime
+            .start_run(StartRun {
+                mission_id: "mission-next".into(),
+                run_id: "run-next".into(),
+                provider: ProviderKind::ClaudeCode,
+                mode: ProviderMode::Managed,
+                worktree_path: repository.path().to_string_lossy().into_owned(),
+                request_id: ClaimRequestId::new("request-next").unwrap(),
+                at_millis: 6,
+            })
+            .expect("completed runs must release their checkout lease");
+        server
+            .mission_runtime
+            .release_worktree(&next.lease)
+            .unwrap();
     }
 
     #[cfg(unix)]
