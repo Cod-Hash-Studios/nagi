@@ -15,10 +15,13 @@ use super::{
     model::{MissionDefinition, MissionStatus, ProviderKind, ProviderMode},
     proof::ClosurePlan,
     store::{
-        CommitOutcome, HandoffFence, MissionStore, MissionStoreError, MissionStoreReader,
-        MissionView, PersistableMissionEvent, PreparedMissionStore, ReleasedMissionStore,
+        CommitOutcome, MissionStore, MissionStoreError, MissionStoreReader, MissionView,
+        PersistableMissionEvent, PreparedMissionStore, ReleasedMissionStore,
     },
 };
+
+#[cfg(unix)]
+use super::store::HandoffFence;
 
 #[cfg(test)]
 use super::{
