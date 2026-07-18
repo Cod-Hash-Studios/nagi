@@ -1,10 +1,10 @@
-Herdr is dual-licensed:
+Nagi is licensed under the GNU Affero General Public License v3.0 or later
+(AGPL-3.0-or-later). See the full text below.
 
-1. Open source: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
-   See the full text below.
-
-2. Commercial: commercial licenses are available for organizations that cannot comply
-   with AGPL. Contact hey@herdr.dev for details.
+Nagi is an independent derivative of Herdr. The upstream copyright holder may
+offer separate terms for upstream code, but no commercial license for Nagi is
+granted by this repository. Provenance and attribution are documented in
+FORK.md.
 
 --------------------------------------------------------------------------------
 
