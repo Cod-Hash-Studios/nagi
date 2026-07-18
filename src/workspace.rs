@@ -156,7 +156,7 @@ pub struct Workspace {
     pub(crate) cached_git_ahead_behind: Option<(usize, usize)>,
     /// Cached derived Git repo metadata for worktree actions and status display.
     pub(crate) cached_git_space: Option<GitSpaceMetadata>,
-    /// Explicit Herdr-managed worktree grouping provenance.
+    /// Explicit Nagi-managed worktree grouping provenance.
     pub worktree_space: Option<WorktreeSpaceMembership>,
     pub(crate) metadata_tokens: crate::metadata_tokens::MetadataTokens,
     pub(crate) metadata_token_sequences: HashMap<String, u64>,
@@ -1581,14 +1581,14 @@ mod tests {
         let mut terminals = HashMap::new();
         terminals.insert(
             terminal_id.clone(),
-            TerminalState::new(terminal_id, PathBuf::from("/herdr-test/pion")),
+            TerminalState::new(terminal_id, PathBuf::from("/nagi-test/pion")),
         );
         let terminal_runtimes = TerminalRuntimeRegistry::new();
 
         assert_eq!(ws.display_name_from(&terminals, &terminal_runtimes), "pion");
         assert_eq!(
             ws.resolved_identity_cwd_from(&terminals, &terminal_runtimes),
-            Some(PathBuf::from("/herdr-test/pion"))
+            Some(PathBuf::from("/nagi-test/pion"))
         );
     }
 

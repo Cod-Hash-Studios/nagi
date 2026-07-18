@@ -26,7 +26,7 @@ pub(super) fn run_server_command(args: &[String]) -> std::io::Result<Option<i32>
 
 fn server_stop(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr server stop");
+        eprintln!("usage: nagi server stop");
         return Ok(2);
     }
 
@@ -41,7 +41,7 @@ fn server_stop(args: &[String]) -> std::io::Result<i32> {
 
 fn server_reload_config(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr server reload-config");
+        eprintln!("usage: nagi server reload-config");
         return Ok(2);
     }
 
@@ -56,7 +56,7 @@ fn server_agent_manifests(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--json" => true,
         _ => {
-            eprintln!("usage: herdr server agent-manifests [--json]");
+            eprintln!("usage: nagi server agent-manifests [--json]");
             return Ok(2);
         }
     };
@@ -75,7 +75,7 @@ fn server_agent_manifests(args: &[String]) -> std::io::Result<i32> {
 
 fn server_reload_agent_manifests(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr server reload-agent-manifests");
+        eprintln!("usage: nagi server reload-agent-manifests");
         return Ok(2);
     }
 
@@ -90,7 +90,7 @@ fn server_update_agent_manifests(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--json" => true,
         _ => {
-            eprintln!("usage: herdr server update-agent-manifests [--json]");
+            eprintln!("usage: nagi server update-agent-manifests [--json]");
             return Ok(2);
         }
     };
@@ -196,7 +196,7 @@ fn print_agent_manifest_status(response: &serde_json::Value) {
 fn server_live_handoff(args: &[String]) -> std::io::Result<i32> {
     let Some(params) = parse_live_handoff_params(args) else {
         eprintln!(
-            "usage: herdr server live-handoff [--import-exe <path>] [--expected-protocol <n>] [--expected-version <version>]"
+            "usage: nagi server live-handoff [--import-exe <path>] [--expected-protocol <n>] [--expected-version <version>]"
         );
         return Ok(2);
     };
@@ -217,9 +217,7 @@ fn server_live_handoff(args: &[String]) -> std::io::Result<i32> {
 
     eprintln!(
         "live handoff complete; server log: {}",
-        crate::session::data_dir()
-            .join("herdr-server.log")
-            .display()
+        crate::session::data_dir().join("nagi-server.log").display()
     );
     Ok(0)
 }
@@ -251,14 +249,16 @@ fn parse_live_handoff_params(args: &[String]) -> Option<ServerLiveHandoffParams>
 }
 
 fn print_server_help() {
-    eprintln!("herdr server commands:");
-    eprintln!("  herdr server                run as headless server");
-    eprintln!("  herdr server stop           stop the running server via the API socket");
-    eprintln!("  herdr server live-handoff   hand off live panes to a new local server");
-    eprintln!("  herdr server reload-config  reload config.toml in the running server");
-    eprintln!("  herdr server agent-manifests [--json]  show agent detection manifest status");
-    eprintln!("  herdr server update-agent-manifests [--json]  fetch and reload agent detection manifests");
-    eprintln!("  herdr server reload-agent-manifests  reload agent detection manifests in the running server");
+    eprintln!("nagi server commands:");
+    eprintln!("  nagi server                run as headless server");
+    eprintln!("  nagi server stop           stop the running server via the API socket");
+    eprintln!("  nagi server live-handoff   hand off live panes to a new local server");
+    eprintln!("  nagi server reload-config  reload config.toml in the running server");
+    eprintln!("  nagi server agent-manifests [--json]  show agent detection manifest status");
+    eprintln!(
+        "  nagi server update-agent-manifests [--json]  fetch and reload agent detection manifests"
+    );
+    eprintln!("  nagi server reload-agent-manifests  reload agent detection manifests in the running server");
 }
 
 #[cfg(test)]
@@ -347,7 +347,7 @@ mod tests {
     fn live_handoff_params_parse_remote_update_fields() {
         let args = vec![
             "--import-exe".to_string(),
-            "/home/me/.local/bin/herdr".to_string(),
+            "/home/me/.local/bin/nagi".to_string(),
             "--expected-protocol=9".to_string(),
             "--expected-version".to_string(),
             "0.6.2".to_string(),
@@ -357,7 +357,7 @@ mod tests {
 
         assert_eq!(
             params.import_exe.as_deref(),
-            Some("/home/me/.local/bin/herdr")
+            Some("/home/me/.local/bin/nagi")
         );
         assert_eq!(params.expected_protocol, Some(9));
         assert_eq!(params.expected_version.as_deref(), Some("0.6.2"));

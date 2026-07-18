@@ -980,10 +980,10 @@ mod tests {
     #[test]
     fn restored_worktree_space_membership_drops_missing_checkout() {
         let missing =
-            std::env::temp_dir().join(format!("herdr-missing-worktree-{}", std::process::id()));
+            std::env::temp_dir().join(format!("nagi-missing-worktree-{}", std::process::id()));
         let membership = crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
+            label: "nagi".into(),
             repo_root: missing.join("repo"),
             checkout_path: missing.join("checkout"),
             is_linked_worktree: true,
@@ -996,7 +996,7 @@ mod tests {
     fn restore_plan_respects_opt_in_and_allowlist() {
         let pi_session_path = test_session_path("pi-session.jsonl");
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:pi".into(),
+            source: "nagi:pi".into(),
             agent: "pi".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: pi_session_path.clone(),
@@ -1009,7 +1009,7 @@ mod tests {
         );
 
         let unsupported_path = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:claude".into(),
+            source: "nagi:claude".into(),
             agent: "claude".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: test_session_path("claude-session"),
@@ -1021,7 +1021,7 @@ mod tests {
     fn restore_plan_selection_suppresses_duplicates() {
         let pi_session_path = test_session_path("pi-session.jsonl");
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:pi".into(),
+            source: "nagi:pi".into(),
             agent: "pi".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: pi_session_path.clone(),
@@ -1043,7 +1043,7 @@ mod tests {
     #[test]
     fn pane_restore_startup_suppresses_history_for_native_agent_resume() {
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:pi".into(),
+            source: "nagi:pi".into(),
             agent: "pi".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: test_session_path("pi-session.jsonl"),
@@ -1068,7 +1068,7 @@ mod tests {
     #[test]
     fn pane_restore_startup_suppresses_history_for_duplicate_native_agent_session() {
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:pi".into(),
+            source: "nagi:pi".into(),
             agent: "pi".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: test_session_path("pi-session.jsonl"),
@@ -1096,7 +1096,7 @@ mod tests {
     #[test]
     fn pane_restore_startup_keeps_history_without_native_agent_resume() {
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:pi".into(),
+            source: "nagi:pi".into(),
             agent: "pi".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: test_session_path("pi-session.jsonl"),
@@ -1122,7 +1122,7 @@ mod tests {
     #[test]
     fn restore_rehydrates_agent_session_metadata() {
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:hermes".into(),
+            source: "nagi:hermes".into(),
             agent: "hermes".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Id,
             value: "hermes-session".into(),
@@ -1130,7 +1130,7 @@ mod tests {
 
         let preserved = restored_terminal_agent_session(Some(&session), false)
             .expect("restore should preserve metadata");
-        assert_eq!(preserved.source, "herdr:hermes");
+        assert_eq!(preserved.source, "nagi:hermes");
         assert_eq!(preserved.agent, "hermes");
         assert_eq!(preserved.session_ref.value, "hermes-session");
     }
@@ -1138,7 +1138,7 @@ mod tests {
     #[test]
     fn restore_does_not_rehydrate_duplicate_agent_session_metadata() {
         let session = super::super::snapshot::PaneAgentSessionSnapshot {
-            source: "herdr:pi".into(),
+            source: "nagi:pi".into(),
             agent: "pi".into(),
             kind: crate::agent_resume::AgentSessionRefKind::Path,
             value: test_session_path("pi-session.jsonl"),
@@ -1174,7 +1174,7 @@ mod tests {
                             label: None,
                             agent_name: None,
                             agent_session: Some(super::super::snapshot::PaneAgentSessionSnapshot {
-                                source: "herdr:opencode".into(),
+                                source: "nagi:opencode".into(),
                                 agent: "opencode".into(),
                                 kind: crate::agent_resume::AgentSessionRefKind::Id,
                                 value: "opencode-session".into(),
@@ -1222,7 +1222,7 @@ mod tests {
             .persisted_agent_session
             .as_ref()
             .expect("persisted agent session should survive restore");
-        assert_eq!(session.source, "herdr:opencode");
+        assert_eq!(session.source, "nagi:opencode");
         assert_eq!(session.agent, "opencode");
         assert_eq!(session.session_ref.value, "opencode-session");
     }
@@ -1328,7 +1328,7 @@ mod tests {
             label: Some("planner".into()),
             agent_name: Some("planner".into()),
             agent_session: Some(super::super::snapshot::PaneAgentSessionSnapshot {
-                source: "herdr:codex".into(),
+                source: "nagi:codex".into(),
                 agent: "codex".into(),
                 kind: crate::agent_resume::AgentSessionRefKind::Id,
                 value: "codex-session".into(),
@@ -1479,7 +1479,7 @@ mod tests {
                             label: None,
                             agent_name: None,
                             agent_session: Some(super::super::snapshot::PaneAgentSessionSnapshot {
-                                source: "herdr:codex".into(),
+                                source: "nagi:codex".into(),
                                 agent: "codex".into(),
                                 kind: crate::agent_resume::AgentSessionRefKind::Id,
                                 value: "codex-session".into(),

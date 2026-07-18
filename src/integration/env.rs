@@ -5,9 +5,9 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use portable_pty::CommandBuilder;
 
-pub(crate) const HERDR_PANE_ID_ENV_VAR: &str = "HERDR_PANE_ID";
-pub(crate) const HERDR_TAB_ID_ENV_VAR: &str = "HERDR_TAB_ID";
-pub(crate) const HERDR_WORKSPACE_ID_ENV_VAR: &str = "HERDR_WORKSPACE_ID";
+pub(crate) const NAGI_PANE_ID_ENV_VAR: &str = "NAGI_PANE_ID";
+pub(crate) const NAGI_TAB_ID_ENV_VAR: &str = "NAGI_TAB_ID";
+pub(crate) const NAGI_WORKSPACE_ID_ENV_VAR: &str = "NAGI_WORKSPACE_ID";
 
 pub(crate) const PI_CODING_AGENT_DIR_ENV_VAR: &str = "PI_CODING_AGENT_DIR";
 pub(crate) const CLAUDE_CONFIG_DIR_ENV_VAR: &str = "CLAUDE_CONFIG_DIR";

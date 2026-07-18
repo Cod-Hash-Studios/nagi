@@ -135,7 +135,7 @@ fn install_target_inner(target: crate::api::schema::IntegrationTarget) -> io::Re
             ];
             if installed.updated_legacy_hooks {
                 messages.push(format!(
-                    "removed legacy herdr droid hook entries from {}",
+                    "removed legacy nagi droid hook entries from {}",
                     installed.hooks_path.display()
                 ));
             }
@@ -261,12 +261,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_settings {
                 messages.push(format!(
-                    "removed herdr claude hook entries from {}",
+                    "removed nagi claude hook entries from {}",
                     result.settings_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr claude hook entries found in {}",
+                    "no nagi claude hook entries found in {}",
                     result.settings_path.display()
                 ));
             }
@@ -288,12 +288,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_hooks {
                 messages.push(format!(
-                    "removed herdr codex hook entries from {}",
+                    "removed nagi codex hook entries from {}",
                     result.hooks_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr codex hook entries found in {}",
+                    "no nagi codex hook entries found in {}",
                     result.hooks_path.display()
                 ));
             }
@@ -319,12 +319,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_settings {
                 messages.push(format!(
-                    "removed herdr copilot hook entries from {}",
+                    "removed nagi copilot hook entries from {}",
                     result.settings_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr copilot hook entries found in {}",
+                    "no nagi copilot hook entries found in {}",
                     result.settings_path.display()
                 ));
             }
@@ -346,12 +346,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_settings {
                 messages.push(format!(
-                    "removed herdr devin hook entries from {}",
+                    "removed nagi devin hook entries from {}",
                     result.settings_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr devin hook entries found in {}",
+                    "no nagi devin hook entries found in {}",
                     result.settings_path.display()
                 ));
             }
@@ -373,12 +373,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_config {
                 messages.push(format!(
-                    "removed herdr kimi hook entries from {}",
+                    "removed nagi kimi hook entries from {}",
                     result.config_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr kimi hook entries found in {}",
+                    "no nagi kimi hook entries found in {}",
                     result.config_path.display()
                 ));
             }
@@ -400,23 +400,23 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_hooks {
                 messages.push(format!(
-                    "removed legacy herdr droid hook entries from {}",
+                    "removed legacy nagi droid hook entries from {}",
                     result.hooks_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no legacy herdr droid hook entries found in {}",
+                    "no legacy nagi droid hook entries found in {}",
                     result.hooks_path.display()
                 ));
             }
             if result.updated_settings {
                 messages.push(format!(
-                    "removed herdr droid hook entries from {}",
+                    "removed nagi droid hook entries from {}",
                     result.settings_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr droid hook entries found in {}",
+                    "no nagi droid hook entries found in {}",
                     result.settings_path.display()
                 ));
             }
@@ -493,12 +493,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_settings {
                 messages.push(format!(
-                    "removed herdr qodercli hook entries from {}",
+                    "removed nagi qodercli hook entries from {}",
                     result.settings_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr qodercli hook entries found in {}",
+                    "no nagi qodercli hook entries found in {}",
                     result.settings_path.display()
                 ));
             }
@@ -520,12 +520,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_hooks {
                 messages.push(format!(
-                    "removed herdr cursor hook entries from {}",
+                    "removed nagi cursor hook entries from {}",
                     result.hooks_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr cursor hook entries found in {}",
+                    "no nagi cursor hook entries found in {}",
                     result.hooks_path.display()
                 ));
             }
@@ -547,12 +547,12 @@ pub(crate) fn uninstall_target(
             }
             if result.updated_hooks {
                 messages.push(format!(
-                    "removed herdr mastracode hook entries from {}",
+                    "removed nagi mastracode hook entries from {}",
                     result.hooks_path.display()
                 ));
             } else {
                 messages.push(format!(
-                    "no herdr mastracode hook entries found in {}",
+                    "no nagi mastracode hook entries found in {}",
                     result.hooks_path.display()
                 ));
             }

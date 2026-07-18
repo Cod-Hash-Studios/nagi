@@ -1,14 +1,14 @@
 use clap::{Arg, ArgAction, Command, ValueHint};
 
 pub(super) fn command() -> Command {
-    let command = Command::new("herdr")
+    let command = Command::new("nagi")
         .about("terminal workspace manager for AI coding agents")
         .disable_help_flag(true)
         .disable_version_flag(true)
         .arg(help_flag())
         .arg(flag("no-session").help("Run monolithically without server/client session mode"))
         .arg(option("session", "NAME").help("Use or create a named persistent session"))
-        .arg(option("remote", "TARGET").help("Attach through SSH to a remote Herdr server"))
+        .arg(option("remote", "TARGET").help("Attach through SSH to a remote Nagi server"))
         .arg(
             option("remote-keybindings", "MODE")
                 .value_parser(["local", "server"])
@@ -248,7 +248,7 @@ fn tab_command() -> Command {
 
 fn notification_command() -> Command {
     Command::new("notification")
-        .about("Show Herdr notifications")
+        .about("Show Nagi notifications")
         .subcommand(
             Command::new("show")
                 .about("Show a notification")
@@ -966,9 +966,9 @@ mod tests {
     fn zsh_completion_contains_public_commands_and_values() {
         let mut cmd = super::command();
         let mut output = Vec::new();
-        clap_complete::generate(clap_complete::Shell::Zsh, &mut cmd, "herdr", &mut output);
+        clap_complete::generate(clap_complete::Shell::Zsh, &mut cmd, "nagi", &mut output);
         let script = String::from_utf8(output).unwrap();
-        assert!(script.contains("#compdef herdr"));
+        assert!(script.contains("#compdef nagi"));
         assert!(script.contains("--help"));
         assert!(script.contains("'completion:Generate shell completion scripts'"));
         assert!(script.contains("bash elvish fish powershell zsh"));

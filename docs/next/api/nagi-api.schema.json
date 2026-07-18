@@ -2276,7 +2276,7 @@
             "position": {
               "anyOf": [
                 {
-                  "$ref": "#/schemas/request/$defs/ToastHerdrPosition"
+                  "$ref": "#/schemas/request/$defs/ToastNagiPosition"
                 },
                 {
                   "type": "null"
@@ -4050,7 +4050,7 @@
           ],
           "type": "object"
         },
-        "ToastHerdrPosition": {
+        "ToastNagiPosition": {
           "enum": [
             "top-left",
             "top-right",
@@ -6920,7 +6920,7 @@
             "manifest_path": {
               "type": "string"
             },
-            "min_herdr_version": {
+            "min_nagi_version": {
               "default": "",
               "type": "string"
             },
@@ -10058,5 +10058,5 @@
       "type": "object"
     }
   },
-  "title": "Herdr API"
+  "title": "Nagi API"
 }

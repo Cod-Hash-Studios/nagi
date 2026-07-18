@@ -12,8 +12,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use support::{
-    cleanup_test_base, register_runtime_dir, register_spawned_herdr_pid,
-    unregister_spawned_herdr_pid,
+    cleanup_test_base, register_runtime_dir, register_spawned_nagi_pid, unregister_spawned_nagi_pid,
 };
 
 const WORKTREE_BOOTSTRAP_MANAGED_COMPONENT: &str = "example.worktree-bootstrap-ef876653ffc3";
@@ -27,7 +26,7 @@ fn unique_test_dir() -> PathBuf {
 }
 
 fn managed_github_plugin_dir(config_home: &Path) -> PathBuf {
-    config_home.join("herdr-dev").join("plugins").join("github")
+    config_home.join("nagi-dev").join("plugins").join("github")
 }
 
 fn path_missing_or_empty(path: &Path) -> bool {
@@ -56,14 +55,14 @@ fn run_git(repo: &Path, args: &[&str]) {
 fn create_committed_repo(path: &Path) {
     fs::create_dir_all(path).unwrap();
     run_git(path, &["init", "--quiet"]);
-    run_git(path, &["config", "user.email", "herdr@example.invalid"]);
-    run_git(path, &["config", "user.name", "Herdr Test"]);
+    run_git(path, &["config", "user.email", "nagi@example.invalid"]);
+    run_git(path, &["config", "user.name", "Nagi Test"]);
     fs::write(path.join("README.md"), "test\n").unwrap();
     run_git(path, &["add", "README.md"]);
     run_git(path, &["commit", "--quiet", "-m", "initial"]);
 }
 
-struct SpawnedHerdr {
+struct SpawnedNagi {
     _master: Box<dyn MasterPty + Send>,
     child: Box<dyn Child + Send + Sync>,
 }
@@ -77,11 +76,11 @@ impl Drop for SpawnedServerProcess {
         let pid = self.child.id();
         let _ = self.child.kill();
         let _ = self.child.wait();
-        unregister_spawned_herdr_pid(Some(pid));
+        unregister_spawned_nagi_pid(Some(pid));
     }
 }
 
-impl Drop for SpawnedHerdr {
+impl Drop for SpawnedNagi {
     fn drop(&mut self) {
         let pid = self.child.process_id();
         let _ = self.child.kill();
@@ -98,12 +97,12 @@ impl Drop for SpawnedHerdr {
                 thread::sleep(Duration::from_millis(20));
             }
 
-            unregister_spawned_herdr_pid(Some(pid));
+            unregister_spawned_nagi_pid(Some(pid));
         }
     }
 }
 
-fn cleanup_spawned_herdr(spawned: SpawnedHerdr, base: PathBuf) {
+fn cleanup_spawned_nagi(spawned: SpawnedNagi, base: PathBuf) {
     drop(spawned);
     cleanup_test_base(&base);
 }
@@ -119,8 +118,8 @@ fn wait_for_socket(path: &Path, timeout: Duration) {
     panic!("socket did not appear at {}", path.display());
 }
 
-fn spawn_herdr(config_home: &Path, runtime_dir: &Path, socket_path: &Path) -> SpawnedHerdr {
-    spawn_herdr_with_config(
+fn spawn_nagi(config_home: &Path, runtime_dir: &Path, socket_path: &Path) -> SpawnedNagi {
+    spawn_nagi_with_config(
         config_home,
         runtime_dir,
         socket_path,
@@ -129,12 +128,12 @@ fn spawn_herdr(config_home: &Path, runtime_dir: &Path, socket_path: &Path) -> Sp
     )
 }
 
-fn spawn_herdr_with_pane_history(
+fn spawn_nagi_with_pane_history(
     config_home: &Path,
     runtime_dir: &Path,
     socket_path: &Path,
-) -> SpawnedHerdr {
-    spawn_herdr_with_config(
+) -> SpawnedNagi {
+    spawn_nagi_with_config(
         config_home,
         runtime_dir,
         socket_path,
@@ -145,9 +144,9 @@ fn spawn_herdr_with_pane_history(
 
 fn app_dir_name() -> &'static str {
     if cfg!(debug_assertions) {
-        "herdr-dev"
+        "nagi-dev"
     } else {
-        "herdr"
+        "nagi"
     }
 }
 
@@ -156,7 +155,7 @@ fn named_session_socket(config_home: &Path, session: &str) -> PathBuf {
         .join(app_dir_name())
         .join("sessions")
         .join(session)
-        .join("herdr.sock")
+        .join("nagi.sock")
 }
 
 fn spawn_named_server(
@@ -173,20 +172,20 @@ fn spawn_named_server(
     )
     .unwrap();
 
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nagi"));
     command
         .args(["--session", session, "server"])
         .env("XDG_CONFIG_HOME", config_home)
         .env("XDG_RUNTIME_DIR", runtime_dir)
-        .env_remove("HERDR_SOCKET_PATH")
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV")
+        .env_remove("NAGI_SOCKET_PATH")
+        .env_remove("NAGI_CLIENT_SOCKET_PATH")
+        .env_remove("NAGI_ENV")
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
 
     let child = command.spawn().unwrap();
-    register_spawned_herdr_pid(Some(child.id()));
+    register_spawned_nagi_pid(Some(child.id()));
     SpawnedServerProcess { child }
 }
 
@@ -219,20 +218,20 @@ fn run_named_cli_with_env_and_socket_override(
     envs: &[(&str, &Path)],
     socket_override: Option<&Path>,
 ) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nagi"));
     command
         .args(args)
         .env("XDG_CONFIG_HOME", config_home)
         .env("XDG_RUNTIME_DIR", runtime_dir)
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV");
+        .env_remove("NAGI_CLIENT_SOCKET_PATH")
+        .env_remove("NAGI_ENV");
     for (key, value) in envs {
         command.env(key, value);
     }
     if let Some(socket_override) = socket_override {
-        command.env("HERDR_SOCKET_PATH", socket_override);
+        command.env("NAGI_SOCKET_PATH", socket_override);
     } else {
-        command.env_remove("HERDR_SOCKET_PATH");
+        command.env_remove("NAGI_SOCKET_PATH");
     }
     command.output().unwrap()
 }
@@ -241,7 +240,7 @@ fn run_named_cli_json(config_home: &Path, runtime_dir: &Path, args: &[&str]) -> 
     let output = run_named_cli(config_home, runtime_dir, args);
     assert!(
         output.status.success(),
-        "command failed: herdr {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
+        "command failed: nagi {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
         args.join(" "),
         output.status.code(),
         String::from_utf8_lossy(&output.stderr),
@@ -250,13 +249,13 @@ fn run_named_cli_json(config_home: &Path, runtime_dir: &Path, args: &[&str]) -> 
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
-fn spawn_herdr_with_path(
+fn spawn_nagi_with_path(
     config_home: &Path,
     runtime_dir: &Path,
     socket_path: &Path,
     path_override: Option<&Path>,
-) -> SpawnedHerdr {
-    spawn_herdr_with_config(
+) -> SpawnedNagi {
+    spawn_nagi_with_config(
         config_home,
         runtime_dir,
         socket_path,
@@ -265,13 +264,13 @@ fn spawn_herdr_with_path(
     )
 }
 
-fn spawn_herdr_with_config(
+fn spawn_nagi_with_config(
     config_home: &Path,
     runtime_dir: &Path,
     socket_path: &Path,
     path_override: Option<&Path>,
     config_toml: &str,
-) -> SpawnedHerdr {
+) -> SpawnedNagi {
     fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
     register_runtime_dir(runtime_dir);
@@ -290,38 +289,38 @@ fn spawn_herdr_with_config(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_nagi"));
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("NAGI_SOCKET_PATH", socket_path);
+    cmd.env_remove("NAGI_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("NAGI_ENV");
     if let Some(path) = path_override {
         cmd.env("PATH", path);
     }
 
     let child = pair.slave.spawn_command(cmd).unwrap();
-    register_spawned_herdr_pid(child.process_id());
-    SpawnedHerdr {
+    register_spawned_nagi_pid(child.process_id());
+    SpawnedNagi {
         _master: pair.master,
         child,
     }
 }
 
 fn run_cli(socket_path: &Path, args: &[&str]) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nagi"));
     command.args(args);
-    command.env("HERDR_SOCKET_PATH", socket_path);
+    command.env("NAGI_SOCKET_PATH", socket_path);
     command.output().unwrap()
 }
 
 fn run_cli_in_dir(socket_path: &Path, args: &[&str], current_dir: &Path) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nagi"));
     command.args(args);
     command.current_dir(current_dir);
-    command.env("HERDR_SOCKET_PATH", socket_path);
+    command.env("NAGI_SOCKET_PATH", socket_path);
     command.output().unwrap()
 }
 
@@ -338,7 +337,7 @@ fn run_cli_json_in_dir(socket_path: &Path, args: &[&str], current_dir: &Path) ->
 fn parse_cli_json_output(args: &[&str], output: std::process::Output) -> serde_json::Value {
     assert!(
         output.status.success(),
-        "command failed: herdr {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
+        "command failed: nagi {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
         args.join(" "),
         output.status.code(),
         String::from_utf8_lossy(&output.stderr),
@@ -347,7 +346,7 @@ fn parse_cli_json_output(args: &[&str], output: std::process::Output) -> serde_j
 
     serde_json::from_slice(&output.stdout).unwrap_or_else(|err| {
         panic!(
-            "failed to parse JSON response for `herdr {}`: {}\nstdout: {}\nstderr: {}",
+            "failed to parse JSON response for `nagi {}`: {}\nstdout: {}\nstderr: {}",
             args.join(" "),
             err,
             String::from_utf8_lossy(&output.stdout),
@@ -522,7 +521,7 @@ fn send_request(socket_path: &Path, json: &str) -> serde_json::Value {
 
 fn run_claude_hook(action: &str, hook_input: &str) -> Option<serde_json::Value> {
     run_shell_hook(
-        "src/integration/assets/claude/herdr-agent-state.sh",
+        "src/integration/assets/claude/nagi-agent-state.sh",
         &[action],
         hook_input,
     )
@@ -530,7 +529,7 @@ fn run_claude_hook(action: &str, hook_input: &str) -> Option<serde_json::Value> 
 
 fn run_codex_hook(action: &str, hook_input: &str) -> Option<serde_json::Value> {
     run_shell_hook(
-        "src/integration/assets/codex/herdr-agent-state.sh",
+        "src/integration/assets/codex/nagi-agent-state.sh",
         &[action],
         hook_input,
     )
@@ -538,7 +537,7 @@ fn run_codex_hook(action: &str, hook_input: &str) -> Option<serde_json::Value> {
 
 fn run_copilot_hook(hook_input: &str) -> Option<serde_json::Value> {
     run_shell_hook(
-        "src/integration/assets/copilot/herdr-agent-state.sh",
+        "src/integration/assets/copilot/nagi-agent-state.sh",
         &[],
         hook_input,
     )
@@ -550,7 +549,7 @@ fn run_devin_hook(
     envs: &[(&str, &str)],
 ) -> Option<serde_json::Value> {
     run_shell_hook_with_env(
-        "src/integration/assets/devin/herdr-agent-state.sh",
+        "src/integration/assets/devin/nagi-agent-state.sh",
         &[action],
         hook_input,
         envs,
@@ -569,7 +568,7 @@ fn run_shell_hook_with_env(
 ) -> Option<serde_json::Value> {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("nagi.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -600,9 +599,9 @@ fn run_shell_hook_with_env(
     command
         .arg(hook_path)
         .args(args)
-        .env("HERDR_ENV", "1")
-        .env("HERDR_SOCKET_PATH", &socket_path)
-        .env("HERDR_PANE_ID", "p_test")
+        .env("NAGI_ENV", "1")
+        .env("NAGI_SOCKET_PATH", &socket_path)
+        .env("NAGI_PANE_ID", "p_test")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -728,7 +727,7 @@ fn devin_hook_ignores_prompt_session_list_fallback() {
         &[
             ("DEVIN_PROJECT_DIR", "/tmp/project"),
             (
-                "HERDR_DEVIN_LIST_JSON",
+                "NAGI_DEVIN_LIST_JSON",
                 r#"[{"id":"older-session","working_directory":"/tmp/other"},{"id":"devin-session","working_directory":"/tmp/project"}]"#,
             ),
         ],
@@ -742,7 +741,7 @@ fn devin_hook_reports_session_id_from_stdin_without_state() {
     let request = run_devin_hook(
         "session",
         r#"{"hook_event_name":"SessionStart","session_id":"devin-session","source":"startup"}"#,
-        &[("HERDR_DEVIN_LIST_JSON", r#"[{"id":"older-session"}]"#)],
+        &[("NAGI_DEVIN_LIST_JSON", r#"[{"id":"older-session"}]"#)],
     )
     .expect("devin session start should report session identity");
 
@@ -760,7 +759,7 @@ fn devin_hook_prefers_hook_session_id_over_list() {
         &[
             ("DEVIN_PROJECT_DIR", "/tmp/project"),
             (
-                "HERDR_DEVIN_LIST_JSON",
+                "NAGI_DEVIN_LIST_JSON",
                 r#"[{"id":"older-session","working_directory":"/tmp/project"}]"#,
             ),
         ],
@@ -780,7 +779,7 @@ fn devin_hook_reports_tool_session_from_list_without_state() {
         &[
             ("DEVIN_PROJECT_DIR", "/tmp/project"),
             (
-                "HERDR_DEVIN_LIST_JSON",
+                "NAGI_DEVIN_LIST_JSON",
                 r#"[{"id":"older-session","working_directory":"/tmp/other"},{"id":"devin-session","working_directory":"/tmp/project"}]"#,
             ),
         ],
@@ -801,7 +800,7 @@ fn devin_hook_ignores_startup_session_list_fallback() {
         &[
             ("DEVIN_PROJECT_DIR", "/tmp/project"),
             (
-                "HERDR_DEVIN_LIST_JSON",
+                "NAGI_DEVIN_LIST_JSON",
                 r#"[{"id":"stale-session","working_directory":"/tmp/project"}]"#,
             ),
         ],
@@ -818,7 +817,7 @@ fn devin_hook_ignores_non_matching_session_list_entries() {
         &[
             ("DEVIN_PROJECT_DIR", "/tmp/project"),
             (
-                "HERDR_DEVIN_LIST_JSON",
+                "NAGI_DEVIN_LIST_JSON",
                 r#"[{"id":"other-session","working_directory":"/tmp/other"}]"#,
             ),
         ],
@@ -831,7 +830,7 @@ fn devin_hook_ignores_non_matching_session_list_entries() {
 fn pane_run_sends_one_send_input_request_with_enter_key() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("nagi.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -901,7 +900,7 @@ fn pane_run_sends_one_send_input_request_with_enter_key() {
 fn workspace_report_metadata_sends_token_patch() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("nagi.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -956,7 +955,7 @@ fn workspace_report_metadata_sends_token_patch() {
 fn pane_report_metadata_sends_presentation_request() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("nagi.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -1106,13 +1105,13 @@ fn help_commands_exit_successfully() {
     ];
 
     for args in help_cases {
-        let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+        let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
             .args(*args)
             .output()
             .unwrap();
         assert!(
             output.status.success(),
-            "herdr {} failed: status={:?} stdout={} stderr={}",
+            "nagi {} failed: status={:?} stdout={} stderr={}",
             args.join(" "),
             output.status.code(),
             String::from_utf8_lossy(&output.stdout),
@@ -1123,11 +1122,11 @@ fn help_commands_exit_successfully() {
 
 #[test]
 fn completion_command_prints_zsh_script_without_session_startup() {
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["completion", "zsh"])
-        .env_remove("HERDR_SOCKET_PATH")
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV")
+        .env_remove("NAGI_SOCKET_PATH")
+        .env_remove("NAGI_CLIENT_SOCKET_PATH")
+        .env_remove("NAGI_ENV")
         .output()
         .unwrap();
 
@@ -1138,7 +1137,7 @@ fn completion_command_prints_zsh_script_without_session_startup() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("#compdef herdr"), "stdout: {stdout}");
+    assert!(stdout.contains("#compdef nagi"), "stdout: {stdout}");
     assert!(
         stdout.contains("bash elvish fish powershell zsh"),
         "stdout: {stdout}"
@@ -1163,7 +1162,7 @@ fn completion_command_prints_zsh_script_without_session_startup() {
 
 #[test]
 fn root_help_hides_explicit_client_command() {
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .arg("--help")
         .output()
         .unwrap();
@@ -1171,14 +1170,14 @@ fn root_help_hides_explicit_client_command() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        !stdout.contains("herdr client"),
+        !stdout.contains("nagi client"),
         "root help should not advertise the internal client command: {stdout}"
     );
 }
 
 #[test]
 fn root_help_advertises_api_schema_command_group() {
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .arg("--help")
         .output()
         .unwrap();
@@ -1186,23 +1185,23 @@ fn root_help_advertises_api_schema_command_group() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("herdr api <subcommand>"),
+        stdout.contains("nagi api <subcommand>"),
         "root help should advertise the api command group: {stdout}"
     );
 }
 
 #[test]
 fn api_schema_default_output_is_a_short_summary() {
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["api", "schema"])
         .output()
         .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Herdr API schema"), "stdout: {stdout}");
+    assert!(stdout.contains("Nagi API schema"), "stdout: {stdout}");
     assert!(
-        stdout.contains("Use `herdr api schema --json`"),
+        stdout.contains("Use `nagi api schema --json`"),
         "stdout: {stdout}"
     );
     assert!(
@@ -1213,7 +1212,7 @@ fn api_schema_default_output_is_a_short_summary() {
 
 #[test]
 fn api_schema_json_prints_bundled_schema() {
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["api", "schema", "--json"])
         .output()
         .unwrap();
@@ -1237,7 +1236,7 @@ fn api_schema_json_prints_bundled_schema() {
 fn api_snapshot_prints_live_session_snapshot() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("nagi.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn({
@@ -1288,9 +1287,9 @@ fn api_snapshot_prints_live_session_snapshot() {
 fn api_schema_output_writes_bundled_schema_to_file() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let schema_path = base.join("herdr-api.schema.json");
+    let schema_path = base.join("nagi-api.schema.json");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["api", "schema", "--output"])
         .arg(&schema_path)
         .output()
@@ -1317,11 +1316,11 @@ fn explicit_client_command_respects_nested_guard() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .arg("client")
-        .env("HERDR_ENV", "1")
+        .env("NAGI_ENV", "1")
         .env("XDG_CONFIG_HOME", &base)
-        .env_remove("HERDR_CONFIG_PATH")
+        .env_remove("NAGI_CONFIG_PATH")
         .output()
         .unwrap();
 
@@ -1330,16 +1329,16 @@ fn explicit_client_command_respects_nested_guard() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("nested herdr is disabled by default"),
+        stderr.contains("nested nagi is disabled by default"),
         "client should fail at the nested guard before connecting: {stderr}"
     );
 }
 
 #[test]
 fn removed_show_changelog_flag_fails_before_nested_guard() {
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .arg("--show-changelog")
-        .env("HERDR_ENV", "1")
+        .env("NAGI_ENV", "1")
         .output()
         .unwrap();
 
@@ -1350,7 +1349,7 @@ fn removed_show_changelog_flag_fails_before_nested_guard() {
         "stderr: {stderr}"
     );
     assert!(
-        !stderr.contains("nested herdr"),
+        !stderr.contains("nested nagi"),
         "unknown flag should be rejected before nested guard: {stderr}"
     );
 }
@@ -1487,7 +1486,7 @@ fn named_sessions_use_separate_servers_and_workspace_state() {
     assert!(alpha_session["socket_path"]
         .as_str()
         .unwrap()
-        .ends_with("/sessions/alpha/herdr.sock"));
+        .ends_with("/sessions/alpha/nagi.sock"));
     assert!(beta_session["session_dir"]
         .as_str()
         .unwrap()
@@ -1551,23 +1550,23 @@ fn integration_commands_run_locally_when_server_is_missing() {
     register_runtime_dir(&runtime_dir);
     let missing_socket = runtime_dir.join("missing.sock");
 
-    let expected_extension = extensions_dir.join("herdr-agent-state.ts");
+    let expected_extension = extensions_dir.join("nagi-agent-state.ts");
     assert!(
         !expected_extension.exists(),
         "test setup should start without extension file"
     );
 
-    let workspace_list = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let workspace_list = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["workspace", "list"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("NAGI_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
     assert_eq!(workspace_list.status.code(), Some(1));
 
-    let integration_install = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let integration_install = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["integration", "install", "pi"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("NAGI_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -1577,9 +1576,9 @@ fn integration_commands_run_locally_when_server_is_missing() {
         "integration install should write local files without a server"
     );
 
-    let integration_status = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let integration_status = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["integration", "status"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("NAGI_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -1588,9 +1587,9 @@ fn integration_commands_run_locally_when_server_is_missing() {
     assert!(status_stdout.contains("pi: current (v5)"));
     assert!(status_stdout.contains("claude: not installed"));
 
-    let integration_uninstall = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let integration_uninstall = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["integration", "uninstall", "pi"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("NAGI_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -1610,8 +1609,8 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     let extensions_dir = home_dir.join(".pi/agent/extensions");
     fs::create_dir_all(&extensions_dir).unwrap();
     fs::write(
-        extensions_dir.join("herdr-agent-state.ts"),
-        "// legacy herdr integration\n",
+        extensions_dir.join("nagi-agent-state.ts"),
+        "// legacy nagi integration\n",
     )
     .unwrap();
 
@@ -1620,9 +1619,9 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     register_runtime_dir(&runtime_dir);
     let missing_socket = runtime_dir.join("missing.sock");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["integration", "status", "--outdated-only"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("NAGI_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -1630,8 +1629,8 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("installed herdr integrations need updating"));
-    assert!(stderr.contains("herdr integration install pi"));
+    assert!(stderr.contains("installed nagi integrations need updating"));
+    assert!(stderr.contains("nagi integration install pi"));
 
     cleanup_test_base(&base);
 }
@@ -1646,9 +1645,9 @@ fn integration_status_rejects_unknown_flags() {
     register_runtime_dir(&runtime_dir);
     let missing_socket = runtime_dir.join("missing.sock");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["integration", "status", "--wat"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("NAGI_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -1663,9 +1662,9 @@ fn status_commands_report_client_and_server_versions() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let full = run_cli(&socket_path, &["status"]);
@@ -1760,7 +1759,7 @@ fn status_commands_report_client_and_server_versions() {
         .as_str()
         .is_some_and(|path| !path.is_empty()));
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -1799,10 +1798,10 @@ fn server_stop_command_shuts_down_running_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
-    let mut herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let mut nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
     wait_for_socket(&client_socket, Duration::from_secs(5));
 
@@ -1826,12 +1825,12 @@ fn server_stop_command_shuts_down_running_server() {
         "client socket should be removed or stale before server stop returns"
     );
 
-    let pid = herdr.child.process_id();
-    let exit_status = herdr.child.wait().unwrap();
-    unregister_spawned_herdr_pid(pid);
+    let pid = nagi.child.process_id();
+    let exit_status = nagi.child.wait().unwrap();
+    unregister_spawned_nagi_pid(pid);
     assert!(exit_status.success(), "server stop should exit cleanly");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -1839,11 +1838,11 @@ fn server_stop_then_restart_restores_pane_history() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
     let marker = "PERSISTED_HISTORY_AFTER_STOP";
 
-    let mut herdr = spawn_herdr_with_pane_history(&config_home, &runtime_dir, &socket_path);
+    let mut nagi = spawn_nagi_with_pane_history(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
     wait_for_socket(&client_socket, Duration::from_secs(5));
 
@@ -1885,13 +1884,13 @@ fn server_stop_then_restart_restores_pane_history() {
         String::from_utf8_lossy(&stopped.stderr)
     );
 
-    let pid = herdr.child.process_id();
-    let exit_status = herdr.child.wait().unwrap();
-    unregister_spawned_herdr_pid(pid);
+    let pid = nagi.child.process_id();
+    let exit_status = nagi.child.wait().unwrap();
+    unregister_spawned_nagi_pid(pid);
     assert!(exit_status.success(), "server stop should exit cleanly");
-    drop(herdr);
+    drop(nagi);
 
-    let restarted = spawn_herdr_with_pane_history(&config_home, &runtime_dir, &socket_path);
+    let restarted = spawn_nagi_with_pane_history(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
     wait_for_socket(&client_socket, Duration::from_secs(5));
 
@@ -1923,7 +1922,7 @@ fn server_stop_then_restart_restores_pane_history() {
         "restarted server should restore saved pane history"
     );
 
-    cleanup_spawned_herdr(restarted, base);
+    cleanup_spawned_nagi(restarted, base);
 }
 
 #[test]
@@ -1931,23 +1930,23 @@ fn server_start_restores_legacy_session_through_api_identity() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
     let data_dir = config_home.join(app_dir_name());
     let pion_cwd = base.join("legacy-pion");
-    let herdr_cwd = base.join("legacy-herdr");
+    let nagi_cwd = base.join("legacy-nagi");
 
     fs::create_dir_all(&pion_cwd).unwrap();
-    fs::create_dir_all(&herdr_cwd).unwrap();
+    fs::create_dir_all(&nagi_cwd).unwrap();
     fs::create_dir_all(&data_dir).unwrap();
     let pion_cwd = pion_cwd.to_str().expect("test cwd should be UTF-8");
-    let herdr_cwd = herdr_cwd.to_str().expect("test cwd should be UTF-8");
+    let nagi_cwd = nagi_cwd.to_str().expect("test cwd should be UTF-8");
     let legacy_session = include_str!("fixtures/session/legacy-pre-tabs-v2.json")
         .replace("/tmp/pion", pion_cwd)
-        .replace("/tmp/herdr", herdr_cwd);
+        .replace("/tmp/nagi", nagi_cwd);
     fs::write(data_dir.join("session.json"), legacy_session).unwrap();
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
     wait_for_socket(&client_socket, Duration::from_secs(5));
 
@@ -1988,7 +1987,7 @@ fn server_start_restores_legacy_session_through_api_identity() {
     assert!(panes.iter().any(|pane| {
         pane["pane_id"] == focused_pane_id
             && pane["tab_id"] == format!("{workspace_id}:t1")
-            && pane["cwd"] == herdr_cwd
+            && pane["cwd"] == nagi_cwd
             && pane["focused"] == true
     }));
 
@@ -2022,7 +2021,7 @@ fn server_start_restores_legacy_session_through_api_identity() {
     assert_eq!(agents[0]["agent"], "pi");
     assert_eq!(agents[0]["agent_status"], "working");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2030,9 +2029,9 @@ fn workspace_and_pane_management_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let reloaded = run_cli(&socket_path, &["server", "reload-config"]);
@@ -2112,7 +2111,7 @@ fn workspace_and_pane_management_commands_work() {
         serde_json::from_slice(&closed_workspace.stdout).unwrap();
     assert_eq!(closed_workspace_json["result"]["type"], "ok");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2120,12 +2119,12 @@ fn worktree_management_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
     let repo = base.join("repo");
     let checkout = base.join("checkout");
     create_committed_repo(&repo);
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let branch = "worktree/cli-wrapper";
@@ -2238,7 +2237,7 @@ fn worktree_management_commands_work() {
     assert_eq!(force_removed["result"]["forced"], true);
     assert!(!checkout.exists());
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2246,12 +2245,12 @@ fn forced_worktree_remove_terminates_processes_inside_checkout() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
     let repo = base.join("repo");
     let checkout = base.join("checkout-with-process");
     create_committed_repo(&repo);
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli_json(
@@ -2308,7 +2307,7 @@ fn forced_worktree_remove_terminates_processes_inside_checkout() {
     assert!(wait_for_pid_exit(pid, Duration::from_secs(3)));
     assert!(!checkout.exists());
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2316,7 +2315,7 @@ fn worktree_open_existing_checkout_by_path_and_branch() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
     let repo = base.join("repo");
     let checkout = base.join("external-checkout");
     create_committed_repo(&repo);
@@ -2334,7 +2333,7 @@ fn worktree_open_existing_checkout_by_path_and_branch() {
         ],
     );
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let opened = run_cli_json_in_dir(
@@ -2424,7 +2423,7 @@ fn worktree_open_existing_checkout_by_path_and_branch() {
     );
     assert_eq!(removed["result"]["type"], "worktree_removed");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2513,7 +2512,7 @@ fn config_check_rejects_json_output() {
     assert!(checked.stdout.is_empty());
     assert_eq!(
         String::from_utf8_lossy(&checked.stderr),
-        "usage: herdr config check\n"
+        "usage: nagi config check\n"
     );
 
     cleanup_test_base(&base);
@@ -2555,7 +2554,7 @@ fn worktree_cli_rejects_local_argument_errors_before_socket_use() {
         assert_eq!(
             output.status.code(),
             Some(2),
-            "herdr {} should fail as local parse error; stdout={} stderr={}",
+            "nagi {} should fail as local parse error; stdout={} stderr={}",
             args.join(" "),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
@@ -2570,9 +2569,9 @@ fn tab_management_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -2630,7 +2629,7 @@ fn tab_management_commands_work() {
     let closed_tab_json: serde_json::Value = serde_json::from_slice(&closed_tab.stdout).unwrap();
     assert_eq!(closed_tab_json["result"]["type"], "ok");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2638,9 +2637,9 @@ fn agent_start_command_works() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let started = run_cli_json(
@@ -2691,7 +2690,7 @@ fn agent_start_command_works() {
     let duplicate_json: serde_json::Value = serde_json::from_slice(&duplicate.stderr).unwrap();
     assert_eq!(duplicate_json["error"]["code"], "agent_name_taken");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2699,9 +2698,9 @@ fn agent_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -2762,7 +2761,7 @@ fn agent_commands_work() {
     let focused = run_cli_json(&socket_path, &["agent", "focus", "reviewer"]);
     assert_eq!(focused["result"]["agent"]["focused"], true);
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2770,9 +2769,9 @@ fn pane_close_only_removes_the_target_tab_when_other_tabs_exist() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -2822,7 +2821,7 @@ fn pane_close_only_removes_the_target_tab_when_other_tabs_exist() {
     let tabs_json: serde_json::Value = serde_json::from_slice(&tabs.stdout).unwrap();
     assert_eq!(tabs_json["result"]["tabs"].as_array().unwrap().len(), 1);
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2830,9 +2829,9 @@ fn pane_close_removes_the_workspace_when_it_closes_the_last_pane() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -2859,7 +2858,7 @@ fn pane_close_removes_the_workspace_when_it_closes_the_last_pane() {
         .unwrap()
         .is_empty());
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2867,9 +2866,9 @@ fn pane_run_read_and_wait_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     send_request(
@@ -2929,7 +2928,7 @@ fn pane_run_read_and_wait_commands_work() {
     assert!(text.contains("alpha"));
     assert!(text.contains("ready"));
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -2937,9 +2936,9 @@ fn wait_output_matches_recent_unwrapped_text() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -3004,7 +3003,7 @@ fn wait_output_matches_recent_unwrapped_text() {
     let text = String::from_utf8(read.stdout).unwrap();
     assert!(text.contains(token));
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -3012,9 +3011,9 @@ fn closing_pane_terminates_processes_inside_it() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -3065,7 +3064,7 @@ fn closing_pane_terminates_processes_inside_it() {
         "process {pid} survived pane close"
     );
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -3073,9 +3072,9 @@ fn closing_workspace_terminates_processes_inside_it() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = run_cli(
@@ -3118,7 +3117,7 @@ fn closing_workspace_terminates_processes_inside_it() {
         "process {pid} survived workspace close"
     );
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -3126,9 +3125,9 @@ fn workspace_ids_and_public_pane_ids_are_stable() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let ws1_json = run_cli_json(
@@ -3271,17 +3270,17 @@ fn workspace_ids_and_public_pane_ids_are_stable() {
         format!("{ws1_id}:p4")
     );
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
-fn pane_shell_gets_herdr_socket_and_pane_env() {
+fn pane_shell_gets_nagi_socket_and_pane_env() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = send_request(
@@ -3304,7 +3303,7 @@ fn pane_shell_gets_herdr_socket_and_pane_env() {
             "run",
             "1-1",
             &format!(
-                "printf '%s\\n%s\\n' \"$HERDR_SOCKET_PATH\" \"$HERDR_PANE_ID\" > {}",
+                "printf '%s\\n%s\\n' \"$NAGI_SOCKET_PATH\" \"$NAGI_PANE_ID\" > {}",
                 env_capture.display()
             ),
         ],
@@ -3329,7 +3328,7 @@ fn pane_shell_gets_herdr_socket_and_pane_env() {
     );
     assert!(text.contains(&pane_id), "env file was: {text:?}");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -3337,7 +3336,7 @@ fn wait_agent_status_exits_when_idle_status_matches() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
     let bin_dir = base.join("bin");
 
     fs::create_dir_all(&bin_dir).unwrap();
@@ -3357,7 +3356,7 @@ fn wait_agent_status_exits_when_idle_status_matches() {
 
     let inherited_path = std::env::var("PATH").unwrap_or_default();
     let path_override = format!("{}:{}", bin_dir.display(), inherited_path);
-    let herdr = spawn_herdr_with_path(
+    let nagi = spawn_nagi_with_path(
         &config_home,
         &runtime_dir,
         &socket_path,
@@ -3400,7 +3399,7 @@ fn wait_agent_status_exits_when_idle_status_matches() {
     assert_eq!(waited_json["data"]["agent_status"], "idle");
     assert_eq!(waited_json["data"]["agent"], "pi");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -3408,17 +3407,17 @@ fn plugin_link_list_unlink_cli_smoke_test() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
     let plugin_dir = base.join("plugins").join("layout");
     fs::create_dir_all(&plugin_dir).unwrap();
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.layout"
 name = "Layout"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
-description = "Apply a preferred Herdr layout"
+min_nagi_version = "0.6.10"
+description = "Apply a preferred Nagi layout"
 
 [[actions]]
 id = "apply"
@@ -3439,7 +3438,7 @@ command = ["sh", "-c", "sleep 5"]
     )
     .unwrap();
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
     let workspace = run_cli_json(
         &socket_path,
@@ -3514,7 +3513,7 @@ command = ["sh", "-c", "sleep 5"]
             "--entrypoint",
             "board",
             "--env",
-            "HERDR_ROLE=board",
+            "NAGI_ROLE=board",
             "--no-focus",
         ],
     );
@@ -3540,7 +3539,7 @@ command = ["sh", "-c", "sleep 5"]
     let listed = run_cli_json(&socket_path, &["plugin", "list", "--json"]);
     assert!(listed["result"]["plugins"].as_array().unwrap().is_empty());
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -3553,16 +3552,16 @@ fn plugin_install_list_uninstall_offline_cli_smoke_test() {
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.worktree-bootstrap"
 name = "Worktree Bootstrap"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[build]]
-command = ["sh", "-c", "echo built > built.txt; if [ -n \"$HERDR_SESSION\" ]; then echo \"$HERDR_SESSION\" > leaked-session.txt; fi"]
+command = ["sh", "-c", "echo built > built.txt; if [ -n \"$NAGI_SESSION\" ]; then echo \"$NAGI_SESSION\" > leaked-session.txt; fi"]
 
 [[actions]]
 id = "bootstrap"
@@ -3573,7 +3572,7 @@ command = ["sh", "-c", "echo bootstrap"]
     .unwrap();
     run_git(
         &source_repo,
-        &["add", "worktree-bootstrap/herdr-plugin.toml"],
+        &["add", "worktree-bootstrap/nagi-plugin.toml"],
     );
     run_git(&source_repo, &["commit", "--quiet", "-m", "add plugin"]);
 
@@ -3583,7 +3582,7 @@ command = ["sh", "-c", "echo bootstrap"]
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -3597,12 +3596,12 @@ command = ["sh", "-c", "echo bootstrap"]
             "plugins",
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/worktree-bootstrap",
+            "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
         ],
         &[
             ("GIT_CONFIG_GLOBAL", &git_config),
-            ("HERDR_SESSION", Path::new("leaked-session")),
+            ("NAGI_SESSION", Path::new("leaked-session")),
         ],
     );
     assert!(
@@ -3621,7 +3620,7 @@ command = ["sh", "-c", "echo bootstrap"]
     assert_eq!(plugin["plugin_id"], "example.worktree-bootstrap");
     assert_eq!(plugin["source"]["kind"], "github");
     assert_eq!(plugin["source"]["owner"], "ogulcancelik");
-    assert_eq!(plugin["source"]["repo"], "herdr-plugin-examples");
+    assert_eq!(plugin["source"]["repo"], "nagi-plugin-examples");
     assert_eq!(plugin["source"]["subdir"], "worktree-bootstrap");
     assert!(plugin["source"]["resolved_commit"].as_str().is_some());
     let managed_path = PathBuf::from(plugin["source"]["managed_path"].as_str().unwrap());
@@ -3638,7 +3637,7 @@ command = ["sh", "-c", "echo bootstrap"]
             .join("worktree-bootstrap")
             .join("leaked-session.txt")
             .exists(),
-        "build command should not inherit HERDR_SESSION"
+        "build command should not inherit NAGI_SESSION"
     );
 
     let uninstall = run_named_cli(
@@ -3683,12 +3682,12 @@ fn plugin_install_build_failure_does_not_register_or_create_checkout() {
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.build-fail"
 name = "Build Fail"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[build]]
@@ -3701,7 +3700,7 @@ command = ["sh", "-c", "echo should-not-install"]
 "#,
     )
     .unwrap();
-    run_git(&source_repo, &["add", "build-fail/herdr-plugin.toml"]);
+    run_git(&source_repo, &["add", "build-fail/nagi-plugin.toml"]);
     run_git(
         &source_repo,
         &["commit", "--quiet", "-m", "add failing plugin"],
@@ -3713,7 +3712,7 @@ command = ["sh", "-c", "echo should-not-install"]
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -3727,7 +3726,7 @@ command = ["sh", "-c", "echo should-not-install"]
             "plugins",
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/build-fail",
+            "Cod-Hash-Studios/nagi-plugin-examples/build-fail",
             "--yes",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
@@ -3777,16 +3776,16 @@ fn plugin_install_build_spawn_failure_prints_clean_error() {
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.missing-tool"
 name = "Missing Tool"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[build]]
-command = ["definitely-missing-herdr-build-tool-xyz"]
+command = ["definitely-missing-nagi-build-tool-xyz"]
 
 [[actions]]
 id = "run"
@@ -3795,7 +3794,7 @@ command = ["sh", "-c", "echo should-not-install"]
 "#,
     )
     .unwrap();
-    run_git(&source_repo, &["add", "missing-tool/herdr-plugin.toml"]);
+    run_git(&source_repo, &["add", "missing-tool/nagi-plugin.toml"]);
     run_git(
         &source_repo,
         &["commit", "--quiet", "-m", "add missing tool plugin"],
@@ -3807,7 +3806,7 @@ command = ["sh", "-c", "echo should-not-install"]
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -3821,7 +3820,7 @@ command = ["sh", "-c", "echo should-not-install"]
             "plugins",
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/missing-tool",
+            "Cod-Hash-Studios/nagi-plugin-examples/missing-tool",
             "--yes",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
@@ -3839,7 +3838,7 @@ command = ["sh", "-c", "echo should-not-install"]
     );
     assert!(stderr.contains("  build: 1/1"), "{stderr}");
     assert!(
-        stderr.contains("  command: definitely-missing-herdr-build-tool-xyz"),
+        stderr.contains("  command: definitely-missing-nagi-build-tool-xyz"),
         "{stderr}"
     );
     assert!(stderr.contains("  error: failed to start:"), "{stderr}");
@@ -3866,12 +3865,12 @@ fn plugin_install_rejects_manifest_changed_by_build() {
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.manifest-mutator"
 name = "Manifest Mutator"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[build]]
@@ -3886,11 +3885,11 @@ command = ["sh", "-c", "echo reviewed"]
     .unwrap();
     fs::write(
         plugin_dir.join("mutate.sh"),
-        r#"cat > herdr-plugin.toml <<'EOF'
+        r#"cat > nagi-plugin.toml <<'EOF'
 id = "example.manifest-mutator"
 name = "Manifest Mutator"
 version = "0.1.0"
-min_herdr_version = "0.0.1"
+min_nagi_version = "0.0.1"
 platforms = ["linux", "macos", "windows"]
 
 [[build]]
@@ -3916,7 +3915,7 @@ EOF
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -3930,7 +3929,7 @@ EOF
             "plugins",
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/manifest-mutator",
+            "Cod-Hash-Studios/nagi-plugin-examples/manifest-mutator",
             "--yes",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
@@ -3941,7 +3940,7 @@ EOF
     );
     let stderr = String::from_utf8_lossy(&install.stderr);
     assert!(
-        stderr.contains("plugin build changed herdr-plugin.toml after install preview"),
+        stderr.contains("plugin build changed nagi-plugin.toml after install preview"),
         "{stderr}"
     );
 
@@ -3965,18 +3964,18 @@ fn plugin_install_restores_previous_checkout_when_registration_fails() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("fake-herdr.sock");
+    let socket_path = runtime_dir.join("fake-nagi.sock");
     let source_repo = base.join("source-repo");
     let plugin_dir = source_repo.join("worktree-bootstrap");
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.worktree-bootstrap"
 name = "Worktree Bootstrap"
 version = "0.2.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -3988,14 +3987,14 @@ command = ["sh", "-c", "echo new"]
     .unwrap();
     run_git(
         &source_repo,
-        &["add", "worktree-bootstrap/herdr-plugin.toml"],
+        &["add", "worktree-bootstrap/nagi-plugin.toml"],
     );
     run_git(&source_repo, &["commit", "--quiet", "-m", "add plugin"]);
 
     fs::create_dir_all(&config_home).unwrap();
     fs::create_dir_all(&runtime_dir).unwrap();
     let managed_checkout = config_home
-        .join("herdr-dev")
+        .join("nagi-dev")
         .join("plugins")
         .join("github")
         .join(WORKTREE_BOOTSTRAP_MANAGED_COMPONENT);
@@ -4006,7 +4005,7 @@ command = ["sh", "-c", "echo new"]
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -4032,14 +4031,14 @@ command = ["sh", "-c", "echo new"]
                         "plugin_id": "example.worktree-bootstrap",
                         "name": "Worktree Bootstrap",
                         "version": "0.1.0",
-                        "min_herdr_version": "0.6.10",
-                        "manifest_path": managed_checkout_for_server.join("herdr-plugin.toml").display().to_string(),
+                        "min_nagi_version": "0.6.10",
+                        "manifest_path": managed_checkout_for_server.join("nagi-plugin.toml").display().to_string(),
                         "plugin_root": managed_checkout_for_server.display().to_string(),
                         "enabled": true,
                         "source": {
                             "kind": "github",
                             "owner": "ogulcancelik",
-                            "repo": "herdr-plugin-examples",
+                            "repo": "nagi-plugin-examples",
                             "subdir": "worktree-bootstrap",
                             "resolved_commit": "old",
                             "managed_path": managed_checkout_for_server.display().to_string(),
@@ -4073,7 +4072,7 @@ command = ["sh", "-c", "echo new"]
         &[
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/worktree-bootstrap",
+            "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
@@ -4097,18 +4096,18 @@ fn plugin_install_rejects_server_that_drops_source_metadata() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("fake-herdr.sock");
+    let socket_path = runtime_dir.join("fake-nagi.sock");
     let source_repo = base.join("source-repo");
     let plugin_dir = source_repo.join("worktree-bootstrap");
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.worktree-bootstrap"
 name = "Worktree Bootstrap"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -4120,14 +4119,14 @@ command = ["sh", "-c", "echo install"]
     .unwrap();
     run_git(
         &source_repo,
-        &["add", "worktree-bootstrap/herdr-plugin.toml"],
+        &["add", "worktree-bootstrap/nagi-plugin.toml"],
     );
     run_git(&source_repo, &["commit", "--quiet", "-m", "add plugin"]);
 
     fs::create_dir_all(&config_home).unwrap();
     fs::create_dir_all(&runtime_dir).unwrap();
     let managed_checkout = config_home
-        .join("herdr-dev")
+        .join("nagi-dev")
         .join("plugins")
         .join("github")
         .join(WORKTREE_BOOTSTRAP_MANAGED_COMPONENT);
@@ -4135,7 +4134,7 @@ command = ["sh", "-c", "echo install"]
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -4173,8 +4172,8 @@ command = ["sh", "-c", "echo install"]
                         "plugin_id": "example.worktree-bootstrap",
                         "name": "Worktree Bootstrap",
                         "version": "0.1.0",
-                        "min_herdr_version": "0.6.10",
-                        "manifest_path": managed_checkout_for_server.join("herdr-plugin.toml").display().to_string(),
+                        "min_nagi_version": "0.6.10",
+                        "manifest_path": managed_checkout_for_server.join("nagi-plugin.toml").display().to_string(),
                         "plugin_root": managed_checkout_for_server.display().to_string(),
                         "enabled": true,
                         "source": {"kind": "local"}
@@ -4210,7 +4209,7 @@ command = ["sh", "-c", "echo install"]
         &[
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/worktree-bootstrap",
+            "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
@@ -4234,18 +4233,18 @@ fn plugin_install_keeps_checkout_when_incompatible_server_cleanup_fails() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("fake-herdr.sock");
+    let socket_path = runtime_dir.join("fake-nagi.sock");
     let source_repo = base.join("source-repo");
     let plugin_dir = source_repo.join("worktree-bootstrap");
     fs::create_dir_all(&plugin_dir).unwrap();
     create_committed_repo(&source_repo);
     fs::write(
-        plugin_dir.join("herdr-plugin.toml"),
+        plugin_dir.join("nagi-plugin.toml"),
         r#"
 id = "example.worktree-bootstrap"
 name = "Worktree Bootstrap"
 version = "0.1.0"
-min_herdr_version = "0.6.10"
+min_nagi_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
@@ -4257,14 +4256,14 @@ command = ["sh", "-c", "echo install"]
     .unwrap();
     run_git(
         &source_repo,
-        &["add", "worktree-bootstrap/herdr-plugin.toml"],
+        &["add", "worktree-bootstrap/nagi-plugin.toml"],
     );
     run_git(&source_repo, &["commit", "--quiet", "-m", "add plugin"]);
 
     fs::create_dir_all(&config_home).unwrap();
     fs::create_dir_all(&runtime_dir).unwrap();
     let managed_checkout = config_home
-        .join("herdr-dev")
+        .join("nagi-dev")
         .join("plugins")
         .join("github")
         .join(WORKTREE_BOOTSTRAP_MANAGED_COMPONENT);
@@ -4272,7 +4271,7 @@ command = ["sh", "-c", "echo install"]
     fs::write(
         &git_config,
         format!(
-            "[url \"file://{}\"]\n    insteadOf = https://github.com/ogulcancelik/herdr-plugin-examples.git\n",
+            "[url \"file://{}\"]\n    insteadOf = https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git\n",
             source_repo.display()
         ),
     )
@@ -4306,8 +4305,8 @@ command = ["sh", "-c", "echo install"]
                         "plugin_id": "example.worktree-bootstrap",
                         "name": "Worktree Bootstrap",
                         "version": "0.1.0",
-                        "min_herdr_version": "0.6.10",
-                        "manifest_path": managed_checkout_for_server.join("herdr-plugin.toml").display().to_string(),
+                        "min_nagi_version": "0.6.10",
+                        "manifest_path": managed_checkout_for_server.join("nagi-plugin.toml").display().to_string(),
                         "plugin_root": managed_checkout_for_server.display().to_string(),
                         "enabled": true,
                         "source": {"kind": "local"}
@@ -4339,7 +4338,7 @@ command = ["sh", "-c", "echo install"]
         &[
             "plugin",
             "install",
-            "ogulcancelik/herdr-plugin-examples/worktree-bootstrap",
+            "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
@@ -4363,9 +4362,9 @@ fn wait_agent_status_exits_immediately_when_status_already_matches() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = send_request(
@@ -4384,7 +4383,7 @@ fn wait_agent_status_exits_immediately_when_status_already_matches() {
     let reported = send_request(
         &socket_path,
         &format!(
-            r#"{{"id":"req_cli_immediate_2","method":"pane.report_agent","params":{{"pane_id":"{}","source":"herdr:pi","agent":"pi","state":"idle"}}}}"#,
+            r#"{{"id":"req_cli_immediate_2","method":"pane.report_agent","params":{{"pane_id":"{}","source":"nagi:pi","agent":"pi","state":"idle"}}}}"#,
             pane_id
         ),
     );
@@ -4412,7 +4411,7 @@ fn wait_agent_status_exits_immediately_when_status_already_matches() {
     assert_eq!(waited_json["data"]["agent_status"], "idle");
     assert_eq!(waited_json["data"]["agent"], "pi");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -4420,9 +4419,9 @@ fn wait_agent_status_times_out_when_status_does_not_match() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
 
-    let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
+    let nagi = spawn_nagi(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
     let created = send_request(
@@ -4454,7 +4453,7 @@ fn wait_agent_status_times_out_when_status_does_not_match() {
         String::from_utf8_lossy(&waited.stderr)
     );
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 #[test]
@@ -4462,7 +4461,7 @@ fn wait_agent_status_exits_when_done_status_matches() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("nagi.sock");
     let bin_dir = base.join("bin");
 
     fs::create_dir_all(&bin_dir).unwrap();
@@ -4482,7 +4481,7 @@ fn wait_agent_status_exits_when_done_status_matches() {
 
     let inherited_path = std::env::var("PATH").unwrap_or_default();
     let path_override = format!("{}:{}", bin_dir.display(), inherited_path);
-    let herdr = spawn_herdr_with_path(
+    let nagi = spawn_nagi_with_path(
         &config_home,
         &runtime_dir,
         &socket_path,
@@ -4537,5 +4536,5 @@ fn wait_agent_status_exits_when_done_status_matches() {
     assert_eq!(waited_json["data"]["agent_status"], "done");
     assert_eq!(waited_json["data"]["agent"], "pi");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }

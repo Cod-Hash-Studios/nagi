@@ -1,20 +1,22 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
+// installed by nagi
+// managed by nagi; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
-// HERDR_INTEGRATION_ID=pi
-// HERDR_INTEGRATION_VERSION=5
+// NAGI_INTEGRATION_ID=omp
+// NAGI_INTEGRATION_VERSION=5
 // @ts-nocheck
 
 import { createConnection } from "node:net";
 
-const HERDR_ENV = process.env.HERDR_ENV;
-const socketPath = process.env.HERDR_SOCKET_PATH;
-const paneId = process.env.HERDR_PANE_ID;
-const source = "herdr:pi";
+const NAGI_ENV = process.env.NAGI_ENV;
+const socketPath = process.env.NAGI_SOCKET_PATH;
+const paneId = process.env.NAGI_PANE_ID;
+const source = "nagi:omp";
 
 function enabled() {
-  return HERDR_ENV === "1" && !!socketPath && !!paneId;
+  return NAGI_ENV === "1" && !!socketPath && !!paneId;
 }
+
+let requestQueue = Promise.resolve();
 
 function sendRequestAttempt(request: unknown, timeoutMs: number): Promise<boolean> {
   if (!enabled()) {
@@ -44,11 +46,19 @@ function sendRequestAttempt(request: unknown, timeoutMs: number): Promise<boolea
   });
 }
 
-async function sendRequest(request: unknown): Promise<void> {
+async function sendRequestNow(request: unknown): Promise<void> {
   if (await sendRequestAttempt(request, 500)) {
     return;
   }
   await sendRequestAttempt(request, 1500);
+}
+
+function sendRequest(request: unknown): Promise<void> {
+  requestQueue = requestQueue.then(
+    () => sendRequestNow(request),
+    () => sendRequestNow(request),
+  );
+  return requestQueue;
 }
 
 type AgentState = "working" | "blocked" | "idle";
@@ -59,8 +69,8 @@ type QueuedState = {
   seq: number;
 };
 
-const idleDebounceMs = parseDurationEnv("HERDR_PI_IDLE_DEBOUNCE_MS", 250);
-const retryGraceMs = parseDurationEnv("HERDR_PI_RETRY_GRACE_MS", 2500);
+const idleDebounceMs = parseDurationEnv("NAGI_OMP_IDLE_DEBOUNCE_MS", 250);
+const retryGraceMs = parseDurationEnv("NAGI_OMP_RETRY_GRACE_MS", 2500);
 const retryableErrorPattern =
   /overloaded|provider.?returned.?error|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|internal.?error|network.?error|connection.?error|connection.?refused|connection.?lost|websocket.?closed|websocket.?error|other side closed|fetch failed|upstream.?connect|reset before headers|socket hang up|ended without|http2 request did not get a response|timed? out|timeout|terminated|retry delay/i;
 let reportSeq = Date.now() * 1000;
@@ -70,18 +80,6 @@ let currentAgentSessionPath: string | undefined;
 function nextReportSeq(): number {
   reportSeq += 1;
   return reportSeq;
-}
-
-function parseDurationEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return fallback;
-  }
-  return parsed;
 }
 
 function updateSessionRef(ctx: any): void {
@@ -111,6 +109,18 @@ function withSessionRef(params: Record<string, unknown>): Record<string, unknown
   return params;
 }
 
+function parseDurationEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
 function currentSessionRef(): Record<string, unknown> | undefined {
   if (currentAgentSessionPath) {
     return { agent_session_path: currentAgentSessionPath };
@@ -121,7 +131,7 @@ function currentSessionRef(): Record<string, unknown> | undefined {
   return undefined;
 }
 
-function reportSession(sessionStartSource?: string): Promise<void> {
+function reportSession(sessionStartSource = "startup"): Promise<void> {
   const sessionRef = currentSessionRef();
   if (!sessionRef) {
     return Promise.resolve();
@@ -133,7 +143,7 @@ function reportSession(sessionStartSource?: string): Promise<void> {
     params: {
       pane_id: paneId,
       source,
-      agent: "pi",
+      agent: "omp",
       seq: nextReportSeq(),
       session_start_source: sessionStartSource,
       ...sessionRef,
@@ -148,7 +158,7 @@ function sendState(state: AgentState, message?: string, seq = nextReportSeq()): 
     params: withSessionRef({
       pane_id: paneId,
       source,
-      agent: "pi",
+      agent: "omp",
       state,
       message,
       seq,
@@ -163,18 +173,18 @@ function releaseAgent(): Promise<void> {
     params: {
       pane_id: paneId,
       source,
-      agent: "pi",
+      agent: "omp",
       seq: nextReportSeq(),
     },
   });
 }
 
 function shouldReleaseOnSessionShutdown(event: any): boolean {
-  // Pi tears down and rebinds extension runtimes for internal lifecycle actions
+  // OMP tears down and rebinds extension runtimes for internal lifecycle actions
   // such as /reload, /new, /resume, and /fork. Those do not mean the pane's
   // agent process has exited, and releasing hook authority there can suppress
   // legitimate reports from the replacement runtime. Only a user/process quit
-  // should release Herdr's full-lifecycle authority.
+  // should release Nagi's full-lifecycle authority.
   const reason = event?.reason;
   return reason === "quit";
 }
@@ -231,6 +241,15 @@ function retryableErrorMessage(event: any): string | undefined {
     return undefined;
   }
   return errorMessage || "retryable provider error";
+}
+
+function askBlockedMessage(args: any): string {
+  const questions = Array.isArray(args?.questions) ? args.questions : [];
+  const firstQuestion = questions.find((question: any) => typeof question?.question === "string");
+  if (firstQuestion?.question) {
+    return firstQuestion.question;
+  }
+  return "waiting for user input";
 }
 
 export default function (pi) {
@@ -318,39 +337,70 @@ export default function (pi) {
     retryTimer.unref?.();
   }
 
-  pi.events.on("herdr:blocked", (data) => {
+  function activateRootSession(ctx: any, sessionStartSource = "startup"): boolean {
+    if (ctx?.hasUI !== true) {
+      return false;
+    }
+    rootSession = true;
+    updateSessionRef(ctx);
+    void reportSession(sessionStartSource);
+    return true;
+  }
+
+  function resetSessionState() {
+    clearPendingTimers();
+    clearFailureState();
+    agentActive = false;
+    blockedCount = 0;
+    blockedMessage = undefined;
+  }
+
+  function activateBlocked(message: string | undefined) {
+    clearPendingTimers();
+    blockedCount += 1;
+    blockedMessage = message;
+    publishState();
+  }
+
+  function deactivateBlocked() {
+    blockedCount = Math.max(0, blockedCount - 1);
+    if (blockedCount === 0) {
+      blockedMessage = undefined;
+    }
+    publishState();
+  }
+
+  pi.events.on("nagi:blocked", (data) => {
     if (!rootSession) {
       return;
     }
     if (!data?.active) {
-      blockedCount = Math.max(0, blockedCount - 1);
-      if (blockedCount === 0) {
-        blockedMessage = undefined;
-      }
-      publishState();
+      deactivateBlocked();
       return;
     }
 
-    clearPendingTimers();
-    blockedCount += 1;
-    blockedMessage = data.label;
-    publishState();
+    activateBlocked(data.label);
   });
 
-  pi.on("session_start", async (event, ctx) => {
-    if (ctx?.hasUI !== true) {
+  pi.on("session_start", (_event, ctx) => {
+    if (!activateRootSession(ctx)) {
       return;
     }
-    rootSession = true;
-    updateSessionRef(ctx);
-    await reportSession(event?.reason);
     // A reload can replace this extension mid-run without emitting another agent_start.
     agentActive = ctx?.isIdle?.() === false;
     publishState(true);
   });
 
+  pi.on("session_switch", (event, ctx) => {
+    if (!activateRootSession(ctx, event?.reason || "resume")) {
+      return;
+    }
+    resetSessionState();
+    publishState(true);
+  });
+
   pi.on("agent_start", (_event, ctx) => {
-    if (!rootSession) {
+    if (!rootSession && !activateRootSession(ctx)) {
       return;
     }
     updateSessionRef(ctx);
@@ -361,12 +411,47 @@ export default function (pi) {
     publishState();
   });
 
+  pi.on("tool_approval_requested", (event, ctx) => {
+    if (!rootSession && !activateRootSession(ctx)) {
+      return;
+    }
+    const label = event?.reason || `${event?.toolName || "Tool"} approval`;
+    activateBlocked(label);
+  });
+
+  pi.on("tool_approval_resolved", (_event, ctx) => {
+    if (!rootSession && !activateRootSession(ctx)) {
+      return;
+    }
+    deactivateBlocked();
+  });
+
+  pi.on("tool_execution_start", (event, ctx) => {
+    if (event?.toolName !== "ask") {
+      return;
+    }
+    if (!rootSession && !activateRootSession(ctx)) {
+      return;
+    }
+    activateBlocked(askBlockedMessage(event.args));
+  });
+
+  pi.on("tool_execution_end", (event, ctx) => {
+    if (event?.toolName !== "ask") {
+      return;
+    }
+    if (!rootSession && !activateRootSession(ctx)) {
+      return;
+    }
+    deactivateBlocked();
+  });
+
   pi.on("agent_end", (event) => {
     if (!rootSession) {
       return;
     }
     if (!agentActive) {
-      // Pi can emit duplicate/late end events while auto-retry is already
+      // OMP can emit duplicate/late end events while auto-retry is already
       // holding the pane in Working. Do not let an unqualified duplicate end
       // cancel the retry hold and publish a false Idle.
       return;

@@ -369,9 +369,9 @@ mod tests {
                 plugin_id: "example.links".into(),
                 name: "Links".into(),
                 version: "0.1.0".into(),
-                min_herdr_version: "0.6.10".into(),
+                min_nagi_version: "0.6.10".into(),
                 description: None,
-                manifest_path: plugin_root.join("herdr-plugin.toml").display().to_string(),
+                manifest_path: plugin_root.join("nagi-plugin.toml").display().to_string(),
                 plugin_root: plugin_root.display().to_string(),
                 enabled: true,
                 platforms: None,
@@ -634,7 +634,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn ctrl_click_url_invokes_plugin_link_handler_but_super_click_does_not() {
-        let line = "see https://github.com/ogulcancelik/herdr/issues/398";
+        let line = "see https://github.com/Cod-Hash-Studios/nagi/issues/398";
         let col = line.find("github").expect("url host") as u16;
 
         let (mut ctrl_app, ctrl_info) = app_with_screen_bytes(line.as_bytes());
@@ -1282,7 +1282,7 @@ mod tests {
 
         let output_path = unique_temp_path("custom-popup-command");
         let command = format!(
-            "printf '%s|%s' \"${{HERDR_PANE_ID-unset}}\" \"$HERDR_ACTIVE_PANE_ID\" > '{}'",
+            "printf '%s|%s' \"${{NAGI_PANE_ID-unset}}\" \"$NAGI_ACTIVE_PANE_ID\" > '{}'",
             output_path.display()
         );
         app.state.keybinds.custom_commands = vec![crate::config::CustomCommandKeybind {
