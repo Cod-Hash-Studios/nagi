@@ -70,17 +70,17 @@ You should not need to memorize tmux before you can keep several agents tidy.
 Use the mouse when it is faster. Use the keyboard when you know exactly where
 you want to go.
 
-### Missions that survive the happy path
+### A durable mission foundation
 
-A mission binds together:
+The implemented mission store and tested domain model bind together:
 
 - a human-readable objective;
 - explicit acceptance criteria;
 - an immutable closure plan;
 - one canonical Git checkout and an exclusive run lease;
 - an append-only journal with snapshots and crash recovery;
-- attention events that are recorded before a response is acknowledged;
-- proof that is tied to the workspace state it verified.
+- durable attention and provider-response records;
+- evidence and proof primitives scoped to the workspace state they describe.
 
 The journal is single-writer. Runtime directories and records use private Unix
 permissions. Symlinked or weakly protected state is rejected instead of quietly
@@ -93,8 +93,8 @@ different protocols into one mission model.
 
 | Agent | Terminal workspace | Managed actor | Mission start |
 |---|:---:|:---:|:---:|
-| Codex | yes | tested | wired |
-| Claude Code | yes | tested | wired |
+| Codex | yes | tested | read-only start wired |
+| Claude Code | yes | tested | read-only start wired |
 | OpenCode | yes | tested | wiring in progress |
 
 The OpenCode actor has its own authenticated loopback lifecycle, SSE limits,
@@ -103,13 +103,15 @@ not label that path complete until `mission.start` exposes it end to end.
 
 ### Proof, not vibes
 
-The closure engine can map every acceptance criterion to command or manual
-checks. Evidence is bound to the relevant files, base tree, result tree, diff,
-artifacts, and timestamps. If the workspace changes, stale proof stops being
-proof.
+The tested closure model maps every acceptance criterion to command or manual
+checks. Its evidence is bound to relevant files, base tree, result tree, diff,
+artifacts, and timestamps, so a workspace change can invalidate stale proof.
+Executing those checks and closing a mission through the public API is still in
+progress.
 
-Checks currently run with the user's operating-system permissions. They are
-trusted commands, not a security sandbox.
+When check execution is wired, commands will run with the user's
+operating-system permissions. They are trusted commands, not a security
+sandbox.
 
 ## Try it from source
 
@@ -171,7 +173,8 @@ This repository contains a serious foundation, not a finished public release.
 | Persistent terminal sessions and socket API | working |
 | Durable mission create, list, get, and configure | working |
 | Worktree claims, journal replay, crash recovery, and handoff | working |
-| Managed Codex and Claude Code start paths | working |
+| Managed Codex and Claude Code start paths | working in read-only mode |
+| Provider replies and workspace-write consent | in progress |
 | Managed OpenCode actor | tested, start wiring pending |
 | Full check execution and closure through the public API | in progress |
 | Mission cockpit in the TUI | in progress |
