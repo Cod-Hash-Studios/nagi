@@ -125,6 +125,10 @@ enum Ownership {
     Prepared(PreparedMissionStore),
     Released(ReleasedMissionStore),
     Observing(MissionStoreReader),
+    #[allow(
+        dead_code,
+        reason = "the disabled runtime is retained for unsupported platform boundaries"
+    )]
     Disabled,
     Vacant,
 }
@@ -197,6 +201,10 @@ impl MissionRuntime {
         })
     }
 
+    #[allow(
+        dead_code,
+        reason = "the disabled runtime is retained for unsupported platform boundaries"
+    )]
     pub(crate) const fn disabled() -> Self {
         Self {
             ownership: Ownership::Disabled,
@@ -528,6 +536,10 @@ impl MissionRuntime {
             .ok_or(MissionRuntimeError::MissionMissing)
     }
 
+    #[allow(
+        dead_code,
+        reason = "response attempt inspection is staged until provider replies are public"
+    )]
     pub(crate) fn next_response_attempt(
         &self,
         mission_id: &str,
@@ -677,8 +689,16 @@ pub(crate) enum MissionRuntimeError {
     #[error("mission authority requires a current worktree lease")]
     LeaseNotCurrent,
     #[error("mission authority worktree lease does not match the proof scope")]
+    #[allow(
+        dead_code,
+        reason = "proof scope validation is staged until public mission closure"
+    )]
     LeaseScopeMismatch,
     #[error("mission authority journal has no durable event")]
+    #[allow(
+        dead_code,
+        reason = "proof authority validation is staged until public mission closure"
+    )]
     EmptyAuthority,
     #[error("mission projection is missing after a durable commit")]
     MissionMissing,
