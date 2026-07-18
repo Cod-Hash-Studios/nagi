@@ -70,6 +70,10 @@ impl MissionDefinition {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "the standalone mission lifecycle is staged behind the durable runtime"
+    )]
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -108,6 +112,10 @@ pub enum ProviderMode {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[allow(
+    dead_code,
+    reason = "the standalone mission lifecycle is staged behind the durable runtime"
+)]
 pub struct RunTarget {
     run_id: String,
     provider: ProviderKind,
@@ -116,6 +124,10 @@ pub struct RunTarget {
     worktree_path: String,
 }
 
+#[allow(
+    dead_code,
+    reason = "the standalone mission lifecycle is staged behind the durable runtime"
+)]
 impl RunTarget {
     pub fn new(
         run_id: impl Into<String>,
@@ -218,6 +230,10 @@ impl MissionStatus {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[allow(
+    dead_code,
+    reason = "lifecycle transition history is staged behind public mission closure"
+)]
 pub struct MissionTransition {
     from: Option<MissionStatus>,
     to: MissionStatus,
@@ -227,6 +243,10 @@ pub struct MissionTransition {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[allow(
+    dead_code,
+    reason = "the standalone mission lifecycle is staged behind the durable runtime"
+)]
 pub struct MissionLifecycle {
     definition: MissionDefinition,
     status: MissionStatus,
@@ -248,12 +268,20 @@ pub(crate) struct ProofReceipt {
 }
 
 #[derive(Debug)]
+#[allow(
+    dead_code,
+    reason = "sealed ready transitions are staged behind public mission closure"
+)]
 pub struct ReadyProof {
     mission_id: String,
     verified: VerifiedProof,
 }
 
 #[derive(Debug)]
+#[allow(
+    dead_code,
+    reason = "sealed archive transitions are staged behind public mission closure"
+)]
 pub struct ArchiveProof {
     mission_id: String,
     verified: VerifiedProof,
@@ -261,6 +289,10 @@ pub struct ArchiveProof {
 }
 
 impl ProofReceipt {
+    #[allow(
+        dead_code,
+        reason = "proof receipts are minted only by the staged closure transition"
+    )]
     fn from_verified(proof: &VerifiedProof) -> Self {
         Self {
             subject_digest: proof.subject_digest(),
@@ -297,6 +329,10 @@ impl ProofReceipt {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "sealed ready transitions are staged behind public mission closure"
+)]
 impl ReadyProof {
     pub(crate) fn into_receipt(self) -> (String, ProofReceipt) {
         let receipt = ProofReceipt::from_verified(&self.verified);
@@ -304,6 +340,10 @@ impl ReadyProof {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "sealed archive transitions are staged behind public mission closure"
+)]
 impl ArchiveProof {
     pub(crate) fn into_receipt(self) -> (String, String, ProofReceipt) {
         let receipt = ProofReceipt::from_verified(&self.verified);
@@ -311,6 +351,10 @@ impl ArchiveProof {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "the standalone mission lifecycle is staged behind the durable runtime"
+)]
 impl MissionLifecycle {
     #[must_use]
     pub fn draft(definition: MissionDefinition, at_millis: u64) -> Self {
@@ -651,6 +695,10 @@ impl MissionLifecycle {
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
+#[allow(
+    dead_code,
+    reason = "this typed error contract includes staged standalone lifecycle failures"
+)]
 pub enum MissionError {
     #[error("mission id cannot be empty")]
     EmptyMissionId,
