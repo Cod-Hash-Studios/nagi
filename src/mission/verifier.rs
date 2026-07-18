@@ -1,3 +1,8 @@
+#![allow(
+    dead_code,
+    reason = "trusted checks are tested but not public until closure execution is wired"
+)]
+
 use std::{
     collections::BTreeMap,
     ffi::{OsStr, OsString},
