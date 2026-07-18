@@ -1,8 +1,7 @@
 name: PR Gate
 
-on:
-  pull_request_target:
-    types: [opened, reopened]
+# Upstream maintainer automation must not run in the fork.
+on: []
 
 jobs:
   check-contributor:

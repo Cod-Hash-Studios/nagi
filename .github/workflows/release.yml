@@ -1,9 +1,7 @@
 name: Release
 
-on:
-  push:
-    tags:
-      - "v*"
+# Disabled while the fork has no signed release-readiness artifact.
+on: []
 
 permissions:
   contents: read

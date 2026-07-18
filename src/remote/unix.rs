@@ -22,6 +22,7 @@ const REMOTE_SERVER_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(100
 const CURRENT_PROTOCOL: u32 = crate::protocol::PROTOCOL_VERSION;
 const STABLE_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/latest.json";
 const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/preview.json";
+const FORK_REMOTE_RELEASE_CHANNEL_CONFIGURED: bool = false;
 const REMOTE_BINARY_ENV_VAR: &str = "HERDR_REMOTE_BINARY";
 const SSH_CONTROL_SOCKET_NAME: &str = "ctl";
 pub(crate) const REATTACH_COMMAND_ENV_VAR: &str = "HERDR_REATTACH_COMMAND";
@@ -1515,6 +1516,12 @@ fn preview_assets_for_build<'a>(
 }
 
 fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
+    if !FORK_REMOTE_RELEASE_CHANNEL_CONFIGURED {
+        return Err(io::Error::other(
+            "automatic remote binary download is disabled until this fork has a verified release channel",
+        ));
+    }
+
     if crate::build_info::is_preview() {
         let build_id = crate::build_info::build_id().ok_or_else(|| {
             io::Error::other("preview client has no build id; set HERDR_REMOTE_BINARY or install Herdr on the remote manually")
@@ -2016,6 +2023,17 @@ fn sanitize_path_component(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fork_never_downloads_an_upstream_remote_binary() {
+        let Err(error) = remote_release_asset("linux-x86_64") else {
+            panic!("upstream remote binary download was unexpectedly enabled");
+        };
+        assert_eq!(
+            error.to_string(),
+            "automatic remote binary download is disabled until this fork has a verified release channel"
+        );
+    }
 
     #[test]
     fn bridge_socket_is_user_only() {
