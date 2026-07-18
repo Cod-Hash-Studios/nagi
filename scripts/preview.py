@@ -159,7 +159,7 @@ def build_notes(previous: str, commit: str, build_id: str, base_version: str, re
         lines.append("")
 
     if not wrote:
-        lines.extend(["### Changed", "- Rebuilt preview from the current master branch.", ""])
+        lines.extend(["### Changed", "- Rebuilt preview from the current main branch.", ""])
 
     return "\n".join(lines).rstrip() + "\n"
 
@@ -318,7 +318,7 @@ def main() -> int:
     current.set_defaults(func=cmd_current_commit)
 
     select = sub.add_parser("select-commit")
-    select.add_argument("--ref", default="origin/master")
+    select.add_argument("--ref", default="origin/main")
     select.set_defaults(func=cmd_select_commit)
 
     range_base = sub.add_parser("range-base")
