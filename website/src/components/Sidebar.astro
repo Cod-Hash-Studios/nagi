@@ -2,9 +2,10 @@
 import MobileMenuFooter from 'virtual:starlight/components/MobileMenuFooter';
 import SidebarPersister from '@astrojs/starlight/components/SidebarPersister.astro';
 import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
+import { withSiteBase, withoutSiteBase } from '../site-path.mjs';
 
 const { sidebar } = Astro.locals.starlightRoute;
-const pathname = Astro.url.pathname;
+const pathname = withoutSiteBase(Astro.url.pathname);
 const isPreview = pathname === '/docs/preview/' || pathname.startsWith('/docs/preview/');
 const channelSidebar = isPreview ? addPreviewOnlyItems(rewriteSidebar(sidebar)) : sidebar;
 
@@ -15,7 +16,7 @@ function addPreviewOnlyItems(entries) {
     const windowsBeta = {
       type: 'link',
       label: 'Windows beta',
-      href: '/docs/preview/windows-beta/',
+      href: withSiteBase('/docs/preview/windows-beta/'),
       badge: undefined,
       isCurrent: samePath('/docs/preview/windows-beta/', pathname),
       attrs: {},
@@ -38,11 +39,11 @@ function addPreviewOnlyItems(entries) {
 function rewriteSidebar(entries) {
   return entries.map((entry) => {
     if (entry.type === 'link') {
-      const href = previewHref(entry.href);
+      const href = withSiteBase(previewHref(withoutSiteBase(entry.href)));
       return {
         ...entry,
         href,
-        isCurrent: samePath(href, pathname),
+        isCurrent: samePath(withoutSiteBase(href), pathname),
       };
     }
     const rewrittenEntries = rewriteSidebar(entry.entries);

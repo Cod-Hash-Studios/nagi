@@ -1,6 +1,7 @@
 ---
 import stableReference from '../data/config-reference.json';
 import previewReference from '../data/config-reference-preview.json';
+import { withoutSiteBase } from '../site-path.mjs';
 
 interface Props {
   placeholder?: string;
@@ -14,7 +15,7 @@ const {
   keyCountLabel = 'keys',
 } = Astro.props;
 
-const reference = Astro.url.pathname.includes('/docs/preview/')
+const reference = withoutSiteBase(Astro.url.pathname).includes('/docs/preview/')
   ? previewReference
   : stableReference;
 const totalKeys = reference.sections.reduce((sum, section) => sum + section.keys.length, 0);

@@ -9,6 +9,8 @@ describe('docsChannel', () => {
     ['/docs/preview/', 'preview'],
     ['/ja/docs/preview/install/', 'preview'],
     ['/zh-cn/docs/preview/', 'preview'],
+    ['/nagi/docs/preview/', 'preview'],
+    ['/nagi/ja/docs/install/', 'stable'],
   ])('maps %s to %s', (pathname, expected) => {
     expect(docsChannel(pathname)).toBe(expected);
   });
