@@ -59,7 +59,7 @@ mod tests {
         fs::write(&path, b"nagi").unwrap();
         let result = super::verify_sha256(
             &path,
-            "78193ef266c1e3c2ce4ea2a86d7fc87e8c52799653faaac8536533a1c9300f82",
+            "7037c5865b4629a983e7a3bb2fec71ac1bf504d99702fc433fe801b1a909d2b7",
         );
         let _ = fs::remove_file(&path);
         assert!(result.is_ok());
