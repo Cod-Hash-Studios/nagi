@@ -98,8 +98,6 @@ report() {
     --seq "$seq" >/dev/null
 }
 
-done_panes=()
-
 read API_WS API_CODEX API_TAB < <(mkws api)
 run tab rename "$API_TAB" agents >/dev/null
 API_SHELL="$(split "$API_CODEX" down)"
@@ -127,7 +125,6 @@ report "$WEB_PI" pi working "build ui" 1
 report "$WEB_CLAUDE" claude blocked "tool approval" 1
 report "$WEB_PREVIEW" server idle "preview ready" 1
 report "$WEB_CODEX" codex working "css pass" 1
-done_panes+=("$WEB_CODEX:codex:review ready")
 
 read DOCS_WS DOCS_NOTES DOCS_TAB < <(mkws docs)
 run tab rename "$DOCS_TAB" release >/dev/null
@@ -136,7 +133,6 @@ rename_sparse "$DOCS_NOTES" "codex notes done"
 rename_sparse "$DOCS_COPY" "codex release copy"
 report "$DOCS_COPY" codex working "release copy" 1
 report "$DOCS_NOTES" codex working "checking notes" 1
-done_panes+=("$DOCS_NOTES:codex:notes done")
 
 read INFRA_WS INFRA_HERMES INFRA_TAB < <(mkws infra)
 run tab rename "$INFRA_TAB" ops >/dev/null
@@ -147,15 +143,8 @@ report "$INFRA_HERMES" hermes blocked "ssh prompt" 1
 report "$INFRA_SSH" ssh idle connected 1
 
 run workspace focus "$API_WS" >/dev/null
-seq=2
-for item in "${done_panes[@]}"; do
-  pane="${item%%:*}"
-  rest="${item#*:}"
-  agent="${rest%%:*}"
-  status="${rest#*:}"
-  report "$pane" "$agent" idle "$status" "$seq"
-  seq=$((seq + 1))
-done
+report "$WEB_CODEX" codex idle "review ready" 2
+report "$DOCS_NOTES" codex idle "notes done" 3
 
 cat <<EOF
 Seeded agent cockpit demo data via $NAGI_SOCKET_PATH
