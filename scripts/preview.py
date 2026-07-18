@@ -137,7 +137,7 @@ def build_notes(previous: str, commit: str, build_id: str, base_version: str, re
     lines = [
         f"Preview build {build_id}",
         "",
-        f"Built from `{short}` on `master`.",
+        f"Built from `{short}` on `main`.",
         f"Base stable: v{normalize_version(base_version)}",
         f"Compare: {compare}",
         "",

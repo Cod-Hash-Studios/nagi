@@ -61,6 +61,18 @@ class PreviewNotesTests(unittest.TestCase):
         self.assertFalse(preview.hidden_subject("release: v0.7.0"))
         self.assertFalse(preview.hidden_subject("fix: repair preview manifest"))
 
+    def test_preview_notes_name_the_main_branch(self):
+        with mock.patch.object(preview, "commit_subjects", return_value=[]):
+            notes = preview.build_notes(
+                "previous",
+                "abcdef1234567890",
+                "2026-07-18-abcdef123456",
+                "0.7.4",
+                "Cod-Hash-Studios/nagi",
+            )
+        self.assertIn("Built from `abcdef123456` on `main`.", notes)
+        self.assertNotIn("master", notes)
+
     def test_latest_publishable_commit_keeps_release_commits(self):
         output = "\n".join(
             [
