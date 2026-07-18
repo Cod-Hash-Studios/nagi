@@ -1,3 +1,8 @@
+#![allow(
+    dead_code,
+    reason = "interactive write consent is tested but remains closed at the public API boundary"
+)]
+
 use std::{
     collections::BTreeMap,
     fmt,
