@@ -2,7 +2,7 @@
   "rules": [
     {
       "allowed": {
-        "origins": ["https://herdr.dev"],
+        "origins": ["https://github.com/Cod-Hash-Studios/nagi"],
         "methods": ["GET", "HEAD"],
         "headers": ["*"]
       },

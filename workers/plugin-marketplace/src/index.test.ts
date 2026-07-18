@@ -26,16 +26,16 @@ class MemoryKV {
 function repo(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 1,
-    full_name: "ogulcancelik/herdr-plugin-example",
-    owner: { login: "ogulcancelik" },
-    name: "herdr-plugin-example",
+    full_name: "Cod-Hash-Studios/nagi-plugin-example",
+    owner: { login: "Cod-Hash-Studios" },
+    name: "nagi-plugin-example",
     description: "Example plugin",
-    html_url: "https://github.com/ogulcancelik/herdr-plugin-example",
+    html_url: "https://github.com/Cod-Hash-Studios/nagi-plugin-example",
     stargazers_count: 5,
     forks_count: 1,
     open_issues_count: 0,
     language: "TypeScript",
-    topics: ["herdr-plugin"],
+    topics: ["nagi-plugin"],
     created_at: "2026-06-01T00:00:00Z",
     updated_at: "2026-06-02T00:00:00Z",
     pushed_at: "2026-06-03T00:00:00Z",
@@ -62,16 +62,16 @@ describe("normalizeRepositories", () => {
 
     expect(plugin).toEqual({
       id: 1,
-      fullName: "ogulcancelik/herdr-plugin-example",
-      owner: "ogulcancelik",
-      name: "herdr-plugin-example",
+      fullName: "Cod-Hash-Studios/nagi-plugin-example",
+      owner: "Cod-Hash-Studios",
+      name: "nagi-plugin-example",
       description: "Example plugin",
-      url: "https://github.com/ogulcancelik/herdr-plugin-example",
+      url: "https://github.com/Cod-Hash-Studios/nagi-plugin-example",
       stars: 5,
       forks: 1,
       openIssues: 0,
       language: "TypeScript",
-      topics: ["herdr-plugin"],
+      topics: ["nagi-plugin"],
       createdAt: "2026-06-01T00:00:00Z",
       updatedAt: "2026-06-02T00:00:00Z",
       pushedAt: "2026-06-03T00:00:00Z",
@@ -113,7 +113,7 @@ describe("normalizeRepositories", () => {
 
   test("drops unsafe urls, archived repositories, forks, disabled repositories, and private repositories", () => {
     const plugins = normalizeRepositories([
-      repo({ html_url: "https://example.com/ogulcancelik/herdr-plugin-example" }),
+      repo({ html_url: "https://example.com/Cod-Hash-Studios/nagi-plugin-example" }),
       repo({ archived: true }),
       repo({ fork: true }),
       repo({ disabled: true }),
@@ -195,7 +195,7 @@ describe("refreshPlugins", () => {
     expect(snapshot.generatedAt).toBe("2026-06-20T12:00:00.000Z");
     expect(snapshot.source).toMatchObject({
       provider: "github",
-      query: "topic:herdr-plugin is:public",
+      query: "topic:nagi-plugin is:public",
       totalCount: 2,
       collectedCount: 2,
       truncated: false,
@@ -220,10 +220,10 @@ describe("refreshPlugins", () => {
           }),
           repo({
             id: 2,
-            full_name: "ogulcancelik/herdr-plugin-example",
-            owner: { login: "ogulcancelik" },
-            name: "herdr-plugin-example",
-            html_url: "https://github.com/ogulcancelik/herdr-plugin-example",
+            full_name: "Cod-Hash-Studios/nagi-plugin-example",
+            owner: { login: "Cod-Hash-Studios" },
+            name: "nagi-plugin-example",
+            html_url: "https://github.com/Cod-Hash-Studios/nagi-plugin-example",
           }),
         ],
       });
@@ -237,7 +237,7 @@ describe("refreshPlugins", () => {
     expect(result.ok).toBe(true);
     const snapshot = JSON.parse(bucket.objects.get("plugins/index.json")?.value ?? "");
     expect(snapshot.plugins.map((plugin: { fullName: string }) => plugin.fullName)).toEqual([
-      "ogulcancelik/herdr-plugin-example",
+      "Cod-Hash-Studios/nagi-plugin-example",
     ]);
   });
 
@@ -329,7 +329,7 @@ describe("refreshPlugins", () => {
 
 describe("fetch handler", () => {
   test("does not expose a public Worker API", async () => {
-    const response = await worker.fetch(new Request("https://herdr.dev/api/plugins"), env());
+    const response = await worker.fetch(new Request("https://github.com/Cod-Hash-Studios/nagi"), env());
 
     expect(response.status).toBe(404);
     expect(response.headers.get("Cache-Control")).toBe("no-store");

@@ -26,10 +26,11 @@ upstream copyright holder and is not granted by this repository.
 
 ## Current status
 
-The fork is under private development. Upstream publishing workflows, update
-channels, and automatic remote binary downloads are disabled until the new
-project has its own identity, infrastructure, security review, and signed
-release-readiness artifact.
+The fork is now developed as **Nagi** by Cod'Hash Studios. It uses its own
+binary, package, config directory, sockets, logs, environment variables, and
+integration namespace. Upstream publishing workflows, update channels, and
+automatic remote binary downloads remain disabled until Nagi has its own
+security review and signed release-readiness artifact.
 
 No public release is an MVP. The first public release is intended to include
 the complete mission-to-proof workflow described in the local product plan.
@@ -43,7 +44,7 @@ patches:
 ```bash
 brew install zig@0.15
 ZIG=/opt/homebrew/opt/zig@0.15/bin/zig \
-  cargo test --bin herdr -- --test-threads=1
+  cargo test --bin nagi -- --test-threads=1
 ```
 
 The pinned upstream baseline contains 2,621 unit tests. They pass serially on
