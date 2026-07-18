@@ -3,44 +3,44 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Herdr: one terminal for the whole herd</title>
+        <title>Nagi: one terminal for the whole herd</title>
         <meta
             name="description"
-            content="Herdr is to coding agents what tmux is to terminals: an agent multiplexer that runs where your agents run. Real panes, agent state at a glance, ssh from anywhere, no app."
+            content="Nagi is to coding agents what tmux is to terminals: an agent multiplexer that runs where your agents run. Real panes, agent state at a glance, ssh from anywhere, no app."
         />
         <meta name="theme-color" content="#f0eee9" />
-        <link rel="canonical" href="https://herdr.dev/" />
+        <link rel="canonical" href="https://cod-hash-studios.github.io/nagi/" />
 
         <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Herdr" />
-        <meta property="og:title" content="Herdr: one terminal for the whole herd" />
+        <meta property="og:site_name" content="Nagi" />
+        <meta property="og:title" content="Nagi: one terminal for the whole herd" />
         <meta
             property="og:description"
             content="To coding agents what tmux is to terminals. Runs where your agents run: close the laptop, ssh from anywhere, nothing dies."
         />
-        <meta property="og:url" content="https://herdr.dev/" />
+        <meta property="og:url" content="https://cod-hash-studios.github.io/nagi/" />
         <meta
             property="og:image"
-            content="https://herdr.dev/assets/og-card-v8.png"
+            content="https://cod-hash-studios.github.io/nagi/assets/nagi-hero.png"
         />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="Herdr. One terminal. The whole herd." />
+        <meta property="og:image:alt" content="Nagi. One terminal. The whole herd." />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Herdr: one terminal for the whole herd" />
+        <meta name="twitter:title" content="Nagi: one terminal for the whole herd" />
         <meta
             name="twitter:description"
             content="To coding agents what tmux is to terminals. Runs where your agents run: close the laptop, ssh from anywhere, nothing dies."
         />
         <meta
             name="twitter:image"
-            content="https://herdr.dev/assets/og-card-v8.png"
+            content="https://cod-hash-studios.github.io/nagi/assets/nagi-hero.png"
         />
-        <meta name="twitter:image:alt" content="Herdr. One terminal. The whole herd." />
+        <meta name="twitter:image:alt" content="Nagi. One terminal. The whole herd." />
 
-        <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon.png?v=14" />
-        <link rel="apple-touch-icon" href="/assets/logo.png" />
+        <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+        <link rel="apple-touch-icon" href="/assets/logo.svg" />
         <link
             rel="preload"
             href="/assets/jbm.woff2?v=2"
@@ -50,7 +50,7 @@
         />
         <script>
             (function () {
-                var saved = localStorage.getItem("herdr-palette");
+                var saved = localStorage.getItem("nagi-palette");
                 var system = window.matchMedia("(prefers-color-scheme: dark)").matches
                     ? "tokyo-night"
                     : "tokyo-night-day";
@@ -62,9 +62,9 @@
     <body>
         <header class="site-header">
             <nav class="nav" aria-label="Primary navigation">
-                <a class="brand" href="/" aria-label="Herdr home">
+                <a class="brand" href="/" aria-label="Nagi home">
                     <span class="brand-logo" aria-hidden="true"></span>
-                    <span>herdr</span>
+                    <span>nagi</span>
                 </a>
                 <details class="nav-menu">
                     <summary class="nav-menu-button" aria-label="Open navigation">
@@ -77,12 +77,11 @@
                         <a href="/compare/">Compare</a>
                         <a href="/plugins/">Plugins</a>
                         <a href="/stats/">Stats</a>
-                        <a href="/blog/">Blog</a>
                         <a href="/docs/quick-start/">Quick start</a>
                         <a href="/docs/">Docs</a>
                         <a href="/docs/socket-api/">API</a>
                         <a href="/docs/install/">Install</a>
-                        <a href="https://github.com/ogulcancelik/herdr">GitHub</a>
+                        <a href="https://github.com/Cod-Hash-Studios/nagi">GitHub</a>
                     </div>
                 </details>
                 <div class="nav-links">
@@ -90,19 +89,18 @@
                     <a href="/compare/">Compare</a>
                     <a href="/plugins/">Plugins</a>
                     <a href="/stats/">Stats</a>
-                    <a href="/blog/">Blog</a>
                     <a href="/docs/quick-start/">Quick start</a>
                     <a href="/docs/">Docs</a>
                     <a href="/docs/socket-api/">API</a>
                 </div>
                 <div class="nav-tools">
-                    <a class="nav-icon-link has-count" href="https://github.com/ogulcancelik/herdr" aria-label="Herdr on GitHub">
+                    <a class="nav-icon-link has-count" href="https://github.com/Cod-Hash-Studios/nagi" aria-label="Nagi on GitHub">
                         <svg viewBox="0 0 16 16" aria-hidden="true">
                             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.87c.68 0 1.36.09 2 .26 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
                         </svg>
                         <span class="nav-star-count" data-stat-stars></span>
                     </a>
-                    <a class="nav-icon-link" href="https://x.com/herdrdev" aria-label="Herdr on X">
+                    <a class="nav-icon-link" href="https://github.com/Cod-Hash-Studios/nagi" aria-label="Nagi on X">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" />
                         </svg>
@@ -141,68 +139,68 @@
                     </div>
                     <div class="install-panel" aria-label="Install options">
                         <div class="install-methods" role="group" aria-label="Install method">
-                            <span class="install-label">Stable install</span>
+                            <span class="install-label">Build from source</span>
                             <button
                                 class="install-method is-active"
                                 type="button"
-                                data-command="curl -fsSL https://herdr.dev/install.sh | sh"
+                                data-command="cargo build --release --locked"
                                 data-size="compact"
                                 aria-pressed="true"
-                            >Script</button>
+                            >Build</button>
                             <button
                                 class="install-method"
                                 type="button"
-                                data-command="brew install herdr"
+                                data-command="git clone https://github.com/Cod-Hash-Studios/nagi.git"
                                 data-size="normal"
                                 aria-pressed="false"
-                            >Homebrew</button>
+                            >Clone</button>
                             <button
                                 class="install-method"
                                 type="button"
-                                data-command="nix run github:ogulcancelik/herdr"
+                                data-command="zig version && rustc --version"
                                 data-size="normal"
                                 aria-pressed="false"
-                            >Nix flake</button>
+                            >Toolchain</button>
                         </div>
                         <div class="install-card" aria-label="Install command">
                             <span class="prompt">$</span>
                             <code id="install-cmd" class="is-compact"
-                                >curl -fsSL https://herdr.dev/install.sh | sh</code
+                                >cargo build --release --locked</code
                             >
                             <button id="copy-btn" type="button" data-copy-target="install-cmd">Copy</button>
                         </div>
-                        <div class="windows-install" aria-label="Windows beta preview install">
+                        <div class="windows-install" aria-label="Current platform support">
                             <div class="windows-install-heading">
-                                <span>Windows beta · preview only</span>
-                                <a href="/docs/preview/windows-beta/">Preview docs</a>
+                                <span>Mission runtime · Unix today</span>
+                                <a href="/docs/install/">Build requirements</a>
                             </div>
-                            <div class="install-card install-card-secondary" aria-label="Windows beta install command">
-                                <span class="prompt">PS&gt;</span>
+                            <div class="install-card install-card-secondary" aria-label="Required toolchain">
+                                <span class="prompt">$</span>
                                 <code id="windows-install-cmd" class="is-compact"
-                                    >irm https://herdr.dev/install.ps1 | iex</code
+                                    >Rust 1.96.1 · Zig 0.15.2</code
                                 >
                                 <button type="button" data-copy-target="windows-install-cmd">Copy</button>
                             </div>
                         </div>
                     </div>
-                    <p class="hero-note">Stable Linux/macOS · Windows preview beta · no Electron, no account, no telemetry · <a href="/stats/">live stats</a></p>
+                    <p class="hero-note">Source-first · no Electron · no account · no inherited download channel · <a href="/stats/">built in public</a></p>
                 </div>
                 </div>
 
                 <div class="hero-right">
                 <figure class="hero-product-shot">
                     <div
-                        class="herdr-ui-mock"
+                        class="nagi-ui-mock"
                         id="herd-mock"
                         role="img"
-                        aria-label="Interactive Herdr session mock with workspaces, tabs, agent states, and terminal panes running Claude Code and Codex"
+                        aria-label="Interactive Nagi session mock with workspaces, tabs, agent states, and terminal panes running Claude Code and Codex"
                     >
                         <aside class="mock-sidebar">
                             <div class="mock-sidebar-half">
                             <div class="mock-sidebar-title">spaces</div>
-                            <div class="mock-space active" data-ws="herdr">
+                            <div class="mock-space active" data-ws="nagi">
                                 <span class="mock-dot dot-working"></span>
-                                <div><strong>herdr</strong><small>master</small></div>
+                                <div><strong>nagi</strong><small>master</small></div>
                             </div>
                             <div class="mock-space" data-ws="llm-proxy">
                                 <span class="mock-dot dot-blocked"></span>
@@ -215,16 +213,16 @@
                             </div>
                             <div class="mock-sidebar-half mock-sidebar-agents">
                             <div class="mock-agent-title"><span>agents</span><span>grouped</span></div>
-                            <div class="mock-agent working active" data-agent="herdr" data-kind="claude" data-ws-link="herdr" data-tab-link="main"><span class="braille-spinner"></span><div><strong>herdr</strong><small>working · claude</small></div></div>
-                            <div class="mock-agent" data-agent="explore" data-kind="opencode" data-ws-link="herdr" data-tab-link="opencode"><span>✓</span><div><strong>explore</strong><small>idle · opencode</small></div></div>
+                            <div class="mock-agent working active" data-agent="nagi" data-kind="claude" data-ws-link="nagi" data-tab-link="main"><span class="braille-spinner"></span><div><strong>nagi</strong><small>working · claude</small></div></div>
+                            <div class="mock-agent" data-agent="explore" data-kind="opencode" data-ws-link="nagi" data-tab-link="opencode"><span>✓</span><div><strong>explore</strong><small>idle · opencode</small></div></div>
                             <div class="mock-agent blocked" data-agent="llm-proxy" data-kind="claude" data-ws-link="llm-proxy" data-tab-link="main"><span>◉</span><div><strong>llm-proxy</strong><small>blocked · claude</small></div></div>
                             <div class="mock-agent done" data-agent="qmp" data-kind="codex" data-ws-link="qmp" data-tab-link="main"><span>●</span><div><strong>qmp</strong><small>done · codex</small></div></div>
                             </div>
                         </aside>
                         <section class="mock-main">
-                            <div class="mock-view active" data-view="herdr">
+                            <div class="mock-view active" data-view="nagi">
                                 <div class="mock-tabs">
-                                    <span data-tab="opencode">opencode</span><span class="active" data-tab="main">herdr</span><span>+</span>
+                                    <span data-tab="opencode">opencode</span><span class="active" data-tab="main">nagi</span><span>+</span>
                                 </div>
                                 <div class="mock-panes active" data-tab="main">
                                     <div class="mock-pane focused tui" data-title="claude">
@@ -235,11 +233,11 @@
                                             <div class="cc-header-text">
                                                 <div><b>Claude Code</b> <span class="dim">v2.1.198</span></div>
                                                 <div class="dim">Fable 5 with high effort · Claude Max</div>
-                                                <div class="dim">~/Projects/herdr/website</div>
+                                                <div class="dim">~/Projects/nagi/website</div>
                                             </div>
                                         </div>
                                         <br />
-                                        <div><b>❯</b> make the herdr.dev hero mock look exactly like real claude code</div>
+                                        <div><b>❯</b> make the Nagi hero mock look exactly like real claude code</div>
                                         <br />
                                         <div><span class="cc-bullet">●</span> Ha. I read the real pane over the socket — the mock was on v2.1.168, Claude Code is <span class="cc-file">v2.1.198</span> now. Missing the logo block and the whole rate-limit row.</div>
                                         <br />
@@ -254,12 +252,12 @@
                                             <div class="cc-rule"></div>
                                             <div><b>❯</b> <span class="cursor"></span></div>
                                             <div class="cc-rule"></div>
-                                            <div class="cc-status">&nbsp;&nbsp;<span class="cc-cyan">~/Projects/herdr/website</span><span class="cc-gy"> &gt; </span><span class="cc-yellow">master *</span><span class="green"> ↑1</span><span class="cc-gy"> &gt; ctx ──────── </span><span class="green">3%</span><span class="cc-gy"> 31k/1M</span></div>
+                                            <div class="cc-status">&nbsp;&nbsp;<span class="cc-cyan">~/Projects/nagi/website</span><span class="cc-gy"> &gt; </span><span class="cc-yellow">master *</span><span class="green"> ↑1</span><span class="cc-gy"> &gt; ctx ──────── </span><span class="green">3%</span><span class="cc-gy"> 31k/1M</span></div>
                                             <div class="cc-status">&nbsp;&nbsp;<span class="cc-coral">⏵⏵ bypass permissions on</span> <span class="dim">(shift+tab to cycle)</span></div>
                                         </div>
                                     </div>
                                     <div class="mock-pane" data-title="bun">
-                                        <div class="mock-prompt"><span>~/Projects/herdr</span> <em>master</em></div>
+                                        <div class="mock-prompt"><span>~/Projects/nagi</span> <em>master</em></div>
                                         <div><b>❯</b> <span class="cmd">bun</span> run dev</div>
                                         <div class="dim">$ node scripts/prepare-docs.mjs && astro dev</div>
                                         <div><span class="time">02:10:44</span> <span class="blue">[types]</span> Generated 0ms</div>
@@ -281,7 +279,7 @@
                                         <br />
                                         <div class="oc-y">+ Thought: 292ms</div>
                                         <br />
-                                        <div>This is <span class="oc-y">src/main.rs</span> — the entry point for <b>herdr</b>. Here's what it does:</div>
+                                        <div>This is <span class="oc-y">src/main.rs</span> — the entry point for <b>nagi</b>. Here's what it does:</div>
                                         <br />
                                         <div><span class="blue">1.</span> Arg parsing — <span class="oc-y">session::configure_from_args</span>, then remote args for the SSH bridge.</div>
                                         <div><span class="blue">2.</span> Subcommand dispatch — <span class="oc-y">server</span>, <span class="oc-y">client</span>, <span class="oc-y">update</span> — each returns early.</div>
@@ -402,25 +400,25 @@
                 <div class="section-heading-wide">
                     <div>
                         <p class="section-kicker"># from the community</p>
-                        <h2 id="community-title">Watch Herdr through other developers' workflows.</h2>
+                        <h2 id="community-title">Watch Nagi through other developers' workflows.</h2>
                     </div>
                     <p>
-                        Independent walkthroughs from Jilles, DevOps Toolbox, and Better Stack. See how Herdr feels as a tmux-style multiplexer for coding agents, remote sessions, and day-to-day agent orchestration.
+                        Independent walkthroughs from Jilles, DevOps Toolbox, and Better Stack. See how Nagi feels as a tmux-style multiplexer for coding agents, remote sessions, and day-to-day agent orchestration.
                     </p>
                 </div>
-                <div class="community-video-grid" aria-label="Community videos about Herdr">
+                <div class="community-video-grid" aria-label="Community videos about Nagi">
                     <a class="community-video-card" href="https://www.youtube.com/watch?v=qnIu-Xu64H0" target="_blank" rel="noopener">
                         <span class="community-video-thumb">
                             <img
                                 src="https://i.ytimg.com/vi/qnIu-Xu64H0/maxresdefault.jpg"
-                                alt="Thumbnail for Jilles' Herdr in about 6 minutes video"
+                                alt="Thumbnail for Jilles' Nagi in about 6 minutes video"
                                 loading="lazy"
                             />
                             <span class="play-badge" aria-hidden="true"></span>
                         </span>
                         <span class="community-video-copy">
                             <span class="community-video-meta">Jilles · 6:37</span>
-                            <span class="community-video-title">Herdr in about 6 minutes</span>
+                            <span class="community-video-title">Nagi in about 6 minutes</span>
                             <span class="community-video-desc">The fastest practical intro: install, workspaces, agent states, persistence, and the agent skill workflow.</span>
                         </span>
                     </a>
@@ -443,7 +441,7 @@
                         <span class="community-video-thumb">
                             <img
                                 src="https://i.ytimg.com/vi/PlN86TvzGy4/maxresdefault.jpg"
-                                alt="Thumbnail for Better Stack's Herdr agent multiplexer video"
+                                alt="Thumbnail for Better Stack's Nagi agent multiplexer video"
                                 loading="lazy"
                             />
                             <span class="play-badge" aria-hidden="true"></span>
@@ -451,7 +449,7 @@
                         <span class="community-video-copy">
                             <span class="community-video-meta">Better Stack · 7:10</span>
                             <span class="community-video-title">Is This the Ultimate Agent Multiplexer?</span>
-                            <span class="community-video-desc">A clear tmux comparison with agent awareness, remote attach, and why Herdr stays inside your terminal.</span>
+                            <span class="community-video-desc">A clear tmux comparison with agent awareness, remote attach, and why Nagi stays inside your terminal.</span>
                         </span>
                     </a>
                 </div>
@@ -460,14 +458,14 @@
             <section class="section access-section why-section" id="why">
                 <div class="section-heading-wide">
                     <div>
-                        <p class="section-kicker"># why herdr</p>
+                        <p class="section-kicker"># why nagi</p>
                         <h2>Run agents where the work is. Attach from anywhere.</h2>
                     </div>
                     <p>
                         Agents run wherever the work is: a server, a Mac Mini,
                         a sandbox VM, anywhere you can ssh. You attach from any
                         terminal, even a phone. Desktop agent managers can't
-                        leave the machine with the GUI. Herdr can.
+                        leave the machine with the GUI. Nagi can.
                         <a href="/compare/">Why switch from an app →</a>
                     </p>
                 </div>
@@ -479,27 +477,27 @@
                             Split panes, create tabs, and keep agents running
                             while your terminal comes and goes.
                         </p>
-                        <pre><code>$ herdr</code></pre>
+                        <pre><code>$ nagi</code></pre>
                     </article>
                     <article class="access-card">
                         <span class="access-label">over ssh</span>
                         <h3>Like tmux, on the server</h3>
                         <p>
-                            SSH in and run Herdr on the remote shell. The session
+                            SSH in and run Nagi on the remote shell. The session
                             stays after you detach, ideal from a phone SSH client.
                         </p>
                         <pre><code>$ ssh you@server
-$ herdr</code></pre>
+$ nagi</code></pre>
                     </article>
                     <article class="access-card">
                         <span class="access-label">thin client</span>
                         <h3>Native remote attach</h3>
                         <p>
-                            A local client to a remote session. Installs Herdr on
+                            A local client to a remote session. Installs Nagi on
                             the host for you, bridges your local clipboard
                             (including image paste), and keeps your keybindings.
                         </p>
-                        <pre><code>$ herdr --remote workbox</code></pre>
+                        <pre><code>$ nagi --remote workbox</code></pre>
                     </article>
                 </div>
                 <div class="mobile-proof">
@@ -507,7 +505,7 @@ $ herdr</code></pre>
                         <p class="section-kicker"># responsive tui</p>
                         <h3>Mobile-first when the terminal gets small.</h3>
                         <p>
-                            Herdr stays usable over SSH from a phone or tablet.
+                            Nagi stays usable over SSH from a phone or tablet.
                             The terminal view remains real, while narrow screens
                             get a switcher built for touch-sized decisions.
                         </p>
@@ -516,7 +514,7 @@ $ herdr</code></pre>
                         <figure>
                             <img
                                 src="/assets/mobile-agent-session-v2.jpeg"
-                                alt="Herdr agent session over SSH on a phone"
+                                alt="Nagi agent session over SSH on a phone"
                                 loading="lazy"
                             />
                             <figcaption>agent session over SSH</figcaption>
@@ -524,7 +522,7 @@ $ herdr</code></pre>
                         <figure>
                             <img
                                 src="/assets/mobile-switch-menu-v2.jpeg"
-                                alt="Herdr responsive switch menu on a phone"
+                                alt="Nagi responsive switch menu on a phone"
                                 loading="lazy"
                             />
                             <figcaption>responsive switch menu</figcaption>
@@ -542,14 +540,14 @@ $ herdr</code></pre>
                 <div class="section-heading-wide">
                     <div>
                         <p class="section-kicker"># why different</p>
-                        <h2>Most agent managers are apps. Herdr is a multiplexer.</h2>
+                        <h2>Most agent managers are apps. Nagi is a multiplexer.</h2>
                     </div>
                     <p>
-                        tmux and Zellij own persistent terminal sessions but don't understand agents. Desktop agent apps understand agents but live on one machine. Herdr keeps the multiplexer in your terminal and makes it agent-aware.
+                        tmux and Zellij own persistent terminal sessions but don't understand agents. Desktop agent apps understand agents but live on one machine. Nagi keeps the multiplexer in your terminal and makes it agent-aware.
                         <a href="/compare/">See the full comparison →</a>
                     </p>
                 </div>
-                <div class="contrast-grid" aria-label="What Herdr is not">
+                <div class="contrast-grid" aria-label="What Nagi is not">
                     <article>
                         <span>not a terminal emulator</span>
                         <p>Ghostty, Kitty, iTerm, Alacritty: your terminal stays.</p>
@@ -571,7 +569,7 @@ $ herdr</code></pre>
                                 <th>tmux / Zellij</th>
                                 <th>agent apps</th>
                                 <th>worktree orchestrators</th>
-                                <th>Herdr</th>
+                                <th>Nagi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -626,42 +624,42 @@ $ herdr</code></pre>
                         <span>tmux/Zellij <b>✓</b></span>
                         <span>agent apps <b>—</b></span>
                         <span>worktree apps <b>—</b></span>
-                        <span class="herdr">Herdr <b>✓</b></span>
+                        <span class="nagi">Nagi <b>✓</b></span>
                     </article>
                     <article>
                         <h3>Persistent PTY sessions</h3>
                         <span>tmux/Zellij <b>✓</b></span>
                         <span>agent apps <b>limited</b></span>
                         <span>worktree apps <b>embedded</b></span>
-                        <span class="herdr">Herdr <b>✓</b></span>
+                        <span class="nagi">Nagi <b>✓</b></span>
                     </article>
                     <article>
                         <h3>Remote SSH attach</h3>
                         <span>tmux/Zellij <b>✓</b></span>
                         <span>agent apps <b>limited</b></span>
                         <span>worktree apps <b>remote projects</b></span>
-                        <span class="herdr">Herdr <b>✓</b></span>
+                        <span class="nagi">Nagi <b>✓</b></span>
                     </article>
                     <article>
                         <h3>Semantic agent state</h3>
                         <span>tmux/Zellij <b>—</b></span>
                         <span>agent apps <b>partial</b></span>
                         <span>worktree apps <b>workspace status</b></span>
-                        <span class="herdr">Herdr <b>✓</b></span>
+                        <span class="nagi">Nagi <b>✓</b></span>
                     </article>
                     <article>
                         <h3>Direct agent attach</h3>
                         <span>tmux/Zellij <b>—</b></span>
                         <span>agent apps <b>—</b></span>
                         <span>worktree apps <b>—</b></span>
-                        <span class="herdr">Herdr <b>✓</b></span>
+                        <span class="nagi">Nagi <b>✓</b></span>
                     </article>
                     <article>
                         <h3>Agents can orchestrate it</h3>
                         <span>tmux/Zellij <b>scriptable</b></span>
                         <span>agent apps <b>partial</b></span>
                         <span>worktree apps <b>workflow-owned</b></span>
-                        <span class="herdr">Herdr <b>✓</b></span>
+                        <span class="nagi">Nagi <b>✓</b></span>
                     </article>
                 </div>
             </section>
@@ -669,62 +667,29 @@ $ herdr</code></pre>
             <section class="section marketplace-teaser" id="marketplace">
                 <div class="marketplace-teaser-top">
                     <div class="marketplace-teaser-copy">
-                        <p class="section-kicker"># marketplace</p>
-                        <h2>Make it yours.</h2>
+                        <p class="section-kicker"># plugins</p>
+                        <h2>Extend locally. Publish carefully.</h2>
                         <p class="marketplace-teaser-lede">
-                            Review diffs beside the agent. Approve from your phone.
-                            Navigate like vim. Watch your agents graze as pixel-art
-                            sheep. If herdr doesn't do it, one of
-                            <span data-plugin-count>150+</span> community plugins
-                            does, or you publish your own with one GitHub topic.
+                            The local plugin engine stays available for workflows
+                            you review and control. The public Nagi registry will
+                            open only when discovery, provenance, and trust are
+                            ready under the Nagi project.
                         </p>
                         <div class="hero-actions">
-                            <a class="button button-primary" href="/plugins/">Browse plugins</a>
-                            <a class="button button-secondary" href="/docs/plugins/">Build a plugin</a>
+                            <a class="button button-primary" href="/docs/plugins/">Build a local plugin</a>
+                            <a class="button button-secondary" href="/plugins/">Registry status</a>
                         </div>
                     </div>
                     <div class="marketplace-teaser-install">
                         <div class="install-card" aria-label="Plugin install command">
                             <span class="prompt">$</span>
-                            <code>herdr plugin install &lt;owner&gt;/&lt;repo&gt;</code>
+                            <code>nagi plugin link ./my-plugin</code>
                         </div>
-                        <p class="marketplace-install-output"># any public repo tagged herdr-plugin</p>
+                        <p class="marketplace-install-output"># review the manifest and commands first</p>
                         <p class="marketplace-install-note">
-                            <span data-plugin-count>150+</span> community plugins, auto-discovered from GitHub
+                            No inherited listings. No imaginary ecosystem numbers.
                         </p>
                     </div>
-                </div>
-                <div class="marketplace-teaser-grid">
-                    <a class="mp-chip" href="https://github.com/smarzban/herdr-file-viewer" target="_blank" rel="noopener" data-repo="smarzban/herdr-file-viewer">
-                        <span class="mp-chip-name">smarzban/<b>herdr-file-viewer</b></span>
-                        <span class="mp-chip-desc">Git-aware file tree, diffs, and rendered markdown in a side pane.</span>
-                        <span class="mp-chip-meta">Rust</span>
-                    </a>
-                    <a class="mp-chip" href="https://github.com/persiyanov/herdr-reviewr" target="_blank" rel="noopener" data-repo="persiyanov/herdr-reviewr">
-                        <span class="mp-chip-name">persiyanov/<b>herdr-reviewr</b></span>
-                        <span class="mp-chip-desc">Review the agent's diff, comment on lines, send notes back to its prompt.</span>
-                        <span class="mp-chip-meta">Rust</span>
-                    </a>
-                    <a class="mp-chip" href="https://github.com/paulbkim-dev/vim-herdr-navigation" target="_blank" rel="noopener" data-repo="paulbkim-dev/vim-herdr-navigation">
-                        <span class="mp-chip-name">paulbkim-dev/<b>vim-herdr-navigation</b></span>
-                        <span class="mp-chip-desc">Ctrl+h/j/k/l moves seamlessly across herdr panes and vim splits.</span>
-                        <span class="mp-chip-meta">Shell</span>
-                    </a>
-                    <a class="mp-chip" href="https://github.com/yuk1ty/herdr-spreader" target="_blank" rel="noopener" data-repo="yuk1ty/herdr-spreader">
-                        <span class="mp-chip-name">yuk1ty/<b>herdr-spreader</b></span>
-                        <span class="mp-chip-desc">Whole workspace layouts, tabs, panes and commands, from one YAML file.</span>
-                        <span class="mp-chip-meta">Rust</span>
-                    </a>
-                    <a class="mp-chip" href="https://github.com/AltanS/collie" target="_blank" rel="noopener" data-repo="AltanS/collie">
-                        <span class="mp-chip-name">AltanS/<b>collie</b></span>
-                        <span class="mp-chip-desc">A phone PWA for your herd over Tailscale, with push when an agent needs you.</span>
-                        <span class="mp-chip-meta">TypeScript</span>
-                    </a>
-                    <a class="mp-chip" href="https://github.com/ragamo/herdr-flock" target="_blank" rel="noopener" data-repo="ragamo/herdr-flock">
-                        <span class="mp-chip-name">ragamo/<b>herdr-flock</b></span>
-                        <span class="mp-chip-desc">Your agents as pixel-art sheep on a farm. Ended sessions rest in the graveyard.</span>
-                        <span class="mp-chip-meta">Rust</span>
-                    </a>
                 </div>
             </section>
 
@@ -759,18 +724,18 @@ $ herdr</code></pre>
                             <p>A CLI and JSON socket API expose workspaces, panes, output, and waits.</p>
                         </article>
                     </div>
-                    <div class="code-card" aria-label="Herdr CLI orchestration example">
+                    <div class="code-card" aria-label="Nagi CLI orchestration example">
                         <pre><code><span class="comment"># create workspace structure</span>
-<span class="cmd">herdr</span> workspace create <span class="flag">--cwd</span> <span class="str">~/project</span> <span class="flag">--label</span> <span class="str">api</span>
-<span class="cmd">herdr</span> tab create <span class="flag">--label</span> <span class="str">logs</span>
+<span class="cmd">nagi</span> workspace create <span class="flag">--cwd</span> <span class="str">~/project</span> <span class="flag">--label</span> <span class="str">api</span>
+<span class="cmd">nagi</span> tab create <span class="flag">--label</span> <span class="str">logs</span>
 
 <span class="comment"># split a pane and run work</span>
-<span class="cmd">herdr</span> pane split <span class="str">1-1</span> <span class="flag">--direction</span> <span class="str">right</span>
-<span class="cmd">herdr</span> pane run <span class="str">1-2</span> <span class="str">"just test"</span>
+<span class="cmd">nagi</span> pane split <span class="str">1-1</span> <span class="flag">--direction</span> <span class="str">right</span>
+<span class="cmd">nagi</span> pane run <span class="str">1-2</span> <span class="str">"just test"</span>
 
 <span class="comment"># wait, inspect, and continue</span>
-<span class="cmd">herdr</span> wait agent-status <span class="str">1-1</span> <span class="flag">--status</span> <span class="str">done</span>
-<span class="cmd">herdr</span> pane read <span class="str">1-2</span> <span class="flag">--source</span> <span class="str">recent-unwrapped</span></code></pre>
+<span class="cmd">nagi</span> wait agent-status <span class="str">1-1</span> <span class="flag">--status</span> <span class="str">done</span>
+<span class="cmd">nagi</span> pane read <span class="str">1-2</span> <span class="flag">--source</span> <span class="str">recent-unwrapped</span></code></pre>
                     </div>
                 </div>
                 <div class="inline-links">
@@ -812,14 +777,14 @@ $ herdr</code></pre>
 
             <section class="final-cta">
                 <p class="section-kicker"># start the herd</p>
-                <h2>Install Herdr, run two agents, detach once.</h2>
+                <h2>Install Nagi, run two agents, detach once.</h2>
                 <p>
                     The value shows up the first time the herd keeps running
                     after your terminal disappears.
                 </p>
                 <div class="hero-actions center">
                     <a class="button button-primary" href="/docs/install/"
-                        >Install Herdr</a
+                        >Install Nagi</a
                     >
                     <a class="button button-secondary" href="/docs/quick-start/"
                         >Quick start</a
@@ -829,27 +794,27 @@ $ herdr</code></pre>
         </main>
 
         <footer class="footer">
-            <a class="brand" href="/" aria-label="Herdr home">
+            <a class="brand" href="/" aria-label="Nagi home">
                 <span class="brand-logo" aria-hidden="true"></span>
-                <span>herdr</span>
+                <span>nagi</span>
             </a>
             <div>
                 <a href="/compare/">Compare</a>
                 <a href="/docs/">Docs</a>
                 <a href="/docs/configuration/">Configuration</a>
                 <a href="/docs/socket-api/">API</a>
-                <a href="https://github.com/ogulcancelik/herdr/releases"
+                <a href="https://github.com/Cod-Hash-Studios/nagi/releases"
                     >Releases</a
                 >
-                <a href="mailto:hey@herdr.dev">hey@herdr.dev</a>
+                <a href="https://github.com/Cod-Hash-Studios/nagi/issues">GitHub issues</a>
             </div>
             <nav class="footer-social" aria-label="Social links">
-                <a href="https://github.com/ogulcancelik/herdr" aria-label="Herdr on GitHub">
+                <a href="https://github.com/Cod-Hash-Studios/nagi" aria-label="Nagi on GitHub">
                     <svg viewBox="0 0 16 16" aria-hidden="true">
                         <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.87c.68 0 1.36.09 2 .26 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
                     </svg>
                 </a>
-                <a href="https://x.com/herdrdev" aria-label="Herdr on X">
+                <a href="https://github.com/Cod-Hash-Studios/nagi" aria-label="Nagi on X">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" />
                     </svg>
@@ -858,8 +823,7 @@ $ herdr</code></pre>
         </footer>
 
         <div class="logo-menu" id="logo-menu" hidden>
-            <a href="/assets/logo.svg" download="herdr-logo.svg">Download SVG</a>
-            <a href="/assets/logo.png" download="herdr-logo.png">Download PNG</a>
+            <a href="/assets/logo.svg" download="nagi-logo.svg">Download SVG</a>
             <button type="button" id="copy-logo-url">Copy SVG URL</button>
         </div>
 
@@ -906,34 +870,12 @@ $ herdr</code></pre>
 
         <script>
             (function () {
-                fetch("https://assets.herdr.dev/plugins/index.json")
+                fetch("https://api.github.com/repos/Cod-Hash-Studios/nagi")
                     .then(function (res) {
                         return res.ok ? res.json() : null;
                     })
                     .then(function (data) {
-                        if (!data || !Array.isArray(data.plugins)) return;
-                        document.querySelectorAll("[data-plugin-count]").forEach(function (el) {
-                            el.textContent = String(data.plugins.length);
-                        });
-                        var byName = {};
-                        data.plugins.forEach(function (p) {
-                            byName[p.fullName] = p;
-                        });
-                        document.querySelectorAll(".mp-chip[data-repo]").forEach(function (chip) {
-                            var p = byName[chip.getAttribute("data-repo")];
-                            if (!p || typeof p.stars !== "number") return;
-                            var meta = chip.querySelector(".mp-chip-meta");
-                            if (meta) meta.textContent = "★ " + p.stars + " · " + meta.textContent;
-                        });
-                    })
-                    .catch(function () {});
-
-                fetch("https://assets.herdr.dev/stats/stats.json")
-                    .then(function (res) {
-                        return res.ok ? res.json() : null;
-                    })
-                    .then(function (data) {
-                        var stars = data && data.stars && data.stars.total;
+                        var stars = data && data.stargazers_count;
                         if (typeof stars !== "number") return;
                         var compact =
                             stars >= 1000
@@ -955,7 +897,7 @@ $ herdr</code></pre>
 
                 var options = Array.prototype.slice.call(list.querySelectorAll("[role='option']"));
                 var media = window.matchMedia("(prefers-color-scheme: dark)");
-                var saved = localStorage.getItem("herdr-palette") || "";
+                var saved = localStorage.getItem("nagi-palette") || "";
                 var committed = saved || defaultPalette();
 
                 function defaultPalette() {
@@ -979,7 +921,7 @@ $ herdr</code></pre>
                 function openOverlay() {
                     overlay.hidden = false;
                     document.body.style.overflow = "hidden";
-                    committed = localStorage.getItem("herdr-palette") || defaultPalette();
+                    committed = localStorage.getItem("nagi-palette") || defaultPalette();
                     updateUI(committed);
                     var active = list.querySelector("[aria-selected='true']") || options[0];
                     if (active) active.focus();
@@ -1004,7 +946,7 @@ $ herdr</code></pre>
 
                 function commit(value) {
                     setPalette(value);
-                    localStorage.setItem("herdr-palette", value);
+                    localStorage.setItem("nagi-palette", value);
                     updateUI(value);
                     closeOverlay();
                 }
@@ -1016,7 +958,7 @@ $ herdr</code></pre>
                 }
 
                 media.addEventListener("change", function () {
-                    if (!localStorage.getItem("herdr-palette")) {
+                    if (!localStorage.getItem("nagi-palette")) {
                         setPalette("");
                         updateUI("");
                     }
@@ -1060,11 +1002,11 @@ $ herdr</code></pre>
                 });
 
                 var themeHint = document.getElementById("theme-hint");
-                if (localStorage.getItem("herdr-theme-hint-seen") === "1") {
+                if (localStorage.getItem("nagi-theme-hint-seen") === "1") {
                     themeHint.classList.add("is-seen");
                 }
                 themeHint.addEventListener("mouseenter", function () {
-                    localStorage.setItem("herdr-theme-hint-seen", "1");
+                    localStorage.setItem("nagi-theme-hint-seen", "1");
                     themeHint.classList.add("is-seen");
                 }, { once: true });
                 themeHint.addEventListener("click", toggleOverlay);
