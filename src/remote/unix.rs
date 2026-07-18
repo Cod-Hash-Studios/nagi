@@ -821,7 +821,7 @@ fi
     script.push_str(
         r#"if [ -n "$home" ]; then
     emit "$home/.local/share/mise/installs/nagi/$version/bin/nagi"
-    emit "$home/.local/share/mise/installs/github-ogulcancelik-nagi/$version/nagi"
+    emit "$home/.local/share/mise/installs/github-Cod-Hash-Studios-nagi/$version/nagi"
     emit "$home/.nix-profile/bin/nagi"
 fi
 if [ -n "$user" ]; then
@@ -2523,7 +2523,7 @@ mod tests {
         assert!(script.contains(&format!("version={}", shell_quote(&current_version()))));
         assert!(script.contains("emit \"$home/.local/share/mise/installs/nagi/$version/bin/nagi\""));
         assert!(script.contains(
-            "emit \"$home/.local/share/mise/installs/github-ogulcancelik-nagi/$version/nagi\""
+            "emit \"$home/.local/share/mise/installs/github-Cod-Hash-Studios-nagi/$version/nagi\""
         ));
         assert!(script.contains("emit \"$home/.nix-profile/bin/nagi\""));
         assert!(script.contains("emit \"/etc/profiles/per-user/$user/bin/nagi\""));
