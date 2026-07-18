@@ -1,3 +1,8 @@
+#![allow(
+    dead_code,
+    reason = "closure proofs are tested but not public until check execution is wired"
+)]
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
