@@ -303,26 +303,32 @@ impl AppState {
         }
 
         NavigatorLayout {
-            header: (inner.height >= 1)
-                .then(|| Rect::new(inner.x, inner.y, inner.width, 1))
-                .unwrap_or_default(),
-            search: (inner.height >= 3)
-                .then(|| Rect::new(inner.x, inner.y + 1, inner.width, 1))
-                .unwrap_or_default(),
-            body: (inner.height >= 4)
-                .then(|| {
-                    Rect::new(
-                        inner.x,
-                        inner.y + 2,
-                        inner.width,
-                        inner.height.saturating_sub(3),
-                    )
-                })
-                .unwrap_or_default(),
+            header: if inner.height >= 1 {
+                Rect::new(inner.x, inner.y, inner.width, 1)
+            } else {
+                Rect::default()
+            },
+            search: if inner.height >= 3 {
+                Rect::new(inner.x, inner.y + 1, inner.width, 1)
+            } else {
+                Rect::default()
+            },
+            body: if inner.height >= 4 {
+                Rect::new(
+                    inner.x,
+                    inner.y + 2,
+                    inner.width,
+                    inner.height.saturating_sub(3),
+                )
+            } else {
+                Rect::default()
+            },
             detail: Rect::default(),
-            footer: (inner.height >= 2)
-                .then(|| Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1))
-                .unwrap_or_default(),
+            footer: if inner.height >= 2 {
+                Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1)
+            } else {
+                Rect::default()
+            },
         }
     }
 
