@@ -14,7 +14,7 @@ jobs:
       - name: Check if contributor is approved
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.KANGAL_GITHUB_TOKEN }}
+          github-token: ${{ secrets.NAGI_RELEASE_TOKEN }}
           script: |
             const prAuthor = context.payload.pull_request.user.login;
             const reopener = context.payload.sender?.login ?? null;
@@ -104,7 +104,7 @@ jobs:
               '',
               'New contributors need maintainer approval before opening PRs. This keeps review time focused on accepted work and avoids wasted effort.',
               '',
-              'Herdr is opinionated about how it should look, feel, and work. Feature requests, ideas, questions, contribution proposals, and product-direction checks belong in Discussions, not issues.',
+              'Nagi is opinionated about how it should look, feel, and work. Feature requests, ideas, questions, contribution proposals, and product-direction checks belong in Discussions, not issues.',
               '',
               '**Next steps:**',
               '1. If this is a feature or behavior change, open a Discussion describing what you want to change and why',

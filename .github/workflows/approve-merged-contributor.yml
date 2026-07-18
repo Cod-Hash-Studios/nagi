@@ -20,7 +20,7 @@ jobs:
         id: update
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.KANGAL_GITHUB_TOKEN }}
+          github-token: ${{ secrets.NAGI_RELEASE_TOKEN }}
           script: |
             const fs = require('fs');
 
@@ -54,10 +54,10 @@ jobs:
       - name: Commit and push
         if: steps.update.outputs.status == 'added'
         env:
-          KANGAL_GITHUB_TOKEN: ${{ secrets.KANGAL_GITHUB_TOKEN }}
+          NAGI_RELEASE_TOKEN: ${{ secrets.NAGI_RELEASE_TOKEN }}
         run: |
           git config user.name "kangal-bot"
           git config user.email "285672167+kangal-bot@users.noreply.github.com"
           git add .github/APPROVED_CONTRIBUTORS
           git diff --staged --quiet || git commit -m "chore: approve merged contributor ${{ github.event.pull_request.user.login }}"
-          git push "https://x-access-token:${KANGAL_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${{ github.event.repository.default_branch }}
+          git push "https://x-access-token:${NAGI_RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${{ github.event.repository.default_branch }}

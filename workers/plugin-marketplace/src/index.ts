@@ -1,6 +1,6 @@
 const SNAPSHOT_KEY = "plugins/index.json";
 const SNAPSHOT_CACHE_CONTROL = "public, max-age=300, s-maxage=1800, stale-while-revalidate=3600";
-const GITHUB_QUERY = "topic:herdr-plugin is:public";
+const GITHUB_QUERY = "topic:nagi-plugin is:public";
 const GITHUB_API_VERSION = "2022-11-28";
 const GITHUB_SEARCH_URL = "https://api.github.com/search/repositories";
 const BLACKLIST_REPO_KEY_PREFIX = "repo:";
@@ -177,7 +177,7 @@ async function fetchGitHubRepositories(
         headers: {
           Accept: "application/vnd.github+json",
           Authorization: `Bearer ${token}`,
-          "User-Agent": "herdr-plugin-marketplace",
+          "User-Agent": "nagi-plugin-marketplace",
           "X-GitHub-Api-Version": GITHUB_API_VERSION,
         },
       },

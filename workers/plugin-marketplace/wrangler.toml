@@ -1,11 +1,11 @@
-name = "herdr-plugin-marketplace"
+name = "nagi-plugin-marketplace"
 main = "src/index.ts"
 compatibility_date = "2026-06-21"
 workers_dev = false
 
 [[r2_buckets]]
 binding = "PLUGIN_MARKETPLACE_BUCKET"
-bucket_name = "herdr-plugin-marketplace"
+bucket_name = "nagi-plugin-marketplace"
 
 [[kv_namespaces]]
 binding = "PLUGIN_MARKETPLACE_BLACKLIST"

@@ -15,7 +15,7 @@ jobs:
       - name: Close non-template issues
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.KANGAL_GITHUB_TOKEN }}
+          github-token: ${{ secrets.NAGI_RELEASE_TOKEN }}
           script: |
             const issue = context.payload.issue;
             const author = issue.user.login;
@@ -31,8 +31,8 @@ jobs:
             ];
             const requiredEnvironmentFields = [
               {
-                label: 'herdr version',
-                pattern: /^\s*(?:-\s*)?Herdr version:[^\S\r\n]*\S.*$/im,
+                label: 'nagi version',
+                pattern: /^\s*(?:-\s*)?Nagi version:[^\S\r\n]*\S.*$/im,
               },
               {
                 label: 'update channel',
@@ -119,7 +119,7 @@ jobs:
             }
 
             const body = issue.body || '';
-            const translationConfirmationPattern = /^\s*-\s*\[[xX]\]\s*I confirm this is a translation issue in the herdr docs, not a bug report, feature request, or question\.\s*$/m;
+            const translationConfirmationPattern = /^\s*-\s*\[[xX]\]\s*I confirm this is a translation issue in the nagi docs, not a bug report, feature request, or question\.\s*$/m;
             const translationSections = ['### Page', '### Language', '### What is wrong'];
             if (
               translationConfirmationPattern.test(body) &&
@@ -212,9 +212,9 @@ jobs:
             const message = [
               `hi @${author}, thanks for opening this.`,
               '',
-              'this issue does not appear to use the full bug report template. herdr issues are only for reproducible bugs and maintainer-created or maintainer-converted work items.',
+              'this issue does not appear to use the full bug report template. nagi issues are only for reproducible bugs and maintainer-created or maintainer-converted work items.',
               '',
-              'bug reports must include the reproducible-bug confirmation, current behavior, expected behavior, reproduction, impact, and environment fields with herdr version, update channel, operating system, and terminal.',
+              'bug reports must include the reproducible-bug confirmation, current behavior, expected behavior, reproduction, impact, and environment fields with nagi version, update channel, operating system, and terminal.',
               '',
               'feature requests, ideas, questions, contribution proposals, and direction checks belong in discussions:',
               `https://github.com/${context.repo.owner}/${context.repo.repo}/discussions`,

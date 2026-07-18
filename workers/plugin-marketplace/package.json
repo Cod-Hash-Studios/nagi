@@ -1,5 +1,5 @@
 {
-  "name": "herdr-plugin-marketplace-worker",
+  "name": "nagi-plugin-marketplace-worker",
   "private": true,
   "type": "module",
   "scripts": {
