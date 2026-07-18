@@ -73,6 +73,7 @@ mod ipc;
 mod kitty_graphics;
 mod layout;
 mod logging;
+mod managed_provider;
 mod metadata_tokens;
 mod mission;
 mod pane;
