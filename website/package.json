@@ -6,7 +6,7 @@
     "prepare-docs": "node scripts/prepare-docs.mjs",
     "dev": "node scripts/prepare-docs.mjs && astro dev",
     "test": "bun test src/docs-path.test.ts src/site-path.test.ts",
-    "build": "bun run test && node scripts/prepare-docs.mjs && astro build",
+    "build": "bun run test && node scripts/prepare-docs.mjs && astro build && node scripts/check-built-paths.mjs",
     "preview": "astro preview"
   },
   "dependencies": {
