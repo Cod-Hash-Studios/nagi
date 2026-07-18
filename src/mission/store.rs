@@ -352,6 +352,10 @@ impl PersistableMissionEvent {
         Ok(event)
     }
 
+    #[allow(
+        dead_code,
+        reason = "sealed ready events are staged until public mission closure"
+    )]
     pub(crate) fn mission_ready(
         mission_id: impl Into<String>,
         proof: ReadyProof,
@@ -375,6 +379,10 @@ impl PersistableMissionEvent {
         Ok(event)
     }
 
+    #[allow(
+        dead_code,
+        reason = "sealed archive events are staged until public mission closure"
+    )]
     pub(crate) fn mission_archived(
         mission_id: impl Into<String>,
         proof: ArchiveProof,
@@ -408,6 +416,10 @@ pub struct ResponseAttemptKey {
 }
 
 impl ResponseAttemptKey {
+    #[allow(
+        dead_code,
+        reason = "response attempts stay private until provider replies are public"
+    )]
     pub fn new(
         attention_id: impl Into<String>,
         request_generation: u64,
@@ -451,6 +463,10 @@ pub struct PersistedResponseRoute {
 
 impl PersistedResponseRoute {
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "pane-routed replies stay private until provider replies are public"
+    )]
     pub fn new(
         provider: ProviderKind,
         mission_run_id: impl Into<String>,
@@ -468,6 +484,10 @@ impl PersistedResponseRoute {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "managed replies stay private until provider replies are public"
+    )]
     pub fn managed(
         provider: ProviderKind,
         mission_run_id: impl Into<String>,
@@ -545,6 +565,10 @@ pub struct SequencedMissionEvent {
 
 impl SequencedMissionEvent {
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "raw event sequence inspection is retained for staged closure auditing"
+    )]
     pub const fn sequence(&self) -> u64 {
         self.sequence
     }
@@ -1025,11 +1049,19 @@ impl MissionProjection {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "status projection inspection is retained for staged lifecycle tests"
+    )]
     pub fn mission_status(&self, mission_id: &str) -> Option<MissionStatus> {
         self.missions.get(mission_id).map(|mission| mission.status)
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "response projection inspection is staged until provider replies are public"
+    )]
     pub fn response_state(
         &self,
         mission_id: &str,
@@ -1043,6 +1075,10 @@ impl MissionProjection {
             .map(|response| &response.state)
     }
 
+    #[allow(
+        dead_code,
+        reason = "response attempt inspection is staged until provider replies are public"
+    )]
     pub(crate) fn next_response_attempt(
         &self,
         mission_id: &str,
@@ -1075,6 +1111,10 @@ impl MissionProjection {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "attention projection inspection is staged until the mission cockpit is public"
+    )]
     pub fn attention_state(
         &self,
         mission_id: &str,
@@ -1202,11 +1242,19 @@ pub struct CommitOutcome {
 
 impl CommitOutcome {
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "commit sequence inspection is retained for staged audit consumers"
+    )]
     pub const fn sequence(self) -> u64 {
         self.sequence
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "duplicate inspection is retained for staged audit consumers"
+    )]
     pub const fn was_duplicate(self) -> bool {
         self.was_duplicate
     }
@@ -1231,6 +1279,10 @@ impl HandoffFence {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "handoff sequence inspection is retained for staged audit consumers"
+    )]
     pub const fn sequence(self) -> u64 {
         self.sequence
     }
@@ -1442,6 +1494,10 @@ impl MissionStore {
 
     /// Checks whether an exact event is already durable without changing any
     /// projection, lease, journal, or idempotence state.
+    #[allow(
+        dead_code,
+        reason = "preflight inspection is retained for staged external event producers"
+    )]
     pub fn preflight_duplicate(
         &self,
         event_id: &str,
@@ -1622,6 +1678,10 @@ impl MissionStore {
     }
 
     #[must_use]
+    #[allow(
+        dead_code,
+        reason = "last sequence inspection is retained for staged audit consumers"
+    )]
     pub const fn last_sequence(&self) -> u64 {
         self.journal_head.sequence
     }
@@ -2577,6 +2637,10 @@ pub enum MissionStoreError {
     #[error("ready_to_close and archived require sealed mission events")]
     SealedStatusRequiresProof,
     #[error("sealed proof belongs to another mission")]
+    #[allow(
+        dead_code,
+        reason = "sealed proof events are staged until public mission closure"
+    )]
     ProofMissionMismatch,
     #[error("sealed proof receipt is invalid")]
     InvalidProofReceipt,
@@ -2624,6 +2688,10 @@ pub enum MissionStoreError {
     InsecurePermissions(PathBuf),
     #[error(
         "mission store cannot enforce private ownership and permissions on this platform: {0}"
+    )]
+    #[allow(
+        dead_code,
+        reason = "this platform guard is unreachable on Unix builds"
     )]
     UnsupportedPlatform(PathBuf),
 }
