@@ -191,13 +191,13 @@
           "key": "update.version_check",
           "type": "boolean",
           "default": "true",
-          "description": "Check the configured Nagi release channel for new versions in the background."
+          "description": "Reserved for a future signed Nagi release channel. Disabled in this fork."
         },
         {
           "key": "update.manifest_check",
           "type": "boolean",
           "default": "true",
-          "description": "Check nagi.dev for remote agent-detection manifest updates in the background. Bundled manifests and local overrides still apply."
+          "description": "Reserved for future Nagi-owned manifest updates. Bundled manifests and local overrides still apply."
         }
       ]
     },
