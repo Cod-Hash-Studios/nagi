@@ -13,6 +13,9 @@ The build output is `dist/`. The site targets the GitHub Pages project URL at
 path. `bun run build` also rejects generated links or assets that escape that
 base.
 
-Publish `website/dist` as the Pages artifact. Do not switch to a root-domain
-host without updating `site`, the shared base-path helper, canonical URLs, and
-the generated-path check together.
+The `Deploy website` workflow builds and publishes `website/dist` after changes
+reach `main`; it can also be started manually. The repository's Pages source
+must be set to **GitHub Actions** once in GitHub settings.
+
+Do not switch to a root-domain host without updating `site`, the shared
+base-path helper, canonical URLs, and the generated-path check together.
