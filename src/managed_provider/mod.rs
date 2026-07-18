@@ -13,6 +13,10 @@ const COMMAND_CHANNEL_CAPACITY: usize = 32;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SandboxAccess {
     ReadOnly,
+    #[allow(
+        dead_code,
+        reason = "workspace writes stay closed until interactive consent is public"
+    )]
     WorkspaceWriteConfirmed,
 }
 
@@ -35,6 +39,10 @@ pub(crate) struct StartOrResume {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(
+    dead_code,
+    reason = "provider replies stay closed until interactive consent is public"
+)]
 pub(crate) enum ProviderResponse {
     Approve,
     ApproveForSession,
@@ -45,14 +53,30 @@ pub(crate) enum ProviderResponse {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderCommand {
     StartOrResume(StartOrResume),
+    #[allow(
+        dead_code,
+        reason = "follow-up turns are staged behind the public mission lifecycle"
+    )]
     SendTurn {
         input: String,
     },
+    #[allow(
+        dead_code,
+        reason = "provider replies stay closed until interactive consent is public"
+    )]
     Respond {
         token: ResponseToken,
         response: ProviderResponse,
     },
+    #[allow(
+        dead_code,
+        reason = "interrupt control is staged behind the public mission lifecycle"
+    )]
     Interrupt,
+    #[allow(
+        dead_code,
+        reason = "handoff quiescing is staged until managed actors own live writes"
+    )]
     Quiesce,
     Shutdown,
 }
