@@ -2529,9 +2529,7 @@ mod tests {
                     .to_string(),
                 );
             }
-            ("POST", "/permission/per_drop/reply") => {
-                return;
-            }
+            ("POST", "/permission/per_drop/reply") => {}
             _ => write_response(&mut stream, 404, "text/plain", b"").await,
         }
     }

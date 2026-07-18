@@ -513,7 +513,7 @@ impl ProviderResponseRoute {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProviderResponseIntent {
     Respond {
-        route: ProviderResponseRoute,
+        route: Box<ProviderResponseRoute>,
         decision: AttentionDecision,
         answer: Option<EphemeralAnswer>,
         token: ProviderResponseToken,
@@ -764,7 +764,7 @@ impl AttentionInbox {
             attempt,
         };
         let response = ProviderResponseIntent::Respond {
-            route: ProviderResponseRoute {
+            route: Box::new(ProviderResponseRoute {
                 provider: item.provider,
                 mission_id: item.mission_id.clone(),
                 mission_run_id: item.mission_run_id.clone(),
@@ -773,7 +773,7 @@ impl AttentionInbox {
                 provider_request_id,
                 request_generation: item.request_generation,
                 scope: item.scope.clone(),
-            },
+            }),
             decision,
             answer: None,
             token: token.clone(),
@@ -859,7 +859,7 @@ impl AttentionInbox {
         };
         let decision = AttentionDecision::Answer;
         let response = ProviderResponseIntent::Respond {
-            route: ProviderResponseRoute {
+            route: Box::new(ProviderResponseRoute {
                 provider: item.provider,
                 mission_id: item.mission_id.clone(),
                 mission_run_id: item.mission_run_id.clone(),
@@ -868,7 +868,7 @@ impl AttentionInbox {
                 provider_request_id,
                 request_generation: item.request_generation,
                 scope: item.scope.clone(),
-            },
+            }),
             decision,
             answer: Some(answer),
             token: token.clone(),

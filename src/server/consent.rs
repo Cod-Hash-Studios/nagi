@@ -545,7 +545,7 @@ mod tests {
                 let subject = &subject;
                 threads.push(scope.spawn(move || {
                     barrier.wait();
-                    authority.consume_at(&grant, &subject, now)
+                    authority.consume_at(grant, subject, now)
                 }));
             }
             threads

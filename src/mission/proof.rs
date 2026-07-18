@@ -272,7 +272,6 @@ pub struct ProofEvaluator;
 
 impl ProofEvaluator {
     #[allow(clippy::too_many_arguments)]
-    #[must_use]
     pub fn evaluate(
         identity: &ProofIdentity,
         closure_plan: &ClosurePlan,

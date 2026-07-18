@@ -93,7 +93,7 @@ impl WorktreeLease {
         hasher.update([0]);
         hasher.update(self.owner.mission_run_id.as_bytes());
         hasher.update([0]);
-        hasher.update(&self.nonce.0);
+        hasher.update(self.nonce.0);
         hasher
             .finalize()
             .iter()
