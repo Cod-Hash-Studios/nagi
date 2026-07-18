@@ -3437,67 +3437,14 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_website_manifest_matches_update_schema() {
+    fn checked_in_website_manifest_disables_fork_updates() {
         let manifest: UpdateManifest = serde_json::from_str(include_str!("../website/latest.json"))
             .expect("website/latest.json should match updater schema");
 
-        assert!(!manifest
-            .metadata_for_version(&Version::parse(&manifest.version).unwrap())
-            .expect("metadata")
-            .notes_body()
-            .is_empty());
-        // website/latest.json describes the latest released binaries, not the
-        // current unreleased checkout. Its protocol is updated by the release
-        // flow together with the release assets.
+        assert_eq!(manifest.version, "0.0.0");
         assert!(manifest.protocol.is_some());
-        assert_eq!(manifest.assets.len(), 4);
-        assert!(manifest.releases.contains_key(&manifest.version));
-
-        for target in [
-            "linux-x86_64",
-            "linux-aarch64",
-            "macos-x86_64",
-            "macos-aarch64",
-        ] {
-            let url = &manifest
-                .assets
-                .get(target)
-                .unwrap_or_else(|| panic!("missing asset URL for {target}"))
-                .url;
-            assert!(
-                url.contains(&format!("/releases/download/v{}/", manifest.version)),
-                "unexpected release URL for {target}: {url}"
-            );
-            assert!(
-                url.ends_with(&format!("nagi-{target}")),
-                "unexpected asset name for {target}: {url}"
-            );
-        }
-
-        for (version, release) in &manifest.releases {
-            let assets = release
-                .get("assets")
-                .and_then(serde_json::Value::as_object)
-                .unwrap_or_else(|| panic!("missing assets for release {version}"));
-            for target in [
-                "linux-x86_64",
-                "linux-aarch64",
-                "macos-x86_64",
-                "macos-aarch64",
-            ] {
-                let url = assets
-                    .get(target)
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_else(|| panic!("missing asset URL for {version} {target}"));
-                assert!(
-                    url.contains(&format!("/releases/download/v{version}/")),
-                    "unexpected release URL for {version} {target}: {url}"
-                );
-                assert!(
-                    url.ends_with(&format!("nagi-{target}")),
-                    "unexpected asset name for {version} {target}: {url}"
-                );
-            }
-        }
+        assert!(manifest.assets.is_empty());
+        assert!(manifest.releases.is_empty());
+        assert!(manifest.notes.contains("no signed public release channel"));
     }
 }
