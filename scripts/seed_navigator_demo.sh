@@ -42,10 +42,25 @@ dev_socket="$config_home/nagi-dev/nagi.sock"
 main_socket="$config_home/nagi/nagi.sock"
 export NAGI_SOCKET_PATH="${NAGI_NAV_SOCKET_PATH:-$dev_socket}"
 
-if [[ "$allow_main" != 1 && "$NAGI_SOCKET_PATH" == "$main_socket" ]]; then
-  echo "refusing to seed main nagi session: $NAGI_SOCKET_PATH" >&2
-  echo "use NAGI_NAV_SOCKET_PATH for a dev socket, or pass --allow-main intentionally" >&2
+if ! command -v jq >/dev/null 2>&1; then
+  echo "required command not found: jq" >&2
+  echo "install jq before seeding the agent cockpit demo" >&2
   exit 1
+fi
+
+if [[ "$allow_main" != 1 ]]; then
+  targets_main_socket=0
+  if [[ "$NAGI_SOCKET_PATH" == "$main_socket" ]]; then
+    targets_main_socket=1
+  elif [[ -e "$NAGI_SOCKET_PATH" && -e "$main_socket" && "$NAGI_SOCKET_PATH" -ef "$main_socket" ]]; then
+    targets_main_socket=1
+  fi
+
+  if [[ "$targets_main_socket" == 1 ]]; then
+    echo "refusing to seed main nagi session: $NAGI_SOCKET_PATH" >&2
+    echo "use a separate dev socket, or pass --allow-main intentionally" >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -S "$NAGI_SOCKET_PATH" ]]; then
