@@ -1,5 +1,13 @@
 //! Mission state, attention routing, and workspace-bound proof.
 
+#![cfg_attr(
+    not(unix),
+    allow(
+        dead_code,
+        reason = "the durable mission runtime is unavailable on non-Unix platforms"
+    )
+)]
+
 pub(crate) mod attention;
 pub(crate) mod claims;
 mod digest;
