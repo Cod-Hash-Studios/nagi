@@ -3518,9 +3518,36 @@ mod tests {
                 amount: Some(0.05),
             }),
         };
+        let mission_create = crate::api::schema::Request {
+            id: "req_9".into(),
+            method: crate::api::schema::Method::MissionCreate(
+                crate::api::schema::MissionCreateParams {
+                    mission_id: "mission-1".into(),
+                    title: "Fix login redirect".into(),
+                    repository_path: "/repo".into(),
+                    objective: "Preserve the destination".into(),
+                    acceptance_criteria: vec!["Redirect test passes".into()],
+                },
+            ),
+        };
+        let mission_list = crate::api::schema::Request {
+            id: "req_10".into(),
+            method: crate::api::schema::Method::MissionList(
+                crate::api::schema::EmptyParams::default(),
+            ),
+        };
+        let mission_get = crate::api::schema::Request {
+            id: "req_11".into(),
+            method: crate::api::schema::Method::MissionGet(crate::api::schema::MissionTarget {
+                mission_id: "mission-1".into(),
+            }),
+        };
 
         assert!(!crate::api::request_changes_ui(&read_only));
         assert!(!crate::api::request_changes_ui(&worktree_list));
+        assert!(!crate::api::request_changes_ui(&mission_create));
+        assert!(!crate::api::request_changes_ui(&mission_list));
+        assert!(!crate::api::request_changes_ui(&mission_get));
         assert!(crate::api::request_changes_ui(&mutating));
         assert!(crate::api::request_changes_ui(&pane_rename));
         assert!(crate::api::request_changes_ui(&worktree_create));

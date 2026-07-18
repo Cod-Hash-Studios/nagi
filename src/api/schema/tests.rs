@@ -62,6 +62,286 @@ fn request_uses_dot_method_names() {
 }
 
 #[test]
+fn mission_requests_and_responses_round_trip() {
+    let request = Request {
+        id: "mission_req_1".into(),
+        method: Method::MissionCreate(MissionCreateParams {
+            mission_id: "mission-1".into(),
+            title: "Fix login redirect".into(),
+            repository_path: "/repo".into(),
+            objective: "Preserve the requested page after login".into(),
+            acceptance_criteria: vec!["Redirect test passes".into()],
+        }),
+    };
+    let request_json = serde_json::to_value(&request).unwrap();
+    assert_eq!(request_json["method"], "mission.create");
+    assert_eq!(
+        serde_json::from_value::<Request>(request_json).unwrap(),
+        request
+    );
+
+    let list_request = Request {
+        id: "mission_req_2".into(),
+        method: Method::MissionList(EmptyParams::default()),
+    };
+    let list_json = serde_json::to_value(&list_request).unwrap();
+    assert_eq!(list_json["method"], "mission.list");
+    assert_eq!(
+        serde_json::from_value::<Request>(list_json).unwrap(),
+        list_request
+    );
+
+    let get_request = Request {
+        id: "mission_req_3".into(),
+        method: Method::MissionGet(MissionTarget {
+            mission_id: "mission-1".into(),
+        }),
+    };
+    let get_json = serde_json::to_value(&get_request).unwrap();
+    assert_eq!(get_json["method"], "mission.get");
+    assert_eq!(
+        serde_json::from_value::<Request>(get_json).unwrap(),
+        get_request
+    );
+
+    let configure_request = Request {
+        id: "mission_req_configure".into(),
+        method: Method::MissionConfigure(MissionConfigureParams {
+            mission_id: "mission-1".into(),
+            checks: vec![MissionCheck::Command {
+                id: "test".into(),
+                program: "cargo".into(),
+                args: vec!["test".into()],
+                cwd: ".".into(),
+                relevant_paths: vec![MissionPathRule::Prefix {
+                    prefix: "src".into(),
+                }],
+                required_artifacts: Vec::new(),
+                include_ignored: false,
+                required: true,
+                covers: vec![0],
+            }],
+        }),
+    };
+    let configure_json = serde_json::to_value(&configure_request).unwrap();
+    assert_eq!(configure_json["method"], "mission.configure");
+    assert_eq!(configure_json["params"]["checks"][0]["kind"], "command");
+    assert_eq!(
+        serde_json::from_value::<Request>(configure_json).unwrap(),
+        configure_request
+    );
+
+    let configured_response = SuccessResponse {
+        id: "mission_req_configure".into(),
+        result: ResponseResult::MissionConfigured {
+            mission: MissionInfo {
+                mission_id: "mission-1".into(),
+                title: "Fix login redirect".into(),
+                repository_path: "/repo".into(),
+                objective: "Preserve the requested page after login".into(),
+                acceptance_criteria: vec!["Redirect test passes".into()],
+                closure_configured: true,
+                check_count: 1,
+                status: MissionStatus::Draft,
+                run: None,
+                unresolved_attention_count: 0,
+                updated_at_millis: 15,
+            },
+            configured: true,
+        },
+    };
+    let configured_json = serde_json::to_value(&configured_response).unwrap();
+    assert_eq!(configured_json["result"]["type"], "mission_configured");
+    assert_eq!(configured_json["result"]["configured"], true);
+    assert_eq!(
+        serde_json::from_value::<SuccessResponse>(configured_json).unwrap(),
+        configured_response
+    );
+
+    let start_request = Request {
+        id: "mission_req_4".into(),
+        method: Method::MissionStart(MissionStartParams {
+            mission_id: "mission-1".into(),
+            run_id: "run-1".into(),
+            provider: MissionProvider::Codex,
+            mode: MissionProviderMode::Managed,
+            worktree_path: Some("/repo".into()),
+        }),
+    };
+    let start_json = serde_json::to_value(&start_request).unwrap();
+    assert_eq!(start_json["method"], "mission.start");
+    assert!(start_json["params"]
+        .get("workspace_write_confirmed")
+        .is_none());
+    assert_eq!(
+        serde_json::from_value::<Request>(start_json).unwrap(),
+        start_request
+    );
+
+    let respond_request = Request {
+        id: "mission_req_5".into(),
+        method: Method::MissionRespond(MissionRespondParams {
+            mission_id: "mission-1".into(),
+            run_id: "run-1".into(),
+            attention_id: "attention-1".into(),
+            decision: MissionResponseDecision::Answer,
+            answers: [("question-1".into(), vec!["Option A".into()])]
+                .into_iter()
+                .collect(),
+        }),
+    };
+    let respond_json = serde_json::to_value(&respond_request).unwrap();
+    assert_eq!(respond_json["method"], "mission.respond");
+    assert_eq!(respond_json["params"]["decision"], "answer");
+    assert_eq!(
+        serde_json::from_value::<Request>(respond_json).unwrap(),
+        respond_request
+    );
+
+    let response = SuccessResponse {
+        id: "mission_req_1".into(),
+        result: ResponseResult::MissionList {
+            missions: vec![MissionSummary {
+                mission_id: "mission-1".into(),
+                title: "Fix login redirect".into(),
+                repository_path: "/repo".into(),
+                status: MissionStatus::Draft,
+                unresolved_attention_count: 0,
+                updated_at_millis: 10,
+            }],
+        },
+    };
+    let response_json = serde_json::to_value(&response).unwrap();
+    assert_eq!(response_json["result"]["type"], "mission_list");
+    assert_eq!(
+        serde_json::from_value::<SuccessResponse>(response_json).unwrap(),
+        response
+    );
+
+    let info = SuccessResponse {
+        id: "mission_req_3".into(),
+        result: ResponseResult::MissionInfo {
+            mission: MissionInfo {
+                mission_id: "mission-1".into(),
+                title: "Fix login redirect".into(),
+                repository_path: "/repo".into(),
+                objective: "Preserve the requested page after login".into(),
+                acceptance_criteria: vec!["Redirect test passes".into()],
+                closure_configured: false,
+                check_count: 0,
+                status: MissionStatus::ReviewRequired,
+                run: None,
+                unresolved_attention_count: 1,
+                updated_at_millis: 20,
+            },
+        },
+    };
+    let info_json = serde_json::to_value(&info).unwrap();
+    assert_eq!(info_json["result"]["type"], "mission_info");
+    assert_eq!(
+        serde_json::from_value::<SuccessResponse>(info_json).unwrap(),
+        info
+    );
+
+    let run_info = SuccessResponse {
+        id: "mission_req_4".into(),
+        result: ResponseResult::MissionRunStarted {
+            mission: MissionInfo {
+                mission_id: "mission-1".into(),
+                title: "Fix login redirect".into(),
+                repository_path: "/repo".into(),
+                objective: "Preserve the requested page after login".into(),
+                acceptance_criteria: vec!["Redirect test passes".into()],
+                closure_configured: true,
+                check_count: 1,
+                status: MissionStatus::Preparing,
+                run: Some(MissionRunInfo {
+                    run_id: "run-1".into(),
+                    provider: MissionProvider::Codex,
+                    mode: MissionProviderMode::Managed,
+                    worktree_path: "/repo".into(),
+                    base_revision: "a".repeat(40),
+                }),
+                unresolved_attention_count: 0,
+                updated_at_millis: 30,
+            },
+        },
+    };
+    let run_info_json = serde_json::to_value(&run_info).unwrap();
+    assert_eq!(run_info_json["result"]["type"], "mission_run_started");
+    assert!(run_info_json["result"]["mission"]["run"]
+        .get("provider_session_id")
+        .is_none());
+    assert_eq!(
+        serde_json::from_value::<SuccessResponse>(run_info_json).unwrap(),
+        run_info
+    );
+}
+
+#[test]
+fn mission_wire_contract_rejects_unknown_status_and_missing_create_fields() {
+    let unknown_status = serde_json::json!({
+        "id": "mission_req_1",
+        "result": {
+            "type": "mission_info",
+            "mission": {
+                "mission_id": "mission-1",
+                "title": "Title",
+                "repository_path": "/repo",
+                "objective": "Objective",
+                "acceptance_criteria": ["Criterion"],
+                "closure_configured": false,
+                "check_count": 0,
+                "status": "finished",
+                "run": null,
+                "unresolved_attention_count": 0,
+                "updated_at_millis": 10
+            }
+        }
+    });
+    assert!(serde_json::from_value::<SuccessResponse>(unknown_status).is_err());
+
+    let missing_objective = serde_json::json!({
+        "id": "mission_req_2",
+        "method": "mission.create",
+        "params": {
+            "mission_id": "mission-1",
+            "title": "Title",
+            "repository_path": "/repo",
+            "acceptance_criteria": ["Criterion"]
+        }
+    });
+    assert!(serde_json::from_value::<Request>(missing_objective).is_err());
+
+    let forged_write_consent = serde_json::json!({
+        "id": "mission_req_3",
+        "method": "mission.start",
+        "params": {
+            "mission_id": "mission-1",
+            "run_id": "run-1",
+            "provider": "codex",
+            "mode": "managed",
+            "workspace_write_confirmed": true
+        }
+    });
+    assert!(serde_json::from_value::<Request>(forged_write_consent).is_err());
+
+    let forged_response_capability = serde_json::json!({
+        "id": "mission_req_4",
+        "method": "mission.respond",
+        "params": {
+            "mission_id": "mission-1",
+            "run_id": "run-1",
+            "attention_id": "attention-1",
+            "decision": "approve_once",
+            "answers": {},
+            "capability": "forged"
+        }
+    });
+    assert!(serde_json::from_value::<Request>(forged_response_capability).is_err());
+}
+
+#[test]
 fn bundled_protocol_schema_refs_resolve_inside_bundle() {
     fn assert_no_standalone_refs(value: &serde_json::Value) {
         match value {
