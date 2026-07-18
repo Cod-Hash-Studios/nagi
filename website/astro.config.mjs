@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { siteBase, withSiteBase } from './src/site-path.mjs';
 
 const repoBlob = 'https://github.com/Cod-Hash-Studios/nagi/blob/main/';
 
@@ -25,7 +26,12 @@ function rewriteNagiLinks() {
       const [path, suffix = ''] = node.url.split(/(?=[#?])/);
       const mapped = docsLinks.get(path);
       if (mapped) {
-        node.url = `${mapped}${suffix}`;
+        node.url = `${withSiteBase(mapped)}${suffix}`;
+        return;
+      }
+
+      if (path.startsWith('/')) {
+        node.url = `${withSiteBase(path)}${suffix}`;
         return;
       }
 
@@ -49,9 +55,10 @@ function walk(node, visitor) {
 
 export default defineConfig({
   site: 'https://cod-hash-studios.github.io/nagi',
+  base: siteBase,
   redirects: {
-    '/ja': '/ja/docs/',
-    '/zh-cn': '/zh-cn/docs/',
+    '/ja': withSiteBase('/ja/docs/'),
+    '/zh-cn': withSiteBase('/zh-cn/docs/'),
   },
   integrations: [
     starlight({
@@ -88,7 +95,8 @@ export default defineConfig({
           content: `(function () {
   try {
     var KEY = 'nagi-docs-lang';
-    var path = location.pathname;
+    var base = '${siteBase}';
+    var path = location.pathname.indexOf(base + '/') === 0 ? location.pathname.slice(base.length) : location.pathname;
     var m = path.match(/^\\/(ja|zh-cn)(?=\\/|$)/);
     var current = m ? m[1] : path.indexOf('/docs') === 0 ? 'en' : null;
     if (!current) return;
@@ -103,7 +111,7 @@ export default defineConfig({
       }
       if (target) {
         localStorage.setItem(KEY, target);
-        location.replace('/' + target + path + location.search + location.hash);
+        location.replace(base + '/' + target + path + location.search + location.hash);
         return;
       }
     }

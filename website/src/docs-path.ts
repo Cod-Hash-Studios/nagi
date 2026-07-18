@@ -1,7 +1,10 @@
+import { withoutSiteBase } from './site-path.mjs';
+
 const docsLocales = new Set(['ja', 'zh-cn']);
 
 export function docsChannel(pathname: string) {
-  return /^\/(?:ja\/|zh-cn\/)?docs\/preview(?:\/|$)/.test(pathname) ? 'preview' : 'stable';
+  const sitePath = withoutSiteBase(pathname);
+  return /^\/(?:ja\/|zh-cn\/)?docs\/preview(?:\/|$)/.test(sitePath) ? 'preview' : 'stable';
 }
 
 export function docsPath({ entry }: { entry: string }) {

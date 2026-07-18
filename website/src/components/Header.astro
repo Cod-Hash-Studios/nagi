@@ -6,11 +6,12 @@ import Search from 'virtual:starlight/components/Search';
 import SiteTitle from 'virtual:starlight/components/SiteTitle';
 import SocialIcons from 'virtual:starlight/components/SocialIcons';
 import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
+import { withSiteBase, withoutSiteBase } from '../site-path.mjs';
 
 const shouldRenderSearch =
   config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
 
-const pathname = Astro.url.pathname;
+const pathname = withoutSiteBase(Astro.url.pathname);
 const isDocs = pathname === '/docs/' || pathname.startsWith('/docs/');
 const isPreview = pathname === '/docs/preview/' || pathname.startsWith('/docs/preview/');
 const stableHref = isPreview ? pathname.replace(/^\/docs\/preview\/?/, '/docs/') : pathname;
@@ -28,8 +29,8 @@ const previewHref = isPreview
   <div class="sl-flex print:hidden search-wrapper">
     {isDocs && (
       <nav class="docs-channel-switcher" aria-label="Documentation channel">
-        <a href={stableHref} aria-current={!isPreview ? 'page' : undefined}>Stable</a>
-        <a href={previewHref} aria-current={isPreview ? 'page' : undefined}>Preview</a>
+        <a href={withSiteBase(stableHref)} aria-current={!isPreview ? 'page' : undefined}>Stable</a>
+        <a href={withSiteBase(previewHref)} aria-current={isPreview ? 'page' : undefined}>Preview</a>
       </nav>
     )}
     {shouldRenderSearch && <Search />}

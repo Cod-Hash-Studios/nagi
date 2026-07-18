@@ -5,7 +5,7 @@
   "scripts": {
     "prepare-docs": "node scripts/prepare-docs.mjs",
     "dev": "node scripts/prepare-docs.mjs && astro dev",
-    "test": "bun test src/docs-path.test.ts",
+    "test": "bun test src/docs-path.test.ts src/site-path.test.ts",
     "build": "bun run test && node scripts/prepare-docs.mjs && astro build",
     "preview": "astro preview"
   },
