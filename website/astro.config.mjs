@@ -121,7 +121,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image:alt',
-            content: 'Nagi documentation — One terminal. The whole herd.',
+            content: 'Nagi documentation — One mission. A calm surface.',
           },
         },
         {
@@ -132,7 +132,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'twitter:image:alt',
-            content: 'Nagi documentation — One terminal. The whole herd.',
+            content: 'Nagi documentation — One mission. A calm surface.',
           },
         },
       ],
