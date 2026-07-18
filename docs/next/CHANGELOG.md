@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Added
+
+- Added the durable mission runtime and socket API: mission creation,
+  configuration, exclusive checkout claims, append-only journals, replay,
+  handoff, attention records, and proof primitives.
+- Added typed managed-provider adapters for Codex and Claude Code in read-only
+  mode, plus a tested OpenCode actor whose public mission-start wiring remains
+  in progress.
+- Added Nagi's light Japanese editorial identity, launch documentation, and
+  English, Japanese, and Simplified Chinese source-build guides.
+
+### Changed
+
+- Renamed the binary, Rust package, runtime namespace, config paths, sockets,
+  logs, environment variables, integrations, schema assets, and developer
+  tooling from Herdr to Nagi. Existing Herdr sessions are intentionally not
+  reused.
+- Reframed the product around durable coding-agent missions while preserving
+  the terminal-native multiplexer and Unix socket foundation.
+
+### Security
+
+- Disabled inherited release manifests, self-update, remote binary downloads,
+  and publishing workflows until Nagi has signed artifacts and an independent
+  release review.
+- Kept managed provider starts read-only. Provider replies, workspace-write
+  consent, public closure execution, and the mission cockpit are not yet wired
+  end to end.
+
+The entries below this point are the preserved pre-fork Herdr history.
+
 ## [0.7.4] - 2026-07-15
 
 ### Added
