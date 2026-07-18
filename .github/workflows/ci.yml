@@ -11,6 +11,7 @@ permissions:
 
 env:
   RUST_TOOLCHAIN_VERSION: 1.96.1
+  FORK_BASE_REVISION: 50aaa2ec046ee26ff407c20f49de496f522512a8
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -29,7 +30,12 @@ jobs:
 
       - name: Validate commit subjects
         if: github.event_name == 'push'
-        run: python3 scripts/conventional_commits.py --range "${{ github.event.before }}..${{ github.event.after }}"
+        run: |
+          before="${{ github.event.before }}"
+          if [[ "$before" =~ ^0+$ ]]; then
+            before="$FORK_BASE_REVISION"
+          fi
+          python3 scripts/conventional_commits.py --range "$before..${{ github.event.after }}"
 
       - name: Validate PR title
         if: github.event_name == 'pull_request'
