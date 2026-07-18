@@ -1,18 +1,18 @@
 [package]
-name = "herdr"
+name = "nagi"
 version = "0.7.4"
 edition = "2021"
 build = "build.rs"
 description = "terminal workspace manager for AI coding agents"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/ogulcancelik/herdr"
-homepage = "https://herdr.dev"
+repository = "https://github.com/Cod-Hash-Studios/nagi"
+homepage = "https://github.com/Cod-Hash-Studios/nagi"
 keywords = ["terminal", "tui", "ai", "agents", "multiplexer"]
 categories = ["command-line-utilities"]
 include = [
     "src/**/*",
     "assets/sounds/*",
-    "docs/next/api/herdr-api.schema.json",
+    "docs/next/api/nagi-api.schema.json",
     "README.md",
     "LICENSE",
     "Cargo.toml",

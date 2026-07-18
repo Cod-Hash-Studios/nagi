@@ -1,12 +1,12 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
+// installed by nagi
+// managed by nagi; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
-// HERDR_INTEGRATION_ID=opencode
-// HERDR_INTEGRATION_VERSION=8
+// NAGI_INTEGRATION_ID=opencode
+// NAGI_INTEGRATION_VERSION=8
 
 import net from "node:net";
 
-const SOURCE = "herdr:opencode";
+const SOURCE = "nagi:opencode";
 const AGENT = "opencode";
 let reportSeq = Date.now() * 1000;
 
@@ -47,8 +47,8 @@ function stateFromSessionStatus(status) {
 }
 
 function request(method, params) {
-  const paneId = process.env.HERDR_PANE_ID;
-  const socketPath = process.env.HERDR_SOCKET_PATH;
+  const paneId = process.env.NAGI_PANE_ID;
+  const socketPath = process.env.NAGI_SOCKET_PATH;
 
   if (!paneId || !socketPath) {
     return Promise.resolve();
@@ -106,11 +106,11 @@ function reportState(state, sessionID) {
   return request("pane.report_agent", params);
 }
 
-export const HerdrAgentStatePlugin = async () => {
+export const NagiAgentStatePlugin = async () => {
   if (
-    process.env.HERDR_ENV !== "1" ||
-    !process.env.HERDR_SOCKET_PATH ||
-    !process.env.HERDR_PANE_ID
+    process.env.NAGI_ENV !== "1" ||
+    !process.env.NAGI_SOCKET_PATH ||
+    !process.env.NAGI_PANE_ID
   ) {
     return {};
   }
@@ -155,7 +155,7 @@ export const HerdrAgentStatePlugin = async () => {
       switch (type) {
         case "session.created":
           // A root session.created is a genuine new-session start (subagent
-          // creates are dropped above). Signal it so herdr replaces the pane's
+          // creates are dropped above). Signal it so nagi replaces the pane's
           // prior session id instead of treating the change as cross-talk.
           await reportSession(sessionID, "new");
           break;

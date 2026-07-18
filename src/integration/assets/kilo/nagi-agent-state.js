@@ -1,12 +1,12 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
+// installed by nagi
+// managed by nagi; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
-// HERDR_INTEGRATION_ID=kilo
-// HERDR_INTEGRATION_VERSION=2
+// NAGI_INTEGRATION_ID=kilo
+// NAGI_INTEGRATION_VERSION=2
 
 import net from "node:net";
 
-const SOURCE = "herdr:kilo";
+const SOURCE = "nagi:kilo";
 const AGENT = "kilo";
 let reportSeq = Date.now() * 1000;
 
@@ -41,8 +41,8 @@ function stateFromSessionStatus(status) {
 }
 
 function request(method, params) {
-  const paneId = process.env.HERDR_PANE_ID;
-  const socketPath = process.env.HERDR_SOCKET_PATH;
+  const paneId = process.env.NAGI_PANE_ID;
+  const socketPath = process.env.NAGI_SOCKET_PATH;
 
   if (!paneId || !socketPath) {
     return Promise.resolve();
@@ -96,11 +96,11 @@ function reportState(state, sessionID) {
   return request("pane.report_agent", params);
 }
 
-export const HerdrAgentStatePlugin = async () => {
+export const NagiAgentStatePlugin = async () => {
   if (
-    process.env.HERDR_ENV !== "1" ||
-    !process.env.HERDR_SOCKET_PATH ||
-    !process.env.HERDR_PANE_ID
+    process.env.NAGI_ENV !== "1" ||
+    !process.env.NAGI_SOCKET_PATH ||
+    !process.env.NAGI_PANE_ID
   ) {
     return {};
   }

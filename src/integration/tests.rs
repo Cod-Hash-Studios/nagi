@@ -51,7 +51,7 @@ fn agent_version_requirement_only_set_for_kimi() {
 fn enforce_agent_version_warns_when_binary_missing() {
     let requirement = AgentVersionRequirement {
         label: "kimi code",
-        binary: "herdr-test-binary-that-does-not-exist",
+        binary: "nagi-test-binary-that-does-not-exist",
         args: &["--version"],
         min_version: "0.14.0",
     };
@@ -132,7 +132,7 @@ fn assert_kimi_hook(config: &str, hook_path: &Path, event: &str, action: &str) {
 fn unique_base() -> PathBuf {
     clear_integration_path_env();
     std::env::temp_dir().join(format!(
-        "herdr-integration-install-test-{}-{}",
+        "nagi-integration-install-test-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -450,7 +450,7 @@ fn integration_recommendation_installs_available_or_outdated_targets() {
         label: "claude",
         command: "claude",
         available: false,
-        path: PathBuf::from("/tmp/herdr-agent-state.sh"),
+        path: PathBuf::from("/tmp/nagi-agent-state.sh"),
         state: IntegrationStatusKind::NotInstalled,
     };
     assert!(!recommendation.needs_install());
@@ -570,7 +570,7 @@ fn install_omp_removes_legacy_pi_integration_from_omp_extensions_dir() {
 }
 
 #[test]
-fn install_omp_preserves_non_herdr_file_with_pi_install_name() {
+fn install_omp_preserves_non_nagi_file_with_pi_install_name() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let home = base.join("home");
@@ -714,7 +714,7 @@ fn outdated_integrations_treat_missing_version_marker_as_legacy() {
     let ext_dir = home.join(".pi/agent/extensions");
     fs::create_dir_all(&ext_dir).unwrap();
     let extension_path = ext_dir.join(PI_EXTENSION_INSTALL_NAME);
-    fs::write(&extension_path, "// installed by herdr\n").unwrap();
+    fs::write(&extension_path, "// installed by nagi\n").unwrap();
     std::env::set_var("HOME", &home);
 
     let outdated = outdated_installed_integrations();
@@ -742,7 +742,7 @@ fn outdated_integrations_detect_previous_pi_version() {
     let extension_path = ext_dir.join(PI_EXTENSION_INSTALL_NAME);
     fs::write(
         &extension_path,
-        "// HERDR_INTEGRATION_ID=pi\n// HERDR_INTEGRATION_VERSION=4\n",
+        "// NAGI_INTEGRATION_ID=pi\n// NAGI_INTEGRATION_VERSION=4\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -772,7 +772,7 @@ fn outdated_integrations_detect_previous_omp_version() {
     let extension_path = ext_dir.join(OMP_EXTENSION_INSTALL_NAME);
     fs::write(
         &extension_path,
-        "// HERDR_INTEGRATION_ID=omp\n// HERDR_INTEGRATION_VERSION=4\n",
+        "// NAGI_INTEGRATION_ID=omp\n// NAGI_INTEGRATION_VERSION=4\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1006,7 +1006,7 @@ fn claude_v1_integration_status_is_outdated() {
     let hook_path = claude_hooks_dir.join(CLAUDE_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=claude\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# NAGI_INTEGRATION_ID=claude\n# NAGI_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1036,7 +1036,7 @@ fn claude_v2_integration_status_is_outdated() {
     let hook_path = claude_hooks_dir.join(CLAUDE_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=claude\n# HERDR_INTEGRATION_VERSION=2\n",
+        "#!/bin/sh\n# NAGI_INTEGRATION_ID=claude\n# NAGI_INTEGRATION_VERSION=2\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1057,7 +1057,7 @@ fn claude_v2_integration_status_is_outdated() {
 }
 
 #[test]
-fn uninstall_claude_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_claude_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let home = base.join("home");
@@ -1169,7 +1169,7 @@ fn codex_v2_integration_status_is_outdated() {
     let hook_path = codex_dir.join(CODEX_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=codex\n# HERDR_INTEGRATION_VERSION=2\n",
+        "#!/bin/sh\n# NAGI_INTEGRATION_ID=codex\n# NAGI_INTEGRATION_VERSION=2\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1305,7 +1305,7 @@ fn install_codex_only_migrates_top_level_feature_flags() {
 }
 
 #[test]
-fn uninstall_codex_removes_herdr_hooks_and_leaves_config_alone() {
+fn uninstall_codex_removes_nagi_hooks_and_leaves_config_alone() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let home = base.join("home");
@@ -1564,7 +1564,7 @@ fn install_copilot_writes_hook_and_updates_settings() {
         if let Some(entries) = settings["hooks"].get(event) {
             assert!(
                 !entries.to_string().contains(COPILOT_HOOK_INSTALL_NAME),
-                "expected herdr hooks.{event} entries to be removed"
+                "expected nagi hooks.{event} entries to be removed"
             );
         }
     }
@@ -1584,7 +1584,7 @@ fn copilot_v1_integration_status_is_outdated() {
     let hook_path = copilot_hooks_dir.join(COPILOT_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=copilot\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# NAGI_INTEGRATION_ID=copilot\n# NAGI_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1640,7 +1640,7 @@ fn install_copilot_uses_copilot_home_env_and_is_idempotent() {
 }
 
 #[test]
-fn uninstall_copilot_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_copilot_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let home = base.join("home");
@@ -1862,7 +1862,7 @@ fn install_devin_removes_legacy_lifecycle_hook_entries() {
 }
 
 #[test]
-fn uninstall_devin_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_devin_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let xdg_config = base.join("xdg");
@@ -2043,7 +2043,7 @@ fn droid_v1_integration_status_is_outdated() {
     let hook_path = droid_hooks_dir.join(DROID_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=droid\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# NAGI_INTEGRATION_ID=droid\n# NAGI_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2064,7 +2064,7 @@ fn droid_v1_integration_status_is_outdated() {
 }
 
 #[test]
-fn uninstall_droid_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_droid_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let home = base.join("home");
@@ -2292,7 +2292,7 @@ fn install_hermes_writes_plugin_and_enables_it() {
     );
     assert_eq!(manifest, HERMES_PLUGIN_MANIFEST_ASSET);
     assert_eq!(init, HERMES_PLUGIN_INIT_ASSET);
-    assert!(config.contains("plugins:\n  enabled:\n    - herdr-agent-state"));
+    assert!(config.contains("plugins:\n  enabled:\n    - nagi-agent-state"));
 
     std::env::remove_var("HOME");
     let _ = fs::remove_dir_all(base);
@@ -2307,7 +2307,7 @@ fn install_hermes_is_idempotent_for_enabled_entry() {
     fs::create_dir_all(&hermes_dir).unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  enabled:\n    - herdr-agent-state\n",
+        "plugins:\n  enabled:\n    - nagi-agent-state\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2316,7 +2316,7 @@ fn install_hermes_is_idempotent_for_enabled_entry() {
     install_hermes().unwrap();
 
     let config = fs::read_to_string(hermes_dir.join("config.yaml")).unwrap();
-    assert_eq!(config.matches("herdr-agent-state").count(), 1);
+    assert_eq!(config.matches("nagi-agent-state").count(), 1);
 
     std::env::remove_var("HOME");
     let _ = fs::remove_dir_all(base);
@@ -2341,7 +2341,7 @@ fn install_hermes_preserves_flat_plugin_list() {
     let config = fs::read_to_string(hermes_dir.join("config.yaml")).unwrap();
     assert_eq!(
         config,
-        "plugins:\n  - herdr-agent-state\n  - platforms/discord\n"
+        "plugins:\n  - nagi-agent-state\n  - platforms/discord\n"
     );
 
     std::env::remove_var("HOME");
@@ -2367,7 +2367,7 @@ fn install_hermes_converts_flow_plugin_list_to_block_list() {
     let config = fs::read_to_string(hermes_dir.join("config.yaml")).unwrap();
     assert_eq!(
         config,
-        "plugins:\n  - herdr-agent-state\n  - platforms/discord\n"
+        "plugins:\n  - nagi-agent-state\n  - platforms/discord\n"
     );
 
     std::env::remove_var("HOME");
@@ -2383,7 +2383,7 @@ fn install_hermes_is_idempotent_for_quoted_flat_plugin_entry() {
     fs::create_dir_all(&hermes_dir).unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  - \"herdr-agent-state\" # installed by herdr\n",
+        "plugins:\n  - \"nagi-agent-state\" # installed by nagi\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2393,7 +2393,7 @@ fn install_hermes_is_idempotent_for_quoted_flat_plugin_entry() {
     let config = fs::read_to_string(hermes_dir.join("config.yaml")).unwrap();
     assert_eq!(
         config,
-        "plugins:\n  - \"herdr-agent-state\" # installed by herdr\n"
+        "plugins:\n  - \"nagi-agent-state\" # installed by nagi\n"
     );
 
     std::env::remove_var("HOME");
@@ -2415,7 +2415,7 @@ fn uninstall_hermes_removes_plugin_and_enabled_entry() {
     .unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  enabled:\n    - other-plugin\n    - herdr-agent-state\n",
+        "plugins:\n  enabled:\n    - other-plugin\n    - nagi-agent-state\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2427,7 +2427,7 @@ fn uninstall_hermes_removes_plugin_and_enabled_entry() {
     assert!(result.updated_config);
     assert!(!plugin_dir.exists());
     assert!(config.contains("    - other-plugin"));
-    assert!(!config.contains("herdr-agent-state"));
+    assert!(!config.contains("nagi-agent-state"));
 
     std::env::remove_var("HOME");
     let _ = fs::remove_dir_all(base);
@@ -2448,7 +2448,7 @@ fn uninstall_hermes_preserves_flat_plugin_list() {
     .unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  - other-plugin\n  - herdr-agent-state\n",
+        "plugins:\n  - other-plugin\n  - nagi-agent-state\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2479,7 +2479,7 @@ fn uninstall_hermes_removes_flow_plugin_list_entry() {
     .unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins: [other-plugin, herdr-agent-state]\n",
+        "plugins: [other-plugin, nagi-agent-state]\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2510,7 +2510,7 @@ fn uninstall_hermes_removes_commented_flat_plugin_entry() {
     .unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  - other-plugin\n  - herdr-agent-state # installed by herdr\n",
+        "plugins:\n  - other-plugin\n  - nagi-agent-state # installed by nagi\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2624,7 +2624,7 @@ fn bundled_integration_assets_report_session_refs() {
     assert!(!CLAUDE_HOOK_ASSET.contains("\"state\": action"));
     assert!(!CLAUDE_HOOK_ASSET.contains("pane.release_agent"));
     assert!(
-        CODEX_HOOK_ASSET.contains("HERDR_HOOK_INPUT_FILE")
+        CODEX_HOOK_ASSET.contains("NAGI_HOOK_INPUT_FILE")
             || CODEX_HOOK_ASSET.contains("In.ReadToEnd")
     );
     assert!(
@@ -2641,7 +2641,7 @@ fn bundled_integration_assets_report_session_refs() {
     );
     assert!(!CODEX_HOOK_ASSET.contains("\"state\": action"));
     assert!(!CODEX_HOOK_ASSET.contains("pane.release_agent"));
-    assert!(KIMI_HOOK_ASSET.contains("source = \"herdr:kimi\""));
+    assert!(KIMI_HOOK_ASSET.contains("source = \"nagi:kimi\""));
     assert!(KIMI_HOOK_ASSET.contains("agent_session_id"));
     assert!(KIMI_HOOK_ASSET.contains("pane.report_agent_session"));
     assert!(KIMI_HOOK_ASSET.contains("\"state\": action"));
@@ -2650,7 +2650,7 @@ fn bundled_integration_assets_report_session_refs() {
     assert!(COPILOT_HOOK_ASSET.contains("pane.report_agent_session"));
     assert!(!COPILOT_HOOK_ASSET.contains("\"state\":"));
     assert!(!COPILOT_HOOK_ASSET.contains("pane.release_agent"));
-    assert!(DEVIN_HOOK_ASSET.contains("HERDR_DEVIN_LIST_JSON"));
+    assert!(DEVIN_HOOK_ASSET.contains("NAGI_DEVIN_LIST_JSON"));
     assert!(DEVIN_HOOK_ASSET.contains("\"method\": \"pane.report_agent_session\""));
     assert!(!DEVIN_HOOK_ASSET.contains("\"method\": \"pane.report_agent\""));
     assert!(!DEVIN_HOOK_ASSET.contains("\"state\":"));
@@ -2665,7 +2665,7 @@ fn bundled_integration_assets_report_session_refs() {
     assert!(OPENCODE_PLUGIN_ASSET.contains("pane.report_agent_session"));
     assert!(OPENCODE_PLUGIN_ASSET.contains("reportState"));
     assert!(!OPENCODE_PLUGIN_ASSET.contains("pane.release_agent"));
-    assert!(KILO_PLUGIN_ASSET.contains("SOURCE = \"herdr:kilo\""));
+    assert!(KILO_PLUGIN_ASSET.contains("SOURCE = \"nagi:kilo\""));
     assert!(KILO_PLUGIN_ASSET.contains("AGENT = \"kilo\""));
     assert!(KILO_PLUGIN_ASSET.contains("pane.report_agent_session"));
     assert!(KILO_PLUGIN_ASSET.contains("reportState"));
@@ -2676,13 +2676,13 @@ fn bundled_integration_assets_report_session_refs() {
     assert!(HERMES_PLUGIN_INIT_ASSET.contains("on_session_end"));
     assert!(!HERMES_PLUGIN_INIT_ASSET.contains("on_session_finalize"));
     assert!(!HERMES_PLUGIN_INIT_ASSET.contains("pane.release_agent"));
-    assert!(QODERCLI_HOOK_ASSET.contains("HERDR_HOOK_INPUT_FILE"));
+    assert!(QODERCLI_HOOK_ASSET.contains("NAGI_HOOK_INPUT_FILE"));
     assert!(QODERCLI_HOOK_ASSET.contains("agent_session_id"));
     assert!(QODERCLI_HOOK_ASSET.contains("pane.report_agent_session"));
     assert!(!QODERCLI_HOOK_ASSET.contains("\"state\": action"));
     assert!(!QODERCLI_HOOK_ASSET.contains("pane.release_agent"));
     assert!(!QODERCLI_HOOK_ASSET.contains("QODER_HOOK_EVENT"));
-    assert!(CURSOR_HOOK_ASSET.contains("HERDR_INTEGRATION_ID=cursor"));
+    assert!(CURSOR_HOOK_ASSET.contains("NAGI_INTEGRATION_ID=cursor"));
     assert!(CURSOR_HOOK_ASSET.contains("conversation_id"));
     assert!(CURSOR_HOOK_ASSET.contains("conversationId"));
     assert!(CURSOR_HOOK_ASSET.contains("sessionId"));
@@ -2692,8 +2692,8 @@ fn bundled_integration_assets_report_session_refs() {
     assert!(CURSOR_HOOK_ASSET.contains("sessionStart"));
     assert!(!CURSOR_HOOK_ASSET.contains("\"state\":"));
     assert!(!CURSOR_HOOK_ASSET.contains("pane.release_agent"));
-    assert!(MASTRACODE_HOOK_ASSET.contains("HERDR_INTEGRATION_ID=mastracode"));
-    assert!(MASTRACODE_HOOK_ASSET.contains("HERDR_INTEGRATION_VERSION=1"));
+    assert!(MASTRACODE_HOOK_ASSET.contains("NAGI_INTEGRATION_ID=mastracode"));
+    assert!(MASTRACODE_HOOK_ASSET.contains("NAGI_INTEGRATION_VERSION=1"));
     assert!(MASTRACODE_HOOK_ASSET.contains("session_id"));
     assert!(!MASTRACODE_HOOK_ASSET.contains("run_id"));
     assert!(MASTRACODE_HOOK_ASSET.contains("agent_session_id"));
@@ -2988,7 +2988,7 @@ fn install_qodercli_is_idempotent_for_hook_entries() {
 }
 
 #[test]
-fn uninstall_qodercli_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_qodercli_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let qoder_dir = base.join(".qoder");
@@ -3082,7 +3082,7 @@ fn install_cursor_writes_hook_and_updates_hooks_json() {
         .and_then(Value::as_str)
         .is_some_and(|command| {
             command.starts_with("bash ")
-                && command.contains("herdr-agent-state.sh")
+                && command.contains("nagi-agent-state.sh")
                 && command.ends_with(" session")
         }));
     assert!(hooks.get("beforeSubmitPrompt").is_none());
@@ -3120,7 +3120,7 @@ fn install_cursor_is_idempotent_for_hook_entries() {
 }
 
 #[test]
-fn uninstall_cursor_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_cursor_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let cursor_dir = base.join(".cursor");
@@ -3181,7 +3181,7 @@ fn cursor_v1_integration_status_is_current() {
     let hook_path = cursor_dir.join(CURSOR_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=cursor\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# NAGI_INTEGRATION_ID=cursor\n# NAGI_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var(CURSOR_CONFIG_DIR_ENV_VAR, &cursor_dir);
@@ -3249,7 +3249,7 @@ fn install_mastracode_writes_hook_and_updates_hooks_json() {
     let hooks = hooks_file.as_object().unwrap();
     for (event, action) in MASTRACODE_HOOK_EVENTS {
         let entries = hooks.get(event).and_then(Value::as_array).unwrap();
-        assert_eq!(entries.len(), 1, "{event} should have one Herdr hook");
+        assert_eq!(entries.len(), 1, "{event} should have one Nagi hook");
         let command = entries[0].get("command").and_then(Value::as_str).unwrap();
         assert!(command.starts_with("bash "));
         assert!(command.contains(MASTRACODE_HOOK_INSTALL_NAME));
@@ -3306,7 +3306,7 @@ fn install_mastracode_is_idempotent_for_hook_entries() {
 }
 
 #[test]
-fn uninstall_mastracode_removes_herdr_hooks_and_preserves_others() {
+fn uninstall_mastracode_removes_nagi_hooks_and_preserves_others() {
     let _lock = integration_env_lock();
     let base = unique_base();
     let original_home = std::env::var_os("HOME");

@@ -31,7 +31,7 @@ class PreviewNotesTests(unittest.TestCase):
             notes = "Preview notes\n"
             content = preview.build_manifest(
                 output=output,
-                repo="ogulcancelik/herdr",
+                repo="Cod-Hash-Studios/nagi",
                 tag="preview-2026-06-02-abcdef123456",
                 build_id="2026-06-02-abcdef123456",
                 commit="abcdef1234567890",
@@ -51,7 +51,7 @@ class PreviewNotesTests(unittest.TestCase):
             )
             self.assertEqual(
                 data["assets"]["windows-x86_64"]["url"],
-                "https://github.com/ogulcancelik/herdr/releases/download/preview-2026-06-02-abcdef123456/herdr-windows-x86_64.exe",
+                "https://github.com/Cod-Hash-Studios/nagi/releases/download/preview-2026-06-02-abcdef123456/nagi-windows-x86_64.exe",
             )
             self.assertIn("2026-06-02-abcdef123456", data["builds"])
 
@@ -138,7 +138,7 @@ class PreviewNotesTests(unittest.TestCase):
 
     def test_preview_docs_rewrite_links_to_preview_namespace(self):
         source = """---
-title: Install Herdr
+title: Install Nagi
 ---
 
 import ConfigReference from '../../components/ConfigReference.astro';

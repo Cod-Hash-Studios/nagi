@@ -16,8 +16,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde_json::Value;
 use support::{
-    cleanup_test_base, register_runtime_dir, register_spawned_herdr_pid,
-    unregister_spawned_herdr_pid,
+    cleanup_test_base, register_runtime_dir, register_spawned_nagi_pid, unregister_spawned_nagi_pid,
 };
 
 fn unique_test_dir() -> PathBuf {
@@ -26,17 +25,17 @@ fn unique_test_dir() -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     PathBuf::from(format!(
-        "/tmp/herdr-autodetect-test-{}-{nanos}",
+        "/tmp/nagi-autodetect-test-{}-{nanos}",
         std::process::id()
     ))
 }
 
-struct SpawnedHerdr {
+struct SpawnedNagi {
     _master: Box<dyn MasterPty + Send>,
     child: Box<dyn Child + Send + Sync>,
 }
 
-impl Drop for SpawnedHerdr {
+impl Drop for SpawnedNagi {
     fn drop(&mut self) {
         let pid = self.child.process_id();
         let _ = self.child.kill();
@@ -53,12 +52,12 @@ impl Drop for SpawnedHerdr {
                 thread::sleep(Duration::from_millis(20));
             }
 
-            unregister_spawned_herdr_pid(Some(pid));
+            unregister_spawned_nagi_pid(Some(pid));
         }
     }
 }
 
-fn cleanup_spawned_herdr(spawned: SpawnedHerdr, base: PathBuf) {
+fn cleanup_spawned_nagi(spawned: SpawnedNagi, base: PathBuf) {
     drop(spawned);
     cleanup_test_base(&base);
 }
@@ -86,15 +85,11 @@ fn spawn_server(
     runtime_dir: &Path,
     api_socket_path: &Path,
     _client_socket_path: &Path,
-) -> SpawnedHerdr {
-    fs::create_dir_all(config_home.join("herdr")).unwrap();
+) -> SpawnedNagi {
+    fs::create_dir_all(config_home.join("nagi")).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
     register_runtime_dir(runtime_dir);
-    fs::write(
-        config_home.join("herdr/config.toml"),
-        "onboarding = false\n",
-    )
-    .unwrap();
+    fs::write(config_home.join("nagi/config.toml"), "onboarding = false\n").unwrap();
 
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -105,40 +100,36 @@ fn spawn_server(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_nagi"));
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("NAGI_SOCKET_PATH", api_socket_path);
+    cmd.env_remove("NAGI_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("NAGI_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
-    register_spawned_herdr_pid(child.process_id());
+    register_spawned_nagi_pid(child.process_id());
     drop(pair.slave);
 
-    SpawnedHerdr {
+    SpawnedNagi {
         _master: pair.master,
         child,
     }
 }
 
-/// Spawn `herdr` (no subcommand) — the auto-detect launch path.
-fn spawn_herdr_auto(
+/// Spawn `nagi` (no subcommand) — the auto-detect launch path.
+fn spawn_nagi_auto(
     config_home: &Path,
     runtime_dir: &Path,
     api_socket_path: &Path,
     _client_socket_path: &Path,
-) -> SpawnedHerdr {
-    fs::create_dir_all(config_home.join("herdr")).unwrap();
+) -> SpawnedNagi {
+    fs::create_dir_all(config_home.join("nagi")).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
     register_runtime_dir(runtime_dir);
-    fs::write(
-        config_home.join("herdr/config.toml"),
-        "onboarding = false\n",
-    )
-    .unwrap();
+    fs::write(config_home.join("nagi/config.toml"), "onboarding = false\n").unwrap();
 
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -149,39 +140,35 @@ fn spawn_herdr_auto(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_nagi"));
     // No subcommand, no --no-session → auto-detect launch
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("NAGI_SOCKET_PATH", api_socket_path);
+    cmd.env_remove("NAGI_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("NAGI_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
-    register_spawned_herdr_pid(child.process_id());
+    register_spawned_nagi_pid(child.process_id());
     drop(pair.slave);
 
-    SpawnedHerdr {
+    SpawnedNagi {
         _master: pair.master,
         child,
     }
 }
 
-/// Spawn `herdr --no-session` — the monolithic escape hatch.
-fn spawn_herdr_no_session(
+/// Spawn `nagi --no-session` — the monolithic escape hatch.
+fn spawn_nagi_no_session(
     config_home: &Path,
     runtime_dir: &Path,
     api_socket_path: &Path,
-) -> SpawnedHerdr {
-    fs::create_dir_all(config_home.join("herdr")).unwrap();
+) -> SpawnedNagi {
+    fs::create_dir_all(config_home.join("nagi")).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
     register_runtime_dir(runtime_dir);
-    fs::write(
-        config_home.join("herdr/config.toml"),
-        "onboarding = false\n",
-    )
-    .unwrap();
+    fs::write(config_home.join("nagi/config.toml"), "onboarding = false\n").unwrap();
 
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -192,19 +179,19 @@ fn spawn_herdr_no_session(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_nagi"));
     cmd.arg("--no-session");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
+    cmd.env("NAGI_SOCKET_PATH", api_socket_path);
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("NAGI_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
-    register_spawned_herdr_pid(child.process_id());
+    register_spawned_nagi_pid(child.process_id());
     drop(pair.slave);
 
-    SpawnedHerdr {
+    SpawnedNagi {
         _master: pair.master,
         child,
     }
@@ -242,9 +229,9 @@ fn wait_for_log_contains(path: &Path, needle: &str, timeout: Duration) {
 }
 
 fn run_cli(socket_path: &Path, args: &[&str]) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nagi"));
     command.args(args);
-    command.env("HERDR_SOCKET_PATH", socket_path);
+    command.env("NAGI_SOCKET_PATH", socket_path);
     command.output().unwrap()
 }
 
@@ -279,7 +266,7 @@ fn wait_for_pid_exit(pid: u32, timeout: Duration) -> bool {
 // Tests
 // ---------------------------------------------------------------------------
 
-/// Running `herdr` with no server present starts a server
+/// Running `nagi` with no server present starts a server
 /// and attaches as client.
 #[test]
 fn auto_detect_no_server_spawns_server_and_attaches() {
@@ -287,8 +274,8 @@ fn auto_detect_no_server_spawns_server_and_attaches() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
     // Ensure no server is running initially.
     assert!(
@@ -300,8 +287,8 @@ fn auto_detect_no_server_spawns_server_and_attaches() {
         "client socket should not exist initially"
     );
 
-    // Run `herdr` (no subcommand) — should auto-detect, spawn server, attach as client.
-    let herdr = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
+    // Run `nagi` (no subcommand) — should auto-detect, spawn server, attach as client.
+    let nagi = spawn_nagi_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
 
     // Wait for both sockets to appear (server was spawned).
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -319,16 +306,16 @@ fn auto_detect_no_server_spawns_server_and_attaches() {
         .expect("should connect to client socket (server is listening)");
 
     // Verify the client process is running.
-    let client_pid = herdr.child.process_id().expect("client should have PID");
+    let client_pid = nagi.child.process_id().expect("client should have PID");
     assert!(
         process_exists(client_pid),
         "client process should be running"
     );
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
-/// Running `herdr` with a server already running attaches
+/// Running `nagi` with a server already running attaches
 /// as client directly (no second server).
 #[test]
 fn auto_detect_server_running_attaches_directly() {
@@ -336,8 +323,8 @@ fn auto_detect_server_running_attaches_directly() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
     // Start a server explicitly.
     let server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -349,8 +336,8 @@ fn auto_detect_server_running_attaches_directly() {
     // Verify server is running.
     assert!(process_exists(server_pid), "server should be running");
 
-    // Run `herdr` (no subcommand) — should detect the running server and attach.
-    let client = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
+    // Run `nagi` (no subcommand) — should detect the running server and attach.
+    let client = spawn_nagi_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
 
     // Wait a moment for the client to attach.
     thread::sleep(Duration::from_millis(500));
@@ -375,12 +362,12 @@ fn auto_detect_server_running_attaches_directly() {
         "API should still respond to ping: {response}"
     );
 
-    cleanup_spawned_herdr(client, PathBuf::from("/nonexistent"));
-    cleanup_spawned_herdr(server, base);
+    cleanup_spawned_nagi(client, PathBuf::from("/nonexistent"));
+    cleanup_spawned_nagi(server, base);
 }
 
 /// Socket path resolution is consistent between server and client.
-/// Both derive the client socket from the `HERDR_SOCKET_PATH` override,
+/// Both derive the client socket from the `NAGI_SOCKET_PATH` override,
 /// so overriding the API socket keeps both endpoints aligned.
 #[test]
 fn auto_detect_socket_path_consistency() {
@@ -388,11 +375,11 @@ fn auto_detect_socket_path_consistency() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
-    // Run `herdr` with custom socket paths.
-    let herdr = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
+    // Run `nagi` with custom socket paths.
+    let nagi = spawn_nagi_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
 
     // Wait for both sockets to appear at the custom paths.
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -420,10 +407,10 @@ fn auto_detect_socket_path_consistency() {
     let _stream = UnixStream::connect(&client_socket)
         .expect("should connect to client socket at custom path");
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
-/// `herdr --no-session` bypasses server/client and runs
+/// `nagi --no-session` bypasses server/client and runs
 /// monolithically. No server process is spawned. No client socket is created.
 #[test]
 fn no_session_flag_runs_monolithically() {
@@ -431,11 +418,11 @@ fn no_session_flag_runs_monolithically() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
-    // Run `herdr --no-session` — monolithic mode, no server/client.
-    let herdr = spawn_herdr_no_session(&config_home, &runtime_dir, &api_socket);
+    // Run `nagi --no-session` — monolithic mode, no server/client.
+    let nagi = spawn_nagi_no_session(&config_home, &runtime_dir, &api_socket);
 
     // Wait for the API socket (monolithic mode creates it).
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -457,14 +444,14 @@ fn no_session_flag_runs_monolithically() {
     // Verify the API socket is served by the monolithic process itself,
     // not by a separate server. We can check this by verifying the client
     // PID matches what would be serving the socket — in monolithic mode,
-    // there is only one herdr process.
-    let client_pid = herdr.child.process_id().expect("should have PID");
+    // there is only one nagi process.
+    let client_pid = nagi.child.process_id().expect("should have PID");
     assert!(
         process_exists(client_pid),
         "monolithic process should be running"
     );
 
-    cleanup_spawned_herdr(herdr, base);
+    cleanup_spawned_nagi(nagi, base);
 }
 
 /// CLI subcommands work through the server's JSON API socket.
@@ -474,15 +461,15 @@ fn cli_subcommands_work_through_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
     // Start a server.
     let server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
     wait_for_socket(&client_socket, Duration::from_secs(10));
 
-    // Test `herdr workspace list` through the server's API socket.
+    // Test `nagi workspace list` through the server's API socket.
     let output = run_cli(&api_socket, &["workspace", "list"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -496,7 +483,7 @@ fn cli_subcommands_work_through_server() {
         "workspace list output should contain 'result': {stdout}"
     );
 
-    // Test `herdr pane list` through the server's API socket.
+    // Test `nagi pane list` through the server's API socket.
     let output = run_cli(&api_socket, &["pane", "list"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -509,22 +496,22 @@ fn cli_subcommands_work_through_server() {
         "pane list output should contain 'result': {stdout}"
     );
 
-    cleanup_spawned_herdr(server, base);
+    cleanup_spawned_nagi(server, base);
 }
 
 /// Verify that the server spawned by auto-detect
-/// persists after the client exits, and a new `herdr` can reattach.
+/// persists after the client exits, and a new `nagi` can reattach.
 #[test]
 fn auto_detect_server_persists_and_reattaches() {
     let _lock = test_lock();
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
-    // Run `herdr` — auto-detect spawns server + attaches client.
-    let mut client1 = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
+    // Run `nagi` — auto-detect spawns server + attaches client.
+    let mut client1 = spawn_nagi_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
     wait_for_socket(&client_socket, Duration::from_secs(10));
 
@@ -558,8 +545,8 @@ fn auto_detect_server_persists_and_reattaches() {
         "client socket should still exist after client exit"
     );
 
-    // Run `herdr` again — should detect the running server and reattach.
-    let client2 = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
+    // Run `nagi` again — should detect the running server and reattach.
+    let client2 = spawn_nagi_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
     thread::sleep(Duration::from_millis(500));
 
     // Verify the new client is running.
@@ -576,7 +563,7 @@ fn auto_detect_server_persists_and_reattaches() {
         "API should still respond after reattach: {response}"
     );
 
-    cleanup_spawned_herdr(client2, PathBuf::from("/nonexistent"));
+    cleanup_spawned_nagi(client2, PathBuf::from("/nonexistent"));
     cleanup_test_base(&base);
 }
 
@@ -589,15 +576,15 @@ fn auto_detect_default_socket_path_from_config_dir() {
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
 
-    // Don't set HERDR_SOCKET_PATH or HERDR_CLIENT_SOCKET_PATH.
+    // Don't set NAGI_SOCKET_PATH or NAGI_CLIENT_SOCKET_PATH.
     // The default paths should come from the app config directory, not XDG_RUNTIME_DIR.
     let app_dir_name = if cfg!(debug_assertions) {
-        "herdr-dev"
+        "nagi-dev"
     } else {
-        "herdr"
+        "nagi"
     };
-    let api_socket = config_home.join(app_dir_name).join("herdr.sock");
-    let client_socket = config_home.join(app_dir_name).join("herdr-client.sock");
+    let api_socket = config_home.join(app_dir_name).join("nagi.sock");
+    let client_socket = config_home.join(app_dir_name).join("nagi-client.sock");
 
     // Spawn server with XDG_RUNTIME_DIR set to a different directory to prove it is ignored.
     fs::create_dir_all(config_home.join(app_dir_name)).unwrap();
@@ -618,20 +605,20 @@ fn auto_detect_default_socket_path_from_config_dir() {
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_nagi"));
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);
     cmd.env("XDG_RUNTIME_DIR", &runtime_dir);
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("NAGI_ENV");
     // Explicitly remove socket overrides to test default path resolution.
-    cmd.env_remove("HERDR_SOCKET_PATH");
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env_remove("NAGI_SOCKET_PATH");
+    cmd.env_remove("NAGI_CLIENT_SOCKET_PATH");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
-    register_spawned_herdr_pid(child.process_id());
+    register_spawned_nagi_pid(child.process_id());
     drop(pair.slave);
-    let server = SpawnedHerdr {
+    let server = SpawnedNagi {
         _master: pair.master,
         child,
     };
@@ -654,7 +641,7 @@ fn auto_detect_default_socket_path_from_config_dir() {
         "API should respond at config-dir path: {response}"
     );
 
-    cleanup_spawned_herdr(server, base);
+    cleanup_spawned_nagi(server, base);
 }
 
 #[test]
@@ -663,22 +650,22 @@ fn auto_detect_writes_client_and_server_logs_to_separate_files() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
-    let spawned = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
+    let spawned = spawn_nagi_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
     wait_for_socket(&client_socket, Duration::from_secs(10));
 
     let app_dir_name = if cfg!(debug_assertions) {
-        "herdr-dev"
+        "nagi-dev"
     } else {
-        "herdr"
+        "nagi"
     };
     let log_dir = config_home.join(app_dir_name);
-    let client_log = log_dir.join("herdr-client.log");
-    let server_log = log_dir.join("herdr-server.log");
-    let monolith_log = log_dir.join("herdr.log");
+    let client_log = log_dir.join("nagi-client.log");
+    let server_log = log_dir.join("nagi-server.log");
+    let monolith_log = log_dir.join("nagi.log");
 
     wait_for_log_contains(
         &client_log,
@@ -694,10 +681,10 @@ fn auto_detect_writes_client_and_server_logs_to_separate_files() {
     let monolith_content = fs::read_to_string(&monolith_log).unwrap_or_default();
     assert!(
         !monolith_content.contains("subsystem=\"client\""),
-        "persistent client logs should not land in herdr.log: {monolith_content}"
+        "persistent client logs should not land in nagi.log: {monolith_content}"
     );
 
-    cleanup_spawned_herdr(spawned, base);
+    cleanup_spawned_nagi(spawned, base);
 }
 
 #[test]
@@ -706,18 +693,18 @@ fn no_session_writes_startup_logs_to_monolith_file() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
 
-    let spawned = spawn_herdr_no_session(&config_home, &runtime_dir, &api_socket);
+    let spawned = spawn_nagi_no_session(&config_home, &runtime_dir, &api_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
 
     let app_dir_name = if cfg!(debug_assertions) {
-        "herdr-dev"
+        "nagi-dev"
     } else {
-        "herdr"
+        "nagi"
     };
     let log_dir = config_home.join(app_dir_name);
-    let monolith_log = log_dir.join("herdr.log");
+    let monolith_log = log_dir.join("nagi.log");
 
     wait_for_log_contains(
         &monolith_log,
@@ -725,7 +712,7 @@ fn no_session_writes_startup_logs_to_monolith_file() {
         Duration::from_secs(10),
     );
 
-    cleanup_spawned_herdr(spawned, base);
+    cleanup_spawned_nagi(spawned, base);
 }
 
 #[test]
@@ -734,8 +721,8 @@ fn auto_detect_respects_nested_guard_before_auto_attach() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("nagi.sock");
+    let client_socket = runtime_dir.join("nagi-client.sock");
 
     let server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -755,12 +742,12 @@ fn auto_detect_respects_nested_guard_before_auto_attach() {
         .map(|workspaces| workspaces.len())
         .unwrap_or(0);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .env("XDG_CONFIG_HOME", &config_home)
         .env("XDG_RUNTIME_DIR", &runtime_dir)
-        .env("HERDR_SOCKET_PATH", &api_socket)
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env("HERDR_ENV", "1")
+        .env("NAGI_SOCKET_PATH", &api_socket)
+        .env_remove("NAGI_CLIENT_SOCKET_PATH")
+        .env("NAGI_ENV", "1")
         .output()
         .unwrap();
 
@@ -770,7 +757,7 @@ fn auto_detect_respects_nested_guard_before_auto_attach() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("nested herdr is disabled by default"),
+        stderr.contains("nested nagi is disabled by default"),
         "stderr should mention nested-launch guard: {stderr}"
     );
 
@@ -792,5 +779,5 @@ fn auto_detect_respects_nested_guard_before_auto_attach() {
         "nested launch should not auto-attach or mutate server state"
     );
 
-    cleanup_spawned_herdr(server, base);
+    cleanup_spawned_nagi(server, base);
 }

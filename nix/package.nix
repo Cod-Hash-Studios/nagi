@@ -15,7 +15,7 @@
 let
   manifest = lib.importTOML ../Cargo.toml;
   zigDeps = callPackage ../vendor/libghostty-vt/build.zig.zon.nix {
-    name = "herdr-libghostty-vt-zig-cache";
+    name = "nagi-libghostty-vt-zig-cache";
     inherit zstd;
     linkFarm =
       name: entries:
@@ -28,7 +28,7 @@ let
   };
 in
 rustPlatform.buildRustPackage {
-  pname = "herdr";
+  pname = "nagi";
   version = manifest.package.version;
 
   src = lib.fileset.toSource {
@@ -36,7 +36,7 @@ rustPlatform.buildRustPackage {
     fileset = lib.fileset.intersection (lib.fileset.fromSource (lib.sources.cleanSource ./..)) (
       lib.fileset.unions [
         ../assets
-        ../docs/next/api/herdr-api.schema.json
+        ../docs/next/api/nagi-api.schema.json
         ../src
         ../vendor/libghostty-vt
         ../vendor/libghostty-vt.vendor.json
@@ -80,9 +80,9 @@ rustPlatform.buildRustPackage {
 
   meta = {
     description = "Terminal workspace manager for AI coding agents";
-    homepage = "https://herdr.dev";
+    homepage = "https://github.com/Cod-Hash-Studios/nagi";
     license = lib.licenses.agpl3Plus;
-    mainProgram = "herdr";
+    mainProgram = "nagi";
     platforms = lib.platforms.linux ++ lib.platforms.darwin;
   };
 }

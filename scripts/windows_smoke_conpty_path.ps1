@@ -16,7 +16,7 @@ function Invoke-Checked {
 }
 
 $exe = (Resolve-Path $ExePath).Path
-$fakeDir = Join-Path ([System.IO.Path]::GetTempPath()) "herdr-fake-conpty-$([guid]::NewGuid().ToString('N'))"
+$fakeDir = Join-Path ([System.IO.Path]::GetTempPath()) "nagi-fake-conpty-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Force $fakeDir | Out-Null
 
 $fakeSource = Join-Path $fakeDir "fake_conpty.rs"
@@ -58,9 +58,9 @@ pub extern "system" fn ClosePseudoConsole(_hpc: HANDLE) {}
 Invoke-Checked rustc @("--crate-type", "cdylib", "--edition", "2021", $fakeSource, "-o", $fakeDll)
 
 $oldPath = $env:PATH
-$oldSession = $env:HERDR_SESSION
+$oldSession = $env:NAGI_SESSION
 $env:PATH = "$fakeDir;$oldPath"
-$env:HERDR_SESSION = $Session
+$env:NAGI_SESSION = $Session
 
 $server = $null
 try {
@@ -119,6 +119,6 @@ try {
     }
     $global:LASTEXITCODE = 0
     $env:PATH = $oldPath
-    $env:HERDR_SESSION = $oldSession
+    $env:NAGI_SESSION = $oldSession
     Remove-Item -Recurse -Force $fakeDir -ErrorAction SilentlyContinue
 }

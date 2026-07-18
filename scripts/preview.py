@@ -16,8 +16,8 @@ ASSET_TARGETS = (
     "windows-x86_64",
 )
 EXPECTED_ASSET_NAMES = {
-    **{target: f"herdr-{target}" for target in ASSET_TARGETS},
-    "windows-x86_64": "herdr-windows-x86_64.exe",
+    **{target: f"nagi-{target}" for target in ASSET_TARGETS},
+    "windows-x86_64": "nagi-windows-x86_64.exe",
 }
 HIDDEN_SUBJECTS = (
     "docs: update website manifest",
@@ -295,13 +295,13 @@ def main() -> int:
     notes.add_argument("--commit", required=True)
     notes.add_argument("--build-id", required=True)
     notes.add_argument("--base-version", required=True)
-    notes.add_argument("--repo", default="ogulcancelik/herdr")
+    notes.add_argument("--repo", default="Cod-Hash-Studios/nagi")
     notes.add_argument("--output", required=True)
     notes.set_defaults(func=cmd_notes)
 
     manifest = sub.add_parser("manifest")
     manifest.add_argument("--output", default="website/preview.json")
-    manifest.add_argument("--repo", default="ogulcancelik/herdr")
+    manifest.add_argument("--repo", default="Cod-Hash-Studios/nagi")
     manifest.add_argument("--tag", required=True)
     manifest.add_argument("--build-id", required=True)
     manifest.add_argument("--commit", required=True)

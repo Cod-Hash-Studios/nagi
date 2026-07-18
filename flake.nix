@@ -1,5 +1,5 @@
 {
-  description = "herdr — terminal workspace manager for AI coding agents";
+  description = "nagi — terminal workspace manager for AI coding agents";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -46,27 +46,27 @@
         system:
         let
           pkgs = pkgsFor system;
-          herdr = pkgs.callPackage ./nix/package.nix {
+          nagi = pkgs.callPackage ./nix/package.nix {
             rustPlatform = rustPlatformFor pkgs;
           };
         in
         {
-          inherit herdr;
-          default = herdr;
+          inherit nagi;
+          default = nagi;
         }
       );
 
       apps = forAllSystems (system: {
         default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/herdr";
-          meta.description = "Run Herdr";
+          program = "${self.packages.${system}.default}/bin/nagi";
+          meta.description = "Run Nagi";
         };
       });
 
       checks = forAllSystems (system: {
-        herdr = self.packages.${system}.default;
-        default = self.checks.${system}.herdr;
+        nagi = self.packages.${system}.default;
+        default = self.checks.${system}.nagi;
       });
 
       devShells = forAllSystems (
@@ -77,7 +77,7 @@
         in
         {
           default = pkgs.mkShell {
-            name = "herdr-dev";
+            name = "nagi-dev";
             packages = with pkgs; [
               cargo-nextest
               cmake
@@ -100,7 +100,7 @@
 
       overlays.default = lib.composeExtensions rust-overlay.overlays.default (
         final: _prev: {
-          herdr = final.callPackage ./nix/package.nix {
+          nagi = final.callPackage ./nix/package.nix {
             rustPlatform = rustPlatformFor final;
           };
         }

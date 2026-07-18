@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const originalEnvironment = {
-  HERDR_ENV: process.env.HERDR_ENV,
-  HERDR_OMP_IDLE_DEBOUNCE_MS: process.env.HERDR_OMP_IDLE_DEBOUNCE_MS,
-  HERDR_PANE_ID: process.env.HERDR_PANE_ID,
-  HERDR_SOCKET_PATH: process.env.HERDR_SOCKET_PATH,
+  NAGI_ENV: process.env.NAGI_ENV,
+  NAGI_OMP_IDLE_DEBOUNCE_MS: process.env.NAGI_OMP_IDLE_DEBOUNCE_MS,
+  NAGI_PANE_ID: process.env.NAGI_PANE_ID,
+  NAGI_SOCKET_PATH: process.env.NAGI_SOCKET_PATH,
 };
 
 let server: Server | undefined;
@@ -40,8 +40,8 @@ afterEach(async () => {
 });
 
 const integrations = [
-  { name: "Pi", modulePath: "./pi/herdr-agent-state.ts" },
-  { name: "Oh My Pi", modulePath: "./omp/herdr-agent-state.ts" },
+  { name: "Pi", modulePath: "./pi/nagi-agent-state.ts" },
+  { name: "Oh My Pi", modulePath: "./omp/nagi-agent-state.ts" },
 ] as const;
 
 function importFresh(modulePath: string) {
@@ -69,13 +69,13 @@ function createExtensionHarness() {
 }
 
 function configureIntegrationEnvironment(recordingSocketPath: string) {
-  process.env.HERDR_ENV = "1";
-  process.env.HERDR_SOCKET_PATH = recordingSocketPath;
-  process.env.HERDR_PANE_ID = "test:p1";
+  process.env.NAGI_ENV = "1";
+  process.env.NAGI_SOCKET_PATH = recordingSocketPath;
+  process.env.NAGI_PANE_ID = "test:p1";
 }
 
 async function startRecordingServer(name: string): Promise<unknown[]> {
-  const recordingSocketPath = join(tmpdir(), `herdr-${name}-${process.pid}.sock`);
+  const recordingSocketPath = join(tmpdir(), `nagi-${name}-${process.pid}.sock`);
   socketPath = recordingSocketPath;
   await rm(recordingSocketPath, { force: true });
 
@@ -152,7 +152,7 @@ test("Pi reports the session replacement source", async () => {
   const requests = await startRecordingServer("pi-session-source");
   const { handlers, pi } = createExtensionHarness();
 
-  const { default: install } = await importFresh("./pi/herdr-agent-state.ts");
+  const { default: install } = await importFresh("./pi/nagi-agent-state.ts");
   install(pi);
 
   const sessionStart = handlers.get("session_start");
@@ -183,7 +183,7 @@ test("Pi reports the session replacement source", async () => {
 });
 
 test("Pi waits for a replacement session report before publishing state", async () => {
-  const recordingSocketPath = join(tmpdir(), `herdr-pi-session-order-${process.pid}.sock`);
+  const recordingSocketPath = join(tmpdir(), `nagi-pi-session-order-${process.pid}.sock`);
   socketPath = recordingSocketPath;
   await rm(recordingSocketPath, { force: true });
 
@@ -215,7 +215,7 @@ test("Pi waits for a replacement session report before publishing state", async 
 
   configureIntegrationEnvironment(recordingSocketPath);
   const { handlers, pi } = createExtensionHarness();
-  const { default: install } = await importFresh("./pi/herdr-agent-state.ts");
+  const { default: install } = await importFresh("./pi/nagi-agent-state.ts");
   install(pi);
 
   const sessionStart = handlers.get("session_start");
@@ -258,7 +258,7 @@ test("Pi waits for a replacement session report before publishing state", async 
 });
 
 async function startDroppedFirstResponseServer(name: string) {
-  const recordingSocketPath = join(tmpdir(), `herdr-${name}-${process.pid}.sock`);
+  const recordingSocketPath = join(tmpdir(), `nagi-${name}-${process.pid}.sock`);
   socketPath = recordingSocketPath;
   await rm(recordingSocketPath, { force: true });
 
@@ -301,10 +301,10 @@ async function startDroppedFirstResponseServer(name: string) {
 
 test("Oh My Pi retries working before a queued idle state", async () => {
   const { attemptedRequests } = await startDroppedFirstResponseServer("omp-retry");
-  process.env.HERDR_OMP_IDLE_DEBOUNCE_MS = "0";
+  process.env.NAGI_OMP_IDLE_DEBOUNCE_MS = "0";
   const { handlers, pi } = createExtensionHarness();
 
-  const { default: install } = await importFresh("./omp/herdr-agent-state.ts");
+  const { default: install } = await importFresh("./omp/nagi-agent-state.ts");
   install(pi);
 
   const context = {
@@ -334,7 +334,7 @@ test("Pi retries working state after an unanswered socket attempt", async () => 
     await startDroppedFirstResponseServer("pi-retry");
   const { handlers, pi } = createExtensionHarness();
 
-  const { default: install } = await importFresh("./pi/herdr-agent-state.ts");
+  const { default: install } = await importFresh("./pi/nagi-agent-state.ts");
   install(pi);
 
   const sessionStart = handlers.get("session_start");

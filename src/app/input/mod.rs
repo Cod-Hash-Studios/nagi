@@ -758,7 +758,7 @@ fn unique_temp_path(name: &str) -> std::path::PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    std::env::temp_dir().join(format!("herdr-{name}-{}-{nanos}", std::process::id()))
+    std::env::temp_dir().join(format!("nagi-{name}-{}-{nanos}", std::process::id()))
 }
 
 #[cfg(test)]
@@ -814,13 +814,13 @@ mod tests {
         app.state.name_input_replace_on_type = true;
         app.state.worktree_create = Some(crate::app::state::WorktreeCreateState {
             source_workspace_id: "source".into(),
-            source_checkout_path: "/repo/herdr".into(),
+            source_checkout_path: "/repo/nagi".into(),
             source_existing_membership: None,
-            source_repo_root: "/repo/herdr".into(),
+            source_repo_root: "/repo/nagi".into(),
             repo_key: "repo-key".into(),
-            repo_name: "herdr".into(),
+            repo_name: "nagi".into(),
             branch: "generated-branch".into(),
-            checkout_path: "/repo/herdr-generated-branch".into(),
+            checkout_path: "/repo/nagi-generated-branch".into(),
             error: None,
             creating: false,
         });

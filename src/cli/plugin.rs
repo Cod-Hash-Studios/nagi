@@ -47,7 +47,7 @@ pub(super) fn run_plugin_command(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_link(args: &[String]) -> std::io::Result<i32> {
     let Some(path) = args.first() else {
-        eprintln!("usage: herdr plugin link <path> [--disabled]");
+        eprintln!("usage: nagi plugin link <path> [--disabled]");
         return Ok(2);
     };
     let path = normalize_plugin_path_arg(path)?;
@@ -78,11 +78,11 @@ fn plugin_link(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_config_dir_command(args: &[String]) -> std::io::Result<i32> {
     let Some(plugin_id) = args.first() else {
-        eprintln!("usage: herdr plugin config-dir <plugin_id>");
+        eprintln!("usage: nagi plugin config-dir <plugin_id>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr plugin config-dir <plugin_id>");
+        eprintln!("usage: nagi plugin config-dir <plugin_id>");
         return Ok(2);
     }
     let path = crate::plugin_paths::plugin_config_dir(plugin_id);
@@ -130,11 +130,11 @@ fn plugin_list(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_unlink(args: &[String]) -> std::io::Result<i32> {
     let Some(plugin_id) = args.first() else {
-        eprintln!("usage: herdr plugin unlink <plugin_id>");
+        eprintln!("usage: nagi plugin unlink <plugin_id>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr plugin unlink <plugin_id>");
+        eprintln!("usage: nagi plugin unlink <plugin_id>");
         return Ok(2);
     }
     print_plugin_response(Method::PluginUnlink(PluginUnlinkParams {
@@ -144,7 +144,7 @@ fn plugin_unlink(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_install(args: &[String]) -> std::io::Result<i32> {
     let Some(source_arg) = args.first() else {
-        eprintln!("usage: herdr plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]");
+        eprintln!("usage: nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]");
         return Ok(2);
     };
     let source = match GithubPluginSource::parse(source_arg) {
@@ -253,11 +253,11 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_uninstall(args: &[String]) -> std::io::Result<i32> {
     let Some(target) = args.first() else {
-        eprintln!("usage: herdr plugin uninstall <plugin_id|owner/repo[/subdir...]>");
+        eprintln!("usage: nagi plugin uninstall <plugin_id|owner/repo[/subdir...]>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr plugin uninstall <plugin_id|owner/repo[/subdir...]>");
+        eprintln!("usage: nagi plugin uninstall <plugin_id|owner/repo[/subdir...]>");
         return Ok(2);
     }
 
@@ -318,14 +318,14 @@ fn plugin_uninstall(args: &[String]) -> std::io::Result<i32> {
 fn plugin_set_enabled(args: &[String], enabled: bool) -> std::io::Result<i32> {
     let Some(plugin_id) = args.first() else {
         eprintln!(
-            "usage: herdr plugin {} <plugin_id>",
+            "usage: nagi plugin {} <plugin_id>",
             if enabled { "enable" } else { "disable" }
         );
         return Ok(2);
     };
     if args.len() != 1 {
         eprintln!(
-            "usage: herdr plugin {} <plugin_id>",
+            "usage: nagi plugin {} <plugin_id>",
             if enabled { "enable" } else { "disable" }
         );
         return Ok(2);
@@ -420,7 +420,7 @@ fn plugin_action_list(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_action_invoke(args: &[String]) -> std::io::Result<i32> {
     let Some(action_id) = args.first() else {
-        eprintln!("usage: herdr plugin action invoke <action_id> [--plugin ID]");
+        eprintln!("usage: nagi plugin action invoke <action_id> [--plugin ID]");
         return Ok(2);
     };
     let mut plugin_id = None;
@@ -630,11 +630,11 @@ fn parse_popup_dimension(value: &str, flag: &str) -> Option<PopupSize> {
 
 fn plugin_pane_focus(args: &[String]) -> std::io::Result<i32> {
     let Some(pane_id) = args.first() else {
-        eprintln!("usage: herdr plugin pane focus <pane_id>");
+        eprintln!("usage: nagi plugin pane focus <pane_id>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr plugin pane focus <pane_id>");
+        eprintln!("usage: nagi plugin pane focus <pane_id>");
         return Ok(2);
     }
     print_plugin_response(Method::PluginPaneFocus(PluginPaneFocusParams {
@@ -644,11 +644,11 @@ fn plugin_pane_focus(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_pane_close(args: &[String]) -> std::io::Result<i32> {
     let Some(pane_id) = args.first() else {
-        eprintln!("usage: herdr plugin pane close <pane_id>");
+        eprintln!("usage: nagi plugin pane close <pane_id>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr plugin pane close <pane_id>");
+        eprintln!("usage: nagi plugin pane close <pane_id>");
         return Ok(2);
     }
     print_plugin_response(Method::PluginPaneClose(PluginPaneCloseParams {
@@ -718,7 +718,7 @@ impl GithubPluginSource {
         }
         let parts = value.split('/').collect::<Vec<_>>();
         if parts.len() < 2 {
-            return Err("usage: herdr plugin install <owner>/<repo>[/subdir...]".into());
+            return Err("usage: nagi plugin install <owner>/<repo>[/subdir...]".into());
         }
         let owner = parts[0];
         let repo = parts[1];
@@ -981,7 +981,7 @@ fn verify_plugin_link_source_response(
         || plugin.source.managed_path != expected.managed_path
     {
         return Err(std::io::Error::other(
-            "running Herdr server did not persist GitHub plugin source metadata",
+            "running Nagi server did not persist GitHub plugin source metadata",
         ));
     }
     Ok(())
@@ -1260,7 +1260,7 @@ fn ensure_manifest_unchanged_after_build(
         return Ok(());
     }
     Err(io::Error::other(
-        "plugin build changed herdr-plugin.toml after install preview; aborting install",
+        "plugin build changed nagi-plugin.toml after install preview; aborting install",
     ))
 }
 
@@ -1290,7 +1290,7 @@ fn run_plugin_build_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    scrub_herdr_runtime_env(&mut child);
+    scrub_nagi_runtime_env(&mut child);
 
     let mut child = match child.spawn() {
         Ok(child) => child,
@@ -1469,21 +1469,21 @@ fn read_tail_capped_output(mut reader: impl Read, cap: usize) -> CappedOutput {
     }
 }
 
-fn scrub_herdr_runtime_env(command: &mut Command) {
+fn scrub_nagi_runtime_env(command: &mut Command) {
     for key in [
         crate::api::SOCKET_PATH_ENV_VAR,
         crate::server::socket_paths::CLIENT_SOCKET_PATH_ENV_VAR,
         crate::session::SESSION_ENV_VAR,
-        "HERDR_BIN_PATH",
-        "HERDR_ENV",
-        "HERDR_WORKSPACE_ID",
-        "HERDR_TAB_ID",
-        "HERDR_PANE_ID",
+        "NAGI_BIN_PATH",
+        "NAGI_ENV",
+        "NAGI_WORKSPACE_ID",
+        "NAGI_TAB_ID",
+        "NAGI_PANE_ID",
     ] {
         command.env_remove(key);
     }
     for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("HERDR_PLUGIN_") {
+        if key.to_string_lossy().starts_with("NAGI_PLUGIN_") {
             command.env_remove(key);
         }
     }
@@ -1571,7 +1571,7 @@ fn plugin_checkout_lifecycle_error(operation: &str, path: &Path, err: io::Error)
         return io::Error::new(
             err.kind(),
             format!(
-                "failed to {operation} managed plugin checkout at {}; close any Herdr plugin panes or plugin commands using that checkout, then retry: {err}",
+                "failed to {operation} managed plugin checkout at {}; close any Nagi plugin panes or plugin commands using that checkout, then retry: {err}",
                 path.display()
             ),
         );
@@ -1616,31 +1616,31 @@ fn print_plugin_response(method: Method) -> std::io::Result<i32> {
 }
 
 fn print_plugin_help() {
-    eprintln!("herdr plugin commands:");
-    eprintln!("  herdr plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]");
-    eprintln!("  herdr plugin uninstall <plugin_id|owner/repo[/subdir...]>");
-    eprintln!("  herdr plugin link <path> [--disabled]");
-    eprintln!("  herdr plugin list [--plugin ID] [--json]");
-    eprintln!("  herdr plugin config-dir <plugin_id>");
-    eprintln!("  herdr plugin unlink <plugin_id>");
-    eprintln!("  herdr plugin enable <plugin_id>");
-    eprintln!("  herdr plugin disable <plugin_id>");
-    eprintln!("  herdr plugin action <list|invoke>");
-    eprintln!("  herdr plugin log list [--plugin ID] [--limit N]");
-    eprintln!("  herdr plugin pane <open|focus|close>");
+    eprintln!("nagi plugin commands:");
+    eprintln!("  nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]");
+    eprintln!("  nagi plugin uninstall <plugin_id|owner/repo[/subdir...]>");
+    eprintln!("  nagi plugin link <path> [--disabled]");
+    eprintln!("  nagi plugin list [--plugin ID] [--json]");
+    eprintln!("  nagi plugin config-dir <plugin_id>");
+    eprintln!("  nagi plugin unlink <plugin_id>");
+    eprintln!("  nagi plugin enable <plugin_id>");
+    eprintln!("  nagi plugin disable <plugin_id>");
+    eprintln!("  nagi plugin action <list|invoke>");
+    eprintln!("  nagi plugin log list [--plugin ID] [--limit N]");
+    eprintln!("  nagi plugin pane <open|focus|close>");
 }
 
 fn print_plugin_action_help() {
-    eprintln!("herdr plugin action commands:");
-    eprintln!("  herdr plugin action list [--plugin ID]");
-    eprintln!("  herdr plugin action invoke <action_id> [--plugin ID]");
+    eprintln!("nagi plugin action commands:");
+    eprintln!("  nagi plugin action list [--plugin ID]");
+    eprintln!("  nagi plugin action invoke <action_id> [--plugin ID]");
 }
 
 fn print_plugin_pane_help() {
-    eprintln!("herdr plugin pane commands:");
-    eprintln!("  herdr plugin pane open --plugin ID --entrypoint ID [--placement overlay|popup|split|tab|zoomed] [--width SIZE] [--height SIZE] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]");
-    eprintln!("  herdr plugin pane focus <pane_id>");
-    eprintln!("  herdr plugin pane close <pane_id>");
+    eprintln!("nagi plugin pane commands:");
+    eprintln!("  nagi plugin pane open --plugin ID --entrypoint ID [--placement overlay|popup|split|tab|zoomed] [--width SIZE] [--height SIZE] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]");
+    eprintln!("  nagi plugin pane focus <pane_id>");
+    eprintln!("  nagi plugin pane close <pane_id>");
 }
 
 #[cfg(test)]
@@ -1665,9 +1665,9 @@ mod tests {
             plugin_id: id.to_string(),
             name: "Test Plugin".to_string(),
             version: "0.1.0".to_string(),
-            min_herdr_version: crate::build_info::BASE_VERSION.to_string(),
+            min_nagi_version: crate::build_info::BASE_VERSION.to_string(),
             description: None,
-            manifest_path: format!("/tmp/{id}/herdr-plugin.toml"),
+            manifest_path: format!("/tmp/{id}/nagi-plugin.toml"),
             plugin_root: format!("/tmp/{id}"),
             enabled: true,
             platforms: None,
@@ -1683,7 +1683,7 @@ mod tests {
                 subdir: subdir.map(str::to_string),
                 requested_ref: None,
                 resolved_commit: Some("abc123".to_string()),
-                managed_path: Some(format!("/tmp/herdr/plugins/{id}")),
+                managed_path: Some(format!("/tmp/nagi/plugins/{id}")),
                 installed_unix_ms: Some(42),
             },
             warnings: vec![],
@@ -1692,34 +1692,34 @@ mod tests {
 
     #[test]
     fn github_plugin_source_parses_root_repo() {
-        let source = GithubPluginSource::parse("ogulcancelik/herdr-plugin-examples").unwrap();
+        let source = GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples").unwrap();
         assert_eq!(source.owner, "ogulcancelik");
-        assert_eq!(source.repo, "herdr-plugin-examples");
+        assert_eq!(source.repo, "nagi-plugin-examples");
         assert_eq!(source.subdir, None);
         assert_eq!(
             source.remote_url(),
-            "https://github.com/ogulcancelik/herdr-plugin-examples.git"
+            "https://github.com/Cod-Hash-Studios/nagi-plugin-examples.git"
         );
     }
 
     #[test]
     fn github_plugin_source_parses_subdir() {
         let source =
-            GithubPluginSource::parse("ogulcancelik/herdr-plugin-examples/worktree-bootstrap")
+            GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap")
                 .unwrap();
         assert_eq!(source.owner, "ogulcancelik");
-        assert_eq!(source.repo, "herdr-plugin-examples");
+        assert_eq!(source.repo, "nagi-plugin-examples");
         assert_eq!(source.subdir.as_deref(), Some("worktree-bootstrap"));
     }
 
     #[test]
     fn github_plugin_source_rejects_non_shorthand_sources() {
         for source in [
-            "https://github.com/ogulcancelik/herdr-plugin-examples",
-            "git@github.com:ogulcancelik/herdr-plugin-examples.git",
+            "https://github.com/Cod-Hash-Studios/nagi-plugin-examples",
+            "git@github.com:Cod-Hash-Studios/nagi-plugin-examples.git",
             "ogulcancelik",
-            "ogulcancelik/herdr-plugin-examples/../bad",
-            "ogulcancelik/herdr-plugin-examples//bad",
+            "Cod-Hash-Studios/nagi-plugin-examples/../bad",
+            "Cod-Hash-Studios/nagi-plugin-examples//bad",
         ] {
             assert!(
                 GithubPluginSource::parse(source).is_err(),
@@ -1730,20 +1730,21 @@ mod tests {
 
     #[test]
     fn github_source_lookup_matches_installed_plugin_source() {
-        let source =
-            GithubPluginSource::parse("ogulcancelik/herdr-plugin-examples/agent-telegram-notify")
-                .unwrap();
+        let source = GithubPluginSource::parse(
+            "Cod-Hash-Studios/nagi-plugin-examples/agent-telegram-notify",
+        )
+        .unwrap();
         let plugins = vec![
             github_plugin(
                 "examples.github-link-preview",
                 "ogulcancelik",
-                "herdr-plugin-examples",
+                "nagi-plugin-examples",
                 Some("github-link-preview"),
             ),
             github_plugin(
                 "examples.agent-telegram-notify",
                 "ogulcancelik",
-                "herdr-plugin-examples",
+                "nagi-plugin-examples",
                 Some("agent-telegram-notify"),
             ),
         ];
@@ -1754,11 +1755,11 @@ mod tests {
 
     #[test]
     fn github_source_lookup_requires_exact_subdir() {
-        let source = GithubPluginSource::parse("ogulcancelik/herdr-plugin-examples").unwrap();
+        let source = GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples").unwrap();
         let plugins = vec![github_plugin(
             "examples.agent-telegram-notify",
             "ogulcancelik",
-            "herdr-plugin-examples",
+            "nagi-plugin-examples",
             Some("agent-telegram-notify"),
         )];
 
@@ -1767,11 +1768,11 @@ mod tests {
 
     #[test]
     fn github_source_lookup_ignores_local_plugins() {
-        let source = GithubPluginSource::parse("ogulcancelik/herdr-plugin-examples").unwrap();
+        let source = GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples").unwrap();
         let mut plugin = github_plugin(
             "examples.local",
             "ogulcancelik",
-            "herdr-plugin-examples",
+            "nagi-plugin-examples",
             None,
         );
         plugin.source = PluginSourceInfo::default();

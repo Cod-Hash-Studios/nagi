@@ -507,7 +507,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("herdr-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("nagi-{name}-{}-{nanos}", std::process::id()))
     }
 
     fn run_git(repo: &Path, args: &[&str]) {
@@ -529,8 +529,8 @@ mod tests {
         let repo = unique_temp_path(name);
         std::fs::create_dir_all(&repo).unwrap();
         run_git(&repo, &["init", "--quiet"]);
-        run_git(&repo, &["config", "user.email", "herdr@example.invalid"]);
-        run_git(&repo, &["config", "user.name", "Herdr Test"]);
+        run_git(&repo, &["config", "user.email", "nagi@example.invalid"]);
+        run_git(&repo, &["config", "user.name", "Nagi Test"]);
         std::fs::write(repo.join("README.md"), "test\n").unwrap();
         run_git(&repo, &["add", "README.md"]);
         run_git(&repo, &["commit", "--quiet", "-m", "initial"]);
@@ -605,11 +605,11 @@ prunable stale
     #[test]
     fn expand_tilde_path_uses_home_when_available() {
         assert_eq!(
-            expand_tilde_path_from_env("~/.herdr/worktrees", false, |key| match key {
+            expand_tilde_path_from_env("~/.nagi/worktrees", false, |key| match key {
                 "HOME" => Some("/home/me".into()),
                 _ => None,
             }),
-            PathBuf::from("/home/me/.herdr/worktrees")
+            PathBuf::from("/home/me/.nagi/worktrees")
         );
         assert_eq!(
             expand_tilde_path_from_env("/tmp/worktrees", false, |_| None),
@@ -622,10 +622,10 @@ prunable stale
         assert_eq!(
             home_dir_from_env(true, |key| match key {
                 "HOME" => Some("~".into()),
-                "USERPROFILE" => Some(r"C:\Users\herdr".into()),
+                "USERPROFILE" => Some(r"C:\Users\nagi".into()),
                 _ => None,
             }),
-            Ok(PathBuf::from(r"C:\Users\herdr"))
+            Ok(PathBuf::from(r"C:\Users\nagi"))
         );
     }
 
@@ -634,10 +634,10 @@ prunable stale
         assert_eq!(
             home_dir_from_env(true, |key| match key {
                 "HOMEDRIVE" => Some("C:".into()),
-                "HOMEPATH" => Some(r"\Users\herdr".into()),
+                "HOMEPATH" => Some(r"\Users\nagi".into()),
                 _ => None,
             }),
-            Ok(PathBuf::from(r"C:\Users\herdr"))
+            Ok(PathBuf::from(r"C:\Users\nagi"))
         );
     }
 
@@ -654,7 +654,7 @@ prunable stale
         assert_eq!(
             home_dir_from_env(true, |key| match key {
                 "HOMEDRIVE" => Some("C:".into()),
-                "HOMEPATH" => Some("Users\\herdr".into()),
+                "HOMEPATH" => Some("Users\\nagi".into()),
                 _ => None,
             }),
             Err(())
@@ -665,11 +665,11 @@ prunable stale
     #[test]
     fn non_windows_tilde_expansion_keeps_windows_separator_literal() {
         assert_eq!(
-            expand_tilde_path_from_env(r"~\.herdr\worktrees", false, |key| match key {
+            expand_tilde_path_from_env(r"~\.nagi\worktrees", false, |key| match key {
                 "HOME" => Some("/home/me".into()),
                 _ => None,
             }),
-            PathBuf::from(r"~\.herdr\worktrees")
+            PathBuf::from(r"~\.nagi\worktrees")
         );
     }
 
@@ -679,23 +679,23 @@ prunable stale
         fn env(key: &str) -> Option<OsString> {
             match key {
                 "HOME" => Some("~".into()),
-                "USERPROFILE" => Some(r"C:\Users\herdr".into()),
+                "USERPROFILE" => Some(r"C:\Users\nagi".into()),
                 _ => None,
             }
         }
 
-        let default_path = expand_tilde_path_from_env("~/.herdr/worktrees", true, env);
+        let default_path = expand_tilde_path_from_env("~/.nagi/worktrees", true, env);
         assert_eq!(
             default_path,
-            PathBuf::from(r"C:\Users\herdr\.herdr\worktrees")
+            PathBuf::from(r"C:\Users\nagi\.nagi\worktrees")
         );
         assert_eq!(
             default_path.display().to_string(),
-            r"C:\Users\herdr\.herdr\worktrees"
+            r"C:\Users\nagi\.nagi\worktrees"
         );
         assert_eq!(
-            expand_tilde_path_from_env(r"~\.herdr\worktrees", true, env),
-            PathBuf::from(r"C:\Users\herdr\.herdr\worktrees")
+            expand_tilde_path_from_env(r"~\.nagi\worktrees", true, env),
+            PathBuf::from(r"C:\Users\nagi\.nagi\worktrees")
         );
     }
 
@@ -703,11 +703,11 @@ prunable stale
     fn default_checkout_path_appends_repo_and_branch_slug() {
         assert_eq!(
             default_checkout_path(
-                Path::new("/home/me/.herdr/worktrees"),
-                "herdr",
+                Path::new("/home/me/.nagi/worktrees"),
+                "nagi",
                 "worktree/brave-river",
             ),
-            PathBuf::from("/home/me/.herdr/worktrees/herdr/worktree-brave-river")
+            PathBuf::from("/home/me/.nagi/worktrees/nagi/worktree-brave-river")
         );
     }
 
@@ -740,8 +740,8 @@ prunable stale
     #[test]
     fn worktree_remove_command_preserves_branch_by_not_deleting_it() {
         let command = build_worktree_remove_command(
-            Path::new("/repo/herdr"),
-            Path::new("/w/herdr/issue-137"),
+            Path::new("/repo/nagi"),
+            Path::new("/w/nagi/issue-137"),
             false,
         );
         assert_eq!(command.program, "git");
@@ -749,10 +749,10 @@ prunable stale
             command.args,
             vec![
                 "-C",
-                "/repo/herdr",
+                "/repo/nagi",
                 "worktree",
                 "remove",
-                "/w/herdr/issue-137"
+                "/w/nagi/issue-137"
             ]
         );
     }
@@ -760,19 +760,19 @@ prunable stale
     #[test]
     fn forced_worktree_remove_command_uses_git_force_flag() {
         let command = build_worktree_remove_command(
-            Path::new("/repo/herdr"),
-            Path::new("/w/herdr/issue-137"),
+            Path::new("/repo/nagi"),
+            Path::new("/w/nagi/issue-137"),
             true,
         );
         assert_eq!(
             command.args,
             vec![
                 "-C",
-                "/repo/herdr",
+                "/repo/nagi",
                 "worktree",
                 "remove",
                 "--force",
-                "/w/herdr/issue-137"
+                "/w/nagi/issue-137"
             ]
         );
     }
@@ -780,21 +780,21 @@ prunable stale
     #[test]
     fn dirty_remove_error_detection_matches_git_force_hint() {
         assert!(is_dirty_worktree_remove_error(
-            "fatal: '/w/herdr' contains modified or untracked files, use --force to delete it"
+            "fatal: '/w/nagi' contains modified or untracked files, use --force to delete it"
         ));
         assert!(!is_dirty_worktree_remove_error(
-            "fatal: '/w/herdr' is a missing but already registered worktree"
+            "fatal: '/w/nagi' is a missing but already registered worktree"
         ));
         assert!(!is_dirty_worktree_remove_error(
-            "fatal: '/w/herdr' contains a locked worktree, use --force only if you know why"
+            "fatal: '/w/nagi' contains a locked worktree, use --force only if you know why"
         ));
     }
 
     #[test]
     fn worktree_add_command_creates_new_branch_from_base() {
         let command = build_worktree_add_new_branch_command(
-            Path::new("/repo/herdr"),
-            Path::new("/w/herdr/worktree-brave-river"),
+            Path::new("/repo/nagi"),
+            Path::new("/w/nagi/worktree-brave-river"),
             "worktree/brave-river",
             "HEAD",
         );
@@ -803,12 +803,12 @@ prunable stale
             command.args,
             vec![
                 "-C",
-                "/repo/herdr",
+                "/repo/nagi",
                 "worktree",
                 "add",
                 "-b",
                 "worktree/brave-river",
-                "/w/herdr/worktree-brave-river",
+                "/w/nagi/worktree-brave-river",
                 "HEAD"
             ]
         );
@@ -817,8 +817,8 @@ prunable stale
     #[test]
     fn worktree_add_command_checks_out_existing_branch() {
         let command = build_worktree_add_existing_branch_command(
-            Path::new("/repo/herdr"),
-            Path::new("/w/herdr/worktree-brave-river"),
+            Path::new("/repo/nagi"),
+            Path::new("/w/nagi/worktree-brave-river"),
             "worktree/brave-river",
         );
         assert_eq!(command.program, "git");
@@ -826,10 +826,10 @@ prunable stale
             command.args,
             vec![
                 "-C",
-                "/repo/herdr",
+                "/repo/nagi",
                 "worktree",
                 "add",
-                "/w/herdr/worktree-brave-river",
+                "/w/nagi/worktree-brave-river",
                 "worktree/brave-river"
             ]
         );

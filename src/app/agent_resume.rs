@@ -393,7 +393,7 @@ mod tests {
         terminal.pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: marker_resume_test_argv(),
-            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+            dedupe_key: "nagi:codex\0codex\0Id\0codex-session".into(),
         });
 
         assert!(!app.start_pending_agent_resumes(false));
@@ -470,7 +470,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: long_running_test_argv(),
-            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+            dedupe_key: "nagi:codex\0codex\0Id\0codex-session".into(),
         });
 
         app.sync_pending_agent_resume_deadline(std::time::Instant::now());
@@ -520,7 +520,7 @@ mod tests {
                 .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
                 agent: "codex".into(),
                 argv: long_running_test_argv(),
-                dedupe_key: format!("herdr:codex\0codex\0Id\0{terminal_id}"),
+                dedupe_key: format!("nagi:codex\0codex\0Id\0{terminal_id}"),
             });
         }
         app.pending_agent_resume_deadline =
@@ -583,7 +583,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: long_running_test_argv(),
-            dedupe_key: "herdr:codex\0codex\0Id\0inactive-tab-session".into(),
+            dedupe_key: "nagi:codex\0codex\0Id\0inactive-tab-session".into(),
         });
 
         assert!(app.start_pending_agent_resumes(false));
@@ -643,7 +643,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: long_running_test_argv(),
-            dedupe_key: "herdr:codex\0codex\0Id\0zoom-hidden-session".into(),
+            dedupe_key: "nagi:codex\0codex\0Id\0zoom-hidden-session".into(),
         });
 
         assert!(app.start_pending_agent_resumes(false));
@@ -700,7 +700,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: long_running_test_argv(),
-            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+            dedupe_key: "nagi:codex\0codex\0Id\0codex-session".into(),
         });
 
         app.sync_pending_agent_resume_deadline(std::time::Instant::now());
@@ -760,7 +760,7 @@ mod tests {
             .pending_agent_resume_plan = Some(crate::agent_resume::AgentResumePlan {
             agent: "codex".into(),
             argv: long_running_test_argv(),
-            dedupe_key: "herdr:codex\0codex\0Id\0codex-session".into(),
+            dedupe_key: "nagi:codex\0codex\0Id\0codex-session".into(),
         });
 
         assert!(app.start_pending_agent_resumes(false));

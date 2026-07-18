@@ -1746,7 +1746,7 @@ fn kitty_placeholder_color_to_id(color: CellColor) -> u32 {
 
 fn kitty_placeholder_diacritic_index(codepoint: u32) -> Option<u32> {
     let map = KITTY_PLACEHOLDER_DIACRITICS.get_or_init(|| {
-        // Reuse Ghostty's vendored table so Herdr decodes the same placeholder
+        // Reuse Ghostty's vendored table so Nagi decodes the same placeholder
         // row/column diacritics that libghostty accepts.
         let source =
             include_str!("../../vendor/libghostty-vt/src/terminal/kitty/graphics_unicode.zig");
@@ -2981,7 +2981,7 @@ mod tests {
         use base64::Engine;
 
         let dir = std::env::temp_dir().join(format!(
-            "herdr-kitty-file-medium-test-{}",
+            "nagi-kitty-file-medium-test-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();

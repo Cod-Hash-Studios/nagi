@@ -1,7 +1,7 @@
 //! Self-update mechanism.
 //!
-//! Checks the hosted herdr.dev update manifest for newer versions.
-//! Manual `herdr update` downloads and installs the binary.
+//! Checks the configured Nagi release manifest for newer versions.
+//! Manual `nagi update` downloads and installs the binary.
 //! Background checks only surface availability and release notes.
 //! Uses `curl` as a subprocess for HTTP — no additional Rust HTTP dependencies.
 //! JSON parsing uses serde_json (already in deps for persistence).
@@ -23,16 +23,16 @@ use std::time::{Duration, Instant};
 use interprocess::local_socket::traits::Stream as _;
 use serde::{Deserialize, Deserializer};
 
-const STABLE_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/latest.json";
-const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/preview.json";
-const HOMEBREW_FORMULA_API_URL: &str = "https://formulae.brew.sh/api/formula/herdr.json";
-const HERDR_UPDATE_COMMAND: &str = "herdr update";
-const HOMEBREW_UPDATE_COMMAND: &str = "brew update && brew upgrade herdr";
-const MISE_UPDATE_COMMAND: &str = "mise upgrade herdr";
+const STABLE_UPDATE_MANIFEST_URL: &str = "https://github.com/Cod-Hash-Studios/nagi";
+const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://github.com/Cod-Hash-Studios/nagi";
+const HOMEBREW_FORMULA_API_URL: &str = "https://formulae.brew.sh/api/formula/nagi.json";
+const NAGI_UPDATE_COMMAND: &str = "nagi update";
+const HOMEBREW_UPDATE_COMMAND: &str = "brew update && brew upgrade nagi";
+const MISE_UPDATE_COMMAND: &str = "mise upgrade nagi";
 const NIX_UPDATE_COMMAND: &str = "update through Nix";
 const MISE_INSTALLS_DIR_ENV: &str = "MISE_INSTALLS_DIR";
-const FAKE_UPDATE_VERSION_ENV: &str = "HERDR_FAKE_UPDATE_VERSION";
-const FAKE_UPDATE_NOTES_VERSION_ENV: &str = "HERDR_FAKE_UPDATE_NOTES_VERSION";
+const FAKE_UPDATE_VERSION_ENV: &str = "NAGI_FAKE_UPDATE_VERSION";
+const FAKE_UPDATE_NOTES_VERSION_ENV: &str = "NAGI_FAKE_UPDATE_NOTES_VERSION";
 const DEFAULT_FAKE_UPDATE_NOTES_VERSION: &str = "0.3.0";
 const FORK_RELEASE_CHANNELS_CONFIGURED: bool = false;
 #[cfg(not(windows))]
@@ -561,7 +561,7 @@ fn download_update(release: &ReleaseInfo) -> Result<DownloadedUpdate, String> {
     let parent = current_exe.parent().ok_or("can't find binary directory")?;
 
     // Check write permissions early
-    let test_path = parent.join(".herdr-write-test");
+    let test_path = parent.join(".nagi-write-test");
     if let Err(e) = fs::write(&test_path, b"") {
         let _ = fs::remove_file(&test_path);
         return Err(format!(
@@ -573,7 +573,7 @@ fn download_update(release: &ReleaseInfo) -> Result<DownloadedUpdate, String> {
     let _ = fs::remove_file(&test_path);
 
     // Unique temp file (avoids races with concurrent instances)
-    let tmp_path = parent.join(format!(".herdr-update-{}.tmp", std::process::id()));
+    let tmp_path = parent.join(format!(".nagi-update-{}.tmp", std::process::id()));
 
     // Download the exact asset URL (pinned to the release we checked)
     let status = Command::new("curl")
@@ -640,10 +640,10 @@ fn install_windows_update_with_installer(channel: UpdateChannel) -> Result<(), S
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            "irm https://herdr.dev/install.ps1 | iex",
+            "irm https://github.com/Cod-Hash-Studios/nagi | iex",
         ])
-        .env("HERDR_CHANNEL", channel.as_str())
-        // Drop any inherited PSModulePath. When herdr is launched from
+        .env("NAGI_CHANNEL", channel.as_str())
+        // Drop any inherited PSModulePath. When nagi is launched from
         // PowerShell 7, its Core module paths come first and Windows
         // PowerShell 5.1 (this `powershell`) fails to autoload cmdlets like
         // Get-FileHash. Removing it lets 5.1 compute its own default path.
@@ -660,30 +660,30 @@ fn install_windows_update_with_installer(channel: UpdateChannel) -> Result<(), S
 }
 
 #[cfg(windows)]
-fn windows_installed_herdr_exe_path() -> Result<PathBuf, String> {
-    if let Some(install_dir) = env::var_os("HERDR_INSTALL_DIR").filter(|value| !value.is_empty()) {
-        return Ok(PathBuf::from(install_dir).join("herdr.exe"));
+fn windows_installed_nagi_exe_path() -> Result<PathBuf, String> {
+    if let Some(install_dir) = env::var_os("NAGI_INSTALL_DIR").filter(|value| !value.is_empty()) {
+        return Ok(PathBuf::from(install_dir).join("nagi.exe"));
     }
 
-    let local_app_data = env::var_os("LOCALAPPDATA")
-        .ok_or("LOCALAPPDATA is not set; cannot locate Herdr install")?;
+    let local_app_data =
+        env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA is not set; cannot locate Nagi install")?;
     Ok(PathBuf::from(local_app_data)
         .join("Programs")
-        .join("Herdr")
+        .join("Nagi")
         .join("bin")
-        .join("herdr.exe"))
+        .join("nagi.exe"))
 }
 
 // ---------------------------------------------------------------------------
 // Upgrade flow helpers
 // ---------------------------------------------------------------------------
 
-fn running_inside_herdr_env(herdr_env: Option<&str>) -> bool {
-    herdr_env == Some(crate::HERDR_ENV_VALUE)
+fn running_inside_nagi_env(nagi_env: Option<&str>) -> bool {
+    nagi_env == Some(crate::NAGI_ENV_VALUE)
 }
 
-fn running_inside_herdr() -> bool {
-    running_inside_herdr_env(env::var(crate::HERDR_ENV_VAR).ok().as_deref())
+fn running_inside_nagi() -> bool {
+    running_inside_nagi_env(env::var(crate::NAGI_ENV_VAR).ok().as_deref())
 }
 
 #[cfg(not(windows))]
@@ -831,7 +831,7 @@ fn plan_running_server_updates(
         )
         .map_err(|err| {
             format!(
-                "failed to read status for herdr target {} at {}: {err}. stop it with `{}` and run `herdr update` again",
+                "failed to read status for nagi target {} at {}: {err}. stop it with `{}` and run `nagi update` again",
                 target.label,
                 target.socket_path.display(),
                 target.stop_command
@@ -840,7 +840,7 @@ fn plan_running_server_updates(
             Some(server) => server,
             None if target.must_be_running => {
                 return Err(format!(
-                        "herdr target {} looked running, but its status API did not respond at {}. stop it with `{}` and run `herdr update` again",
+                        "nagi target {} looked running, but its status API did not respond at {}. stop it with `{}` and run `nagi update` again",
                     target.label,
                     target.socket_path.display(),
                     target.stop_command
@@ -848,7 +848,7 @@ fn plan_running_server_updates(
             }
             None if client_protocol_server_is_running_at(&target.client_socket_path) => {
                 return Err(format!(
-                    "herdr target {} has a client socket, but its status API did not respond at {}. stop it with `{}` and run `herdr update` again",
+                    "nagi target {} has a client socket, but its status API did not respond at {}. stop it with `{}` and run `nagi update` again",
                     target.label,
                     target.socket_path.display(),
                     target.stop_command
@@ -866,7 +866,7 @@ fn plan_running_server_updates(
 
     if plans.is_empty() && target_client_protocol_server_is_running()? {
         return Err(format!(
-            "a herdr server is listening, but its status API is unavailable; try `{}`, or stop the old server process manually, then run `herdr update` again",
+            "a nagi server is listening, but its status API is unavailable; try `{}`, or stop the old server process manually, then run `nagi update` again",
             crate::session::local_stop_command()
         ));
     }
@@ -907,7 +907,7 @@ fn running_update_targets() -> Result<Vec<RunningUpdateTarget>, String> {
             name: None,
             label: socket_path.display().to_string(),
             stop_command: format!(
-                "{}={} herdr server stop",
+                "{}={} nagi server stop",
                 crate::api::SOCKET_PATH_ENV_VAR,
                 socket_path.display()
             ),
@@ -922,7 +922,7 @@ fn running_update_targets() -> Result<Vec<RunningUpdateTarget>, String> {
     }
 
     let sessions = crate::session::list_sessions()
-        .map_err(|err| format!("failed to list herdr sessions: {err}"))?;
+        .map_err(|err| format!("failed to list nagi sessions: {err}"))?;
     Ok(sessions
         .into_iter()
         .map(|session| RunningUpdateTarget {
@@ -937,9 +937,9 @@ fn running_update_targets() -> Result<Vec<RunningUpdateTarget>, String> {
                 Some(&session.name)
             }),
             attach_command: Some(if session.default {
-                "herdr".to_string()
+                "nagi".to_string()
             } else {
-                format!("herdr session attach {}", session.name)
+                format!("nagi session attach {}", session.name)
             }),
             label: session.name.clone(),
             client_socket_path: crate::session::client_socket_path_for(if session.default {
@@ -962,7 +962,7 @@ fn target_client_protocol_server_is_running() -> Result<bool, String> {
     }
 
     let sessions = crate::session::list_sessions()
-        .map_err(|err| format!("failed to list herdr sessions: {err}"))?;
+        .map_err(|err| format!("failed to list nagi sessions: {err}"))?;
     Ok(sessions.into_iter().any(|session| {
         let client_socket = crate::session::client_socket_path_for(if session.default {
             None
@@ -984,7 +984,7 @@ pub(crate) fn parse_self_update_args(args: &[String]) -> Result<SelfUpdateOption
         match arg.as_str() {
             "--handoff" => options.live_handoff = true,
             "--help" | "-h" => {
-                return Err("usage: herdr update [--handoff]".to_string());
+                return Err("usage: nagi update [--handoff]".to_string());
             }
             _ => return Err(format!("unknown update option: {arg}")),
         }
@@ -999,7 +999,7 @@ fn prompt_to_stop_old_servers_before_update(
 ) -> Result<bool, String> {
     if !io::stdin().is_terminal() {
         return Err(
-            "one or more Herdr sessions must stop for this update. Stop running Herdr sessions when ready, then run `herdr update` again from an interactive terminal."
+            "one or more Nagi sessions must stop for this update. Stop running Nagi sessions when ready, then run `nagi update` again from an interactive terminal."
                 .to_string(),
         );
     }
@@ -1127,7 +1127,7 @@ fn prompt_to_complete_plain_update(
     let (singular, plural) = target_group_nouns(&plans);
     let noun = if plans.len() == 1 { singular } else { plural };
     eprintln!(
-        "To complete the update, Herdr must stop {} running {}.",
+        "To complete the update, Nagi must stop {} running {}.",
         plans.len(),
         noun
     );
@@ -1185,7 +1185,7 @@ fn print_running_session_update_summary(
     release: &ReleaseInfo,
     options: SelfUpdateOptions,
 ) {
-    eprintln!("running herdr targets:");
+    eprintln!("running nagi targets:");
     for plan in plans {
         if options.live_handoff {
             let capability = if server_supports_live_handoff(&plan.server) {
@@ -1270,7 +1270,7 @@ fn prompt_to_stop_old_server_after_failed_handoff(
     eprintln!("  server: v{}", version_label(status.version.as_deref()));
     eprintln!("  installed: {}", release.label());
     eprintln!(
-        "you can keep using the old server, or stop it now so the next `herdr` start uses {}.",
+        "you can keep using the old server, or stop it now so the next `nagi` start uses {}.",
         release.label()
     );
     eprintln!("stopping the old server will exit its pane processes.");
@@ -1337,13 +1337,13 @@ fn recover_failed_live_handoff_for_update(
         FailedHandoffServerState::NoServerResponding => {
             if let Some(command) = plan.attach_command() {
                 eprintln!(
-                    "no herdr server is responding for session {}. the binary was updated; run `{command}` to start {}.",
+                    "no nagi server is responding for session {}. the binary was updated; run `{command}` to start {}.",
                     plan.label(),
                     release.label()
                 );
             } else {
                 eprintln!(
-                    "no herdr server is responding at {}. the binary was updated; restart with the same socket override to use {}.",
+                    "no nagi server is responding at {}. the binary was updated; restart with the same socket override to use {}.",
                     plan.socket_path().display(),
                     release.label()
                 );
@@ -1352,7 +1352,7 @@ fn recover_failed_live_handoff_for_update(
         }
         FailedHandoffServerState::Unknown(status_error) => {
             eprintln!(
-                "herdr could not determine server state for {} {} after the failed handoff: {status_error}",
+                "nagi could not determine server state for {} {} after the failed handoff: {status_error}",
                 plan.target_noun(),
                 plan.label()
             );
@@ -1542,7 +1542,7 @@ fn wait_for_server_shutdown_at(socket_path: &Path, timeout: Duration) -> Result<
 
 #[cfg(not(windows))]
 fn stop_running_server_for_update(plan: &RunningServerUpdatePlan) -> Result<(), String> {
-    eprintln!("stopping herdr {} {}...", plan.target_noun(), plan.label());
+    eprintln!("stopping nagi {} {}...", plan.target_noun(), plan.label());
     stop_server_via_api_at(plan.socket_path(), SERVER_STOP_RESPONSE_TIMEOUT)?;
     wait_for_server_shutdown_at(plan.socket_path(), SERVER_HANDOFF_CONFIRM_TIMEOUT)?;
     Ok(())
@@ -1639,7 +1639,7 @@ fn print_running_session_update_outcomes(
     release: &ReleaseInfo,
 ) {
     if outcomes.is_empty() {
-        eprintln!("run herdr again.");
+        eprintln!("run nagi again.");
         return;
     }
 
@@ -1671,7 +1671,7 @@ fn print_running_session_update_outcomes(
                         release.label()
                     ),
                     None => eprintln!(
-                        "Run `{}`, then restart Herdr with the same socket override when ready to use {}.",
+                        "Run `{}`, then restart Nagi with the same socket override when ready to use {}.",
                         outcome.stop_command,
                         release.label()
                     ),
@@ -1736,26 +1736,26 @@ pub(crate) fn update_install_command() -> &'static str {
     } else if is_nix_managed_install() {
         NIX_UPDATE_COMMAND
     } else {
-        HERDR_UPDATE_COMMAND
+        NAGI_UPDATE_COMMAND
     }
 }
 
 pub(crate) fn update_install_instruction(install_command: &str) -> String {
     match install_command {
-        HERDR_UPDATE_COMMAND => {
-            "detach, run `herdr update`, then follow its restart guidance".to_string()
+        NAGI_UPDATE_COMMAND => {
+            "detach, run `nagi update`, then follow its restart guidance".to_string()
         }
         HOMEBREW_UPDATE_COMMAND => {
-            "detach, run `brew update && brew upgrade herdr`, then restart this Herdr session when ready".to_string()
+            "detach, run `brew update && brew upgrade nagi`, then restart this Nagi session when ready".to_string()
         }
         MISE_UPDATE_COMMAND => {
-            "detach, run `mise upgrade herdr`, then restart this Herdr session when ready"
+            "detach, run `mise upgrade nagi`, then restart this Nagi session when ready"
                 .to_string()
         }
         NIX_UPDATE_COMMAND => {
-            "detach, update through Nix, then restart this Herdr session when ready".to_string()
+            "detach, update through Nix, then restart this Nagi session when ready".to_string()
         }
-        command => format!("detach, run `{command}`, then restart this Herdr session when ready"),
+        command => format!("detach, run `{command}`, then restart this Nagi session when ready"),
     }
 }
 
@@ -1794,11 +1794,11 @@ pub(crate) fn preview_channel_rejection_for_current_install() -> Option<&'static
 pub(crate) fn package_manager_channel_update_guidance_for_current_install() -> Option<&'static str>
 {
     if is_homebrew_managed_install() {
-        Some("Use `brew update && brew upgrade herdr` to update Homebrew installs.")
+        Some("Use `brew update && brew upgrade nagi` to update Homebrew installs.")
     } else if is_mise_managed_install() {
-        Some("Use `mise upgrade herdr` to update mise installs.")
+        Some("Use `mise upgrade nagi` to update mise installs.")
     } else if is_nix_managed_install() {
-        Some("Update through Nix to update Nix-managed Herdr installs.")
+        Some("Update through Nix to update Nix-managed Nagi installs.")
     } else {
         None
     }
@@ -1807,14 +1807,14 @@ pub(crate) fn package_manager_channel_update_guidance_for_current_install() -> O
 fn preview_channel_rejection_for_exe_path(path: &Path) -> Option<&'static str> {
     if is_homebrew_managed_exe_path_following_links(path) {
         Some(
-            "preview channel is only available for direct Herdr installs; Homebrew installs update through `brew update && brew upgrade herdr`",
+            "preview channel is only available for direct Nagi installs; Homebrew installs update through `brew update && brew upgrade nagi`",
         )
     } else if is_mise_managed_exe_path_following_links(path) {
         Some(
-            "preview channel is only available for direct Herdr installs; mise installs update through `mise upgrade herdr`",
+            "preview channel is only available for direct Nagi installs; mise installs update through `mise upgrade nagi`",
         )
     } else if is_nix_store_exe_path_following_links(path) {
-        Some("preview channel is only available for direct Herdr installs; Nix installs update through Nix")
+        Some("preview channel is only available for direct Nagi installs; Nix installs update through Nix")
     } else {
         None
     }
@@ -1890,7 +1890,7 @@ fn mise_install_root_under_named_installs_dir(path: &Path) -> Option<PathBuf> {
 }
 
 fn mise_tool_version_dir(path: &Path) -> Option<&Path> {
-    if path.file_name()? != "herdr" {
+    if path.file_name()? != "nagi" {
         return None;
     }
     let bin_dir = path.parent()?;
@@ -1899,7 +1899,7 @@ fn mise_tool_version_dir(path: &Path) -> Option<&Path> {
     }
     let version_dir = bin_dir.parent()?;
     let tool_dir = version_dir.parent()?;
-    if tool_dir.file_name()? != "herdr" {
+    if tool_dir.file_name()? != "nagi" {
         return None;
     }
     Some(version_dir)
@@ -1924,7 +1924,7 @@ fn is_homebrew_managed_exe_path(path: &Path) -> bool {
 }
 
 fn homebrew_cellar_keg_root(path: &Path) -> Option<PathBuf> {
-    if path.file_name()? != "herdr" {
+    if path.file_name()? != "nagi" {
         return None;
     }
     let bin_dir = path.parent()?;
@@ -1933,7 +1933,7 @@ fn homebrew_cellar_keg_root(path: &Path) -> Option<PathBuf> {
     }
     let version_dir = bin_dir.parent()?;
     let formula_dir = version_dir.parent()?;
-    if formula_dir.file_name()? != "herdr" {
+    if formula_dir.file_name()? != "nagi" {
         return None;
     }
     let cellar_dir = formula_dir.parent()?;
@@ -1947,7 +1947,7 @@ fn homebrew_cellar_keg_root(path: &Path) -> Option<PathBuf> {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Manual self-update command (`herdr update`).
+/// Manual self-update command (`nagi update`).
 pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     if !fork_release_channels_configured() {
         return Err(
@@ -1959,14 +1959,14 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     #[cfg(windows)]
     if channel == UpdateChannel::Stable {
         return Err(
-            "Windows builds are preview-only for now; run `herdr channel set preview`".into(),
+            "Windows builds are preview-only for now; run `nagi channel set preview`".into(),
         );
     }
 
     if is_homebrew_managed_install() {
         if channel == UpdateChannel::Preview {
             return Err(
-                "self-update is disabled for Homebrew installs; preview is only available for direct Herdr installs".into(),
+                "self-update is disabled for Homebrew installs; preview is only available for direct Nagi installs".into(),
             );
         }
         return Err(format!(
@@ -1977,7 +1977,7 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     if is_mise_managed_install() {
         if channel == UpdateChannel::Preview {
             return Err(
-                "self-update is disabled for mise installs; preview is only available for direct Herdr installs".into(),
+                "self-update is disabled for mise installs; preview is only available for direct Nagi installs".into(),
             );
         }
         return Err(format!(
@@ -1988,16 +1988,16 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     if is_nix_managed_install() {
         if channel == UpdateChannel::Preview {
             return Err(
-                "self-update is disabled for Nix installs; preview is only available for direct Herdr installs".into(),
+                "self-update is disabled for Nix installs; preview is only available for direct Nagi installs".into(),
             );
         }
         return Err(
-            "self-update is disabled for Nix installs; update with `nix profile upgrade` or update the flake input that provides Herdr".into(),
+            "self-update is disabled for Nix installs; update with `nix profile upgrade` or update the flake input that provides Nagi".into(),
         );
     }
 
-    if running_inside_herdr() {
-        return Err("run `herdr update` outside herdr after detaching from the session".into());
+    if running_inside_nagi() {
+        return Err("run `nagi update` outside nagi after detaching from the session".into());
     }
 
     eprintln!("checking {} channel for updates...", channel.as_str());
@@ -2031,11 +2031,11 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
             tracing::debug!(sha256 = %sha256, "selected Windows update asset has checksum");
         }
         install_windows_update_with_installer(channel)?;
-        let updated_exe = windows_installed_herdr_exe_path()?;
+        let updated_exe = windows_installed_nagi_exe_path()?;
         eprintln!("installed {}", release.label());
         print_outdated_integration_notice_with_updated_binary(&updated_exe);
         eprintln!(
-            "Restart any running Herdr sessions to use {}.",
+            "Restart any running Nagi sessions to use {}.",
             release.label()
         );
     }
@@ -2053,8 +2053,8 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
         if !options.live_handoff
             && !prompt_to_complete_plain_update(&server_update_decisions, &release)?
         {
-            eprintln!("Herdr was not updated.");
-            eprintln!("Stop running Herdr sessions when ready, then run `herdr update` again.");
+            eprintln!("Nagi was not updated.");
+            eprintln!("Stop running Nagi sessions when ready, then run `nagi update` again.");
             return Ok(current);
         }
         install_downloaded_update(downloaded_update)?;
@@ -2335,7 +2335,7 @@ mod tests {
             build_id: None,
             commit: None,
             target_protocol,
-            download_url: "https://example.com/herdr".to_string(),
+            download_url: "https://example.com/nagi".to_string(),
             sha256: None,
             notes_body: "### Changed\n- One".to_string(),
         }
@@ -2390,57 +2390,57 @@ mod tests {
 
     #[test]
     fn homebrew_cellar_path_is_detected() {
-        let path = Path::new("/opt/homebrew/Cellar/herdr/0.5.9/bin/herdr");
+        let path = Path::new("/opt/homebrew/Cellar/nagi/0.5.9/bin/nagi");
 
         assert!(is_homebrew_managed_exe_path(path));
         assert_eq!(
             homebrew_cellar_keg_root(path).unwrap(),
-            PathBuf::from("/opt/homebrew/Cellar/herdr/0.5.9")
+            PathBuf::from("/opt/homebrew/Cellar/nagi/0.5.9")
         );
     }
 
     #[test]
     fn homebrew_linux_cellar_path_is_detected() {
-        let path = Path::new("/home/linuxbrew/.linuxbrew/Cellar/herdr/0.5.9/bin/herdr");
+        let path = Path::new("/home/linuxbrew/.linuxbrew/Cellar/nagi/0.5.9/bin/nagi");
 
         assert!(is_homebrew_managed_exe_path(path));
     }
 
     #[test]
     fn homebrew_opt_path_requires_canonicalized_cellar_target() {
-        let path = Path::new("/opt/homebrew/opt/herdr/bin/herdr");
+        let path = Path::new("/opt/homebrew/opt/nagi/bin/nagi");
 
         assert!(!is_homebrew_managed_exe_path(path));
     }
 
     #[test]
     fn non_homebrew_path_is_not_detected() {
-        let path = Path::new("/usr/local/bin/herdr");
+        let path = Path::new("/usr/local/bin/nagi");
 
         assert!(!is_homebrew_managed_exe_path(path));
     }
 
     #[test]
     fn mise_install_path_is_detected() {
-        let path = Path::new("/home/user/.local/share/mise/installs/herdr/0.6.6/bin/herdr");
+        let path = Path::new("/home/user/.local/share/mise/installs/nagi/0.6.6/bin/nagi");
 
         assert!(is_mise_managed_exe_path(path));
         assert_eq!(
             mise_install_root(path).unwrap(),
-            PathBuf::from("/home/user/.local/share/mise/installs/herdr/0.6.6")
+            PathBuf::from("/home/user/.local/share/mise/installs/nagi/0.6.6")
         );
     }
 
     #[test]
     fn mise_alias_install_path_is_detected() {
-        let path = Path::new("/home/user/.local/share/mise/installs/herdr/latest/bin/herdr");
+        let path = Path::new("/home/user/.local/share/mise/installs/nagi/latest/bin/nagi");
 
         assert!(is_mise_managed_exe_path(path));
     }
 
     #[test]
     fn mise_custom_installs_dir_path_is_detected() {
-        let path = Path::new("/opt/mise-tools/installs/herdr/0.6.6/bin/herdr");
+        let path = Path::new("/opt/mise-tools/installs/nagi/0.6.6/bin/nagi");
 
         assert!(is_mise_managed_exe_path(path));
     }
@@ -2450,12 +2450,12 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         let previous = std::env::var_os(MISE_INSTALLS_DIR_ENV);
         std::env::set_var(MISE_INSTALLS_DIR_ENV, "/opt/mise-tools");
-        let path = Path::new("/opt/mise-tools/herdr/0.6.6/bin/herdr");
+        let path = Path::new("/opt/mise-tools/nagi/0.6.6/bin/nagi");
 
         assert!(is_mise_managed_exe_path(path));
         assert_eq!(
             mise_install_root(path).unwrap(),
-            PathBuf::from("/opt/mise-tools/herdr/0.6.6")
+            PathBuf::from("/opt/mise-tools/nagi/0.6.6")
         );
 
         if let Some(previous) = previous {
@@ -2467,7 +2467,7 @@ mod tests {
 
     #[test]
     fn non_mise_install_path_is_not_detected() {
-        let path = Path::new("/home/user/.local/bin/herdr");
+        let path = Path::new("/home/user/.local/bin/nagi");
 
         assert!(!is_mise_managed_exe_path(path));
     }
@@ -2476,16 +2476,14 @@ mod tests {
     fn package_manager_path_detection_follows_homebrew_symlink() {
         #[cfg(unix)]
         {
-            let root = std::env::temp_dir().join(format!(
-                "herdr-homebrew-symlink-test-{}",
-                std::process::id()
-            ));
-            let cellar_bin = root.join("Cellar/herdr/0.6.2/bin");
-            let opt_bin = root.join("opt/herdr/bin");
+            let root = std::env::temp_dir()
+                .join(format!("nagi-homebrew-symlink-test-{}", std::process::id()));
+            let cellar_bin = root.join("Cellar/nagi/0.6.2/bin");
+            let opt_bin = root.join("opt/nagi/bin");
             fs::create_dir_all(&cellar_bin).unwrap();
             fs::create_dir_all(&opt_bin).unwrap();
-            let cellar_binary = cellar_bin.join("herdr");
-            let opt_binary = opt_bin.join("herdr");
+            let cellar_binary = cellar_bin.join("nagi");
+            let opt_binary = opt_bin.join("nagi");
             fs::write(&cellar_binary, b"").unwrap();
             std::os::unix::fs::symlink(&cellar_binary, &opt_binary).unwrap();
 
@@ -2499,14 +2497,14 @@ mod tests {
     fn package_manager_path_detection_follows_mise_symlink() {
         #[cfg(unix)]
         {
-            let root = std::env::temp_dir()
-                .join(format!("herdr-mise-symlink-test-{}", std::process::id()));
-            let version_bin = root.join("installs/herdr/0.6.2/bin");
-            let latest_bin = root.join("installs/herdr/latest/bin");
+            let root =
+                std::env::temp_dir().join(format!("nagi-mise-symlink-test-{}", std::process::id()));
+            let version_bin = root.join("installs/nagi/0.6.2/bin");
+            let latest_bin = root.join("installs/nagi/latest/bin");
             fs::create_dir_all(&version_bin).unwrap();
             fs::create_dir_all(&latest_bin).unwrap();
-            let version_binary = version_bin.join("herdr");
-            let latest_binary = latest_bin.join("herdr");
+            let version_binary = version_bin.join("nagi");
+            let latest_binary = latest_bin.join("nagi");
             fs::write(&version_binary, b"").unwrap();
             std::os::unix::fs::symlink(&version_binary, &latest_binary).unwrap();
 
@@ -2518,7 +2516,7 @@ mod tests {
 
     #[test]
     fn nix_store_path_is_detected() {
-        let path = Path::new("/nix/store/abc123-herdr-0.6.1/bin/herdr");
+        let path = Path::new("/nix/store/abc123-nagi-0.6.1/bin/nagi");
 
         assert!(is_nix_store_exe_path(path));
         assert!(is_package_manager_managed_exe_path(path));
@@ -2526,10 +2524,10 @@ mod tests {
 
     #[test]
     fn preview_channel_is_rejected_for_package_manager_paths() {
-        let homebrew = Path::new("/opt/homebrew/Cellar/herdr/0.6.6/bin/herdr");
-        let mise = Path::new("/home/user/.local/share/mise/installs/herdr/0.6.6/bin/herdr");
-        let nix = Path::new("/nix/store/abc123-herdr-0.6.6/bin/herdr");
-        let direct = Path::new("/home/user/.local/bin/herdr");
+        let homebrew = Path::new("/opt/homebrew/Cellar/nagi/0.6.6/bin/nagi");
+        let mise = Path::new("/home/user/.local/share/mise/installs/nagi/0.6.6/bin/nagi");
+        let nix = Path::new("/nix/store/abc123-nagi-0.6.6/bin/nagi");
+        let direct = Path::new("/home/user/.local/bin/nagi");
 
         assert!(preview_channel_rejection_for_exe_path(homebrew)
             .is_some_and(|message| message.contains("Homebrew")));
@@ -2542,7 +2540,7 @@ mod tests {
 
     #[test]
     fn non_nix_store_path_is_not_detected() {
-        let path = Path::new("/usr/local/bin/herdr");
+        let path = Path::new("/usr/local/bin/nagi");
 
         assert!(!is_nix_store_exe_path(path));
     }
@@ -2597,7 +2595,7 @@ mod tests {
                 "protocol": 10,
                 "notes": "### Fixed\n- Brew notes",
                 "assets": {
-                    "linux-x86_64": "https://example.com/herdr-linux-x86_64"
+                    "linux-x86_64": "https://example.com/nagi-linux-x86_64"
                 }
             }"####,
         )
@@ -2613,16 +2611,16 @@ mod tests {
     #[test]
     fn update_install_instruction_distinguishes_install_from_restart() {
         assert_eq!(
-            update_install_instruction(HERDR_UPDATE_COMMAND),
-            "detach, run `herdr update`, then follow its restart guidance"
+            update_install_instruction(NAGI_UPDATE_COMMAND),
+            "detach, run `nagi update`, then follow its restart guidance"
         );
         assert_eq!(
             update_install_instruction(HOMEBREW_UPDATE_COMMAND),
-            "detach, run `brew update && brew upgrade herdr`, then restart this Herdr session when ready"
+            "detach, run `brew update && brew upgrade nagi`, then restart this Nagi session when ready"
         );
         assert_eq!(
             update_install_instruction(MISE_UPDATE_COMMAND),
-            "detach, run `mise upgrade herdr`, then restart this Herdr session when ready"
+            "detach, run `mise upgrade nagi`, then restart this Nagi session when ready"
         );
     }
 
@@ -2650,10 +2648,10 @@ mod tests {
     }
 
     #[test]
-    fn running_inside_herdr_env_requires_marker() {
-        assert!(running_inside_herdr_env(Some(crate::HERDR_ENV_VALUE)));
-        assert!(!running_inside_herdr_env(None));
-        assert!(!running_inside_herdr_env(Some("0")));
+    fn running_inside_nagi_env_requires_marker() {
+        assert!(running_inside_nagi_env(Some(crate::NAGI_ENV_VALUE)));
+        assert!(!running_inside_nagi_env(None));
+        assert!(!running_inside_nagi_env(Some("0")));
     }
 
     #[test]
@@ -2712,7 +2710,7 @@ mod tests {
             build_id: None,
             commit: None,
             target_protocol: Some(2),
-            download_url: "https://example.com/herdr".to_string(),
+            download_url: "https://example.com/nagi".to_string(),
             sha256: None,
             notes_body: "### Changed\n- One".to_string(),
         };
@@ -2747,8 +2745,8 @@ mod tests {
             target: RunningUpdateTarget {
                 name: Some("work".to_string()),
                 label: "work".to_string(),
-                stop_command: "herdr session stop work".to_string(),
-                attach_command: Some("herdr session attach work".to_string()),
+                stop_command: "nagi session stop work".to_string(),
+                attach_command: Some("nagi session attach work".to_string()),
                 socket_path: crate::session::api_socket_path_for(Some("work")),
                 client_socket_path: crate::session::client_socket_path_for(Some("work")),
                 must_be_running: true,
@@ -2812,11 +2810,11 @@ mod tests {
     fn explicit_session_update_targets_only_that_session() {
         let _guard = env_lock().lock().unwrap();
         let config_home = set_test_config_home("explicit-session");
-        std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, "/tmp/ignored-herdr.sock");
+        std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, "/tmp/ignored-nagi.sock");
         std::env::remove_var(crate::session::SESSION_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
         let args = vec![
-            "herdr".to_string(),
+            "nagi".to_string(),
             "--session".to_string(),
             "work".to_string(),
             "update".to_string(),
@@ -2841,7 +2839,7 @@ mod tests {
     #[test]
     fn socket_override_update_targets_socket_not_env_session() {
         let _guard = env_lock().lock().unwrap();
-        std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, "/tmp/custom-herdr.sock");
+        std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, "/tmp/custom-nagi.sock");
         std::env::set_var(crate::session::SESSION_ENV_VAR, "work");
         crate::session::clear_explicit_session_for_test();
 
@@ -2855,7 +2853,7 @@ mod tests {
         assert_eq!(targets[0].name, None);
         assert_eq!(
             targets[0].socket_path,
-            PathBuf::from("/tmp/custom-herdr.sock")
+            PathBuf::from("/tmp/custom-nagi.sock")
         );
         assert!(targets[0]
             .stop_command
@@ -2886,7 +2884,7 @@ mod tests {
             "unexpected error: {err}"
         );
         assert!(
-            err.contains("herdr session stop work"),
+            err.contains("nagi session stop work"),
             "unexpected error: {err}"
         );
     }
@@ -2954,7 +2952,7 @@ mod tests {
             build_id: None,
             commit: None,
             target_protocol: Some(3),
-            download_url: "https://example.com/herdr".to_string(),
+            download_url: "https://example.com/nagi".to_string(),
             sha256: None,
             notes_body: "### Changed\n- One".to_string(),
         };
@@ -2962,8 +2960,8 @@ mod tests {
             target: RunningUpdateTarget {
                 name: Some("work".to_string()),
                 label: "work".to_string(),
-                stop_command: "herdr session stop work".to_string(),
-                attach_command: Some("herdr session attach work".to_string()),
+                stop_command: "nagi session stop work".to_string(),
+                attach_command: Some("nagi session attach work".to_string()),
                 socket_path: crate::session::api_socket_path_for(Some("work")),
                 client_socket_path: crate::session::client_socket_path_for(Some("work")),
                 must_be_running: true,
@@ -3074,7 +3072,7 @@ mod tests {
                 .unwrap();
             let value: serde_json::Value = serde_json::from_str(&request).unwrap();
             assert_eq!(value["method"], "server.live_handoff");
-            assert_eq!(value["params"]["import_exe"], "/tmp/herdr-new");
+            assert_eq!(value["params"]["import_exe"], "/tmp/nagi-new");
             assert_eq!(value["params"]["expected_protocol"], 77);
             assert_eq!(value["params"]["expected_version"], "9.8.7");
             stream
@@ -3089,7 +3087,7 @@ mod tests {
             build_id: None,
             commit: None,
             target_protocol: Some(77),
-            download_url: "https://example.com/herdr".to_string(),
+            download_url: "https://example.com/nagi".to_string(),
             sha256: None,
             notes_body: "### Changed\n- One".to_string(),
         };
@@ -3097,7 +3095,7 @@ mod tests {
         let result = live_handoff_server_via_api_for_release_at(
             &socket_path,
             Duration::from_millis(200),
-            Path::new("/tmp/herdr-new"),
+            Path::new("/tmp/nagi-new"),
             &release,
         );
         let _ = handle.join();
@@ -3206,8 +3204,8 @@ mod tests {
                 \"body\": \"### Heads up\\n- Defaults changed\"\n\
             },\n\
             \"assets\": {\n\
-                \"linux-x86_64\": \"https://example.com/herdr-linux-x86_64\",\n\
-                \"macos-aarch64\": \"https://example.com/herdr-macos-aarch64\"\n\
+                \"linux-x86_64\": \"https://example.com/nagi-linux-x86_64\",\n\
+                \"macos-aarch64\": \"https://example.com/nagi-macos-aarch64\"\n\
             }\n\
         }";
         let manifest: UpdateManifest = serde_json::from_str(json).unwrap();
@@ -3231,7 +3229,7 @@ mod tests {
         );
         assert_eq!(
             manifest.download_url_for("linux", "x86_64").as_deref(),
-            Some("https://example.com/herdr-linux-x86_64")
+            Some("https://example.com/nagi-linux-x86_64")
         );
     }
 
@@ -3338,7 +3336,7 @@ mod tests {
         let json = r#"{
             "version": "0.2.0",
             "assets": {
-                "linux-x86_64": "https://example.com/herdr-linux-x86_64"
+                "linux-x86_64": "https://example.com/nagi-linux-x86_64"
             }
         }"#;
 
@@ -3360,7 +3358,7 @@ mod tests {
                     "body": "### Heads up\n- Defaults changed"
                 }},
                 "assets": {{
-                    "{asset_key}": "https://example.com/herdr"
+                    "{asset_key}": "https://example.com/nagi"
                 }}
             }}"####
         );
@@ -3372,7 +3370,7 @@ mod tests {
             .expect("release info");
 
         assert_eq!(release.version, Version::parse("99.99.99").unwrap());
-        assert_eq!(release.download_url, "https://example.com/herdr");
+        assert_eq!(release.download_url, "https://example.com/nagi");
     }
 
     #[test]
@@ -3406,7 +3404,7 @@ mod tests {
                 "notes": "### Fixed\n- One",
                 "assets": {{
                     "{asset_key}": {{
-                        "url": "https://example.com/herdr-linux-x86_64",
+                        "url": "https://example.com/nagi-linux-x86_64",
                         "sha256": "deadbeef"
                     }}
                 }},
@@ -3418,7 +3416,7 @@ mod tests {
                         "protocol": 77,
                         "assets": {{
                             "{asset_key}": {{
-                                "url": "https://example.com/herdr-linux_x86_64",
+                                "url": "https://example.com/nagi-linux_x86_64",
                                 "sha256": "deadbeef"
                             }}
                         }}
@@ -3471,7 +3469,7 @@ mod tests {
                 "unexpected release URL for {target}: {url}"
             );
             assert!(
-                url.ends_with(&format!("herdr-{target}")),
+                url.ends_with(&format!("nagi-{target}")),
                 "unexpected asset name for {target}: {url}"
             );
         }
@@ -3496,7 +3494,7 @@ mod tests {
                     "unexpected release URL for {version} {target}: {url}"
                 );
                 assert!(
-                    url.ends_with(&format!("herdr-{target}")),
+                    url.ends_with(&format!("nagi-{target}")),
                     "unexpected asset name for {version} {target}: {url}"
                 );
             }

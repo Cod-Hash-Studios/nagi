@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use tracing::warn;
 
-const DISABLE_SOUND_ENV: &str = "HERDR_DISABLE_SOUND";
+const DISABLE_SOUND_ENV: &str = "NAGI_DISABLE_SOUND";
 
 static SOUND_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 static SOUND_DONE: &[u8] = include_bytes!("../assets/sounds/done.mp3");
@@ -87,7 +87,7 @@ fn play_bytes(data: &[u8]) -> Result<(), String> {
 
 fn temp_sound_path() -> PathBuf {
     let id = SOUND_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!("herdr-sound-{}-{id}.mp3", std::process::id()))
+    std::env::temp_dir().join(format!("nagi-sound-{}-{id}.mp3", std::process::id()))
 }
 
 #[cfg(windows)]

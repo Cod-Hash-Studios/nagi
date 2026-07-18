@@ -662,7 +662,7 @@ mod tests {
 
     use windows_sys::Win32::System::Console::{AllocConsole, FreeConsole, GetConsoleWindow};
 
-    const DETACHED_CONSOLE_TEST_CHILD_ENV: &str = "HERDR_TEST_DETACHED_CONSOLE_CHILD";
+    const DETACHED_CONSOLE_TEST_CHILD_ENV: &str = "NAGI_TEST_DETACHED_CONSOLE_CHILD";
 
     #[test]
     fn server_daemon_command_does_not_inherit_console() {
@@ -754,7 +754,7 @@ mod tests {
     #[test]
     fn detached_custom_command_preserves_quoted_command_tail() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-raw-command-quotes-{}.txt",
+            "nagi-raw-command-quotes-{}.txt",
             std::process::id()
         ));
         let command = format!(r#"echo "hi" > "{}""#, path.display());
@@ -772,7 +772,7 @@ mod tests {
 
     #[test]
     fn windows_process_cwd_reads_child_launch_directory() {
-        let cwd = std::env::temp_dir().join(format!("herdr-cwd-test-{}", std::process::id()));
+        let cwd = std::env::temp_dir().join(format!("nagi-cwd-test-{}", std::process::id()));
         fs::create_dir_all(&cwd).expect("create cwd fixture");
 
         let shell =
@@ -827,7 +827,7 @@ mod tests {
                 "node.exe",
                 &[
                     "node.exe",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\codex\\bin\\codex.js",
+                    "C:\\Users\\nagi\\AppData\\Roaming\\npm\\node_modules\\codex\\bin\\codex.js",
                 ],
             ),
         ];
@@ -851,7 +851,7 @@ mod tests {
                     "/D",
                     "/S",
                     "/C",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\codex.cmd --model gpt-5",
+                    "C:\\Users\\nagi\\AppData\\Roaming\\npm\\codex.cmd --model gpt-5",
                 ],
             ),
         ];
@@ -872,14 +872,14 @@ mod tests {
                 "node.exe",
                 &[
                     "node.exe",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js",
+                    "C:\\Users\\nagi\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js",
                 ],
             ),
             test_entry(
                 30,
                 20,
                 "codex.exe",
-                &["C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe"],
+                &["C:\\Users\\nagi\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe"],
             ),
             test_entry(40, 30, "node_repl.exe", &["node_repl.exe"]),
             test_entry(
@@ -1002,7 +1002,7 @@ mod tests {
 
     #[test]
     fn scrollback_editor_argv_uses_editor_env_and_appends_path() {
-        let path = std::path::Path::new(r"C:\Users\User\AppData\Local\Temp\herdr scrollback.txt");
+        let path = std::path::Path::new(r"C:\Users\User\AppData\Local\Temp\nagi scrollback.txt");
         let argv = super::scrollback_editor_argv_with_env(
             path,
             Some(r#""C:\Program Files\Microsoft VS Code\Code.exe" --wait"#),
@@ -1016,7 +1016,7 @@ mod tests {
 
     #[test]
     fn scrollback_editor_argv_falls_back_to_notepad() {
-        let path = std::path::Path::new(r"C:\Temp\herdr-scrollback.txt");
+        let path = std::path::Path::new(r"C:\Temp\nagi-scrollback.txt");
         let argv = super::scrollback_editor_argv_with_env(path, None).unwrap();
 
         assert_eq!(
