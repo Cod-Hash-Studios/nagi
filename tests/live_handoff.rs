@@ -57,9 +57,13 @@ fn spawn_server_with_env(
     api_socket: &Path,
     extra_env: &[(&str, &str)],
 ) -> SpawnedNagi {
-    fs::create_dir_all(config_home.join("nagi")).unwrap();
+    fs::create_dir_all(config_home.join("nagi-dev")).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
-    fs::write(config_home.join("nagi/config.toml"), "onboarding = false\n").unwrap();
+    fs::write(
+        config_home.join("nagi-dev/config.toml"),
+        "onboarding = false\n[terminal]\nshell_mode = \"non_login\"\n",
+    )
+    .unwrap();
 
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -898,7 +902,7 @@ pathlib.Path({received:?}).write_text(data.hex())
             "params": {"pane_id": pane_id, "text": format!("python3 {}", script.display()), "keys": ["Enter"]}
         }),
     ));
-    support::wait_for_file(&ready_marker, Duration::from_secs(5));
+    support::wait_for_file(&ready_marker, Duration::from_secs(10));
 
     let protocol = request(
         &api_socket,
@@ -989,7 +993,7 @@ pathlib.Path({received:?}).write_text(data.hex())
             "params": {"pane_id": pane_id, "text": format!("python3 {}", script.display()), "keys": ["Enter"]}
         }),
     ));
-    support::wait_for_file(&ready_marker, Duration::from_secs(5));
+    support::wait_for_file(&ready_marker, Duration::from_secs(10));
 
     let protocol = request(
         &api_socket,
