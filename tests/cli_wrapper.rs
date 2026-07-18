@@ -3619,7 +3619,7 @@ command = ["sh", "-c", "echo bootstrap"]
     let plugin = &listed["result"]["plugins"][0];
     assert_eq!(plugin["plugin_id"], "example.worktree-bootstrap");
     assert_eq!(plugin["source"]["kind"], "github");
-    assert_eq!(plugin["source"]["owner"], "ogulcancelik");
+    assert_eq!(plugin["source"]["owner"], "Cod-Hash-Studios");
     assert_eq!(plugin["source"]["repo"], "nagi-plugin-examples");
     assert_eq!(plugin["source"]["subdir"], "worktree-bootstrap");
     assert!(plugin["source"]["resolved_commit"].as_str().is_some());
@@ -4037,7 +4037,7 @@ command = ["sh", "-c", "echo new"]
                         "enabled": true,
                         "source": {
                             "kind": "github",
-                            "owner": "ogulcancelik",
+                            "owner": "Cod-Hash-Studios",
                             "repo": "nagi-plugin-examples",
                             "subdir": "worktree-bootstrap",
                             "resolved_commit": "old",

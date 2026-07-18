@@ -186,7 +186,7 @@ mod tests {
         entry.enabled = false;
         entry.source = crate::api::schema::PluginSourceInfo {
             kind: crate::api::schema::PluginSourceKind::Github,
-            owner: Some("ogulcancelik".into()),
+            owner: Some("Cod-Hash-Studios".into()),
             repo: Some("nagi-plugin-examples".into()),
             subdir: Some("worktree-bootstrap".into()),
             requested_ref: Some("main".into()),
@@ -224,7 +224,7 @@ mod tests {
             result[0].source.kind,
             crate::api::schema::PluginSourceKind::Github
         );
-        assert_eq!(result[0].source.owner.as_deref(), Some("ogulcancelik"));
+        assert_eq!(result[0].source.owner.as_deref(), Some("Cod-Hash-Studios"));
         assert!(result[0].warnings.is_empty());
     }
 
