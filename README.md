@@ -93,8 +93,8 @@ different protocols into one mission model.
 
 | Agent | Terminal workspace | Managed actor | Mission start |
 |---|:---:|:---:|:---:|
-| Codex | yes | tested | wired |
-| Claude Code | yes | tested | wired |
+| Codex | yes | tested | read-only start wired |
+| Claude Code | yes | tested | read-only start wired |
 | OpenCode | yes | tested | wiring in progress |
 
 The OpenCode actor has its own authenticated loopback lifecycle, SSE limits,
@@ -171,7 +171,8 @@ This repository contains a serious foundation, not a finished public release.
 | Persistent terminal sessions and socket API | working |
 | Durable mission create, list, get, and configure | working |
 | Worktree claims, journal replay, crash recovery, and handoff | working |
-| Managed Codex and Claude Code start paths | working |
+| Managed Codex and Claude Code start paths | working in read-only mode |
+| Provider replies and workspace-write consent | in progress |
 | Managed OpenCode actor | tested, start wiring pending |
 | Full check execution and closure through the public API | in progress |
 | Mission cockpit in the TUI | in progress |
