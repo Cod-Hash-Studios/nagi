@@ -950,7 +950,7 @@ platforms = ["linux", "macos", "windows"]
                 enabled: true,
                 source: Some(PluginSourceInfo {
                     kind: PluginSourceKind::Github,
-                    owner: Some("ogulcancelik".into()),
+                    owner: Some("Cod-Hash-Studios".into()),
                     repo: Some("nagi-plugin-examples".into()),
                     subdir: Some("worktree-bootstrap".into()),
                     requested_ref: None,

@@ -1693,7 +1693,7 @@ mod tests {
     #[test]
     fn github_plugin_source_parses_root_repo() {
         let source = GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples").unwrap();
-        assert_eq!(source.owner, "ogulcancelik");
+        assert_eq!(source.owner, "Cod-Hash-Studios");
         assert_eq!(source.repo, "nagi-plugin-examples");
         assert_eq!(source.subdir, None);
         assert_eq!(
@@ -1707,7 +1707,7 @@ mod tests {
         let source =
             GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap")
                 .unwrap();
-        assert_eq!(source.owner, "ogulcancelik");
+        assert_eq!(source.owner, "Cod-Hash-Studios");
         assert_eq!(source.repo, "nagi-plugin-examples");
         assert_eq!(source.subdir.as_deref(), Some("worktree-bootstrap"));
     }
@@ -1717,7 +1717,7 @@ mod tests {
         for source in [
             "https://github.com/Cod-Hash-Studios/nagi-plugin-examples",
             "git@github.com:Cod-Hash-Studios/nagi-plugin-examples.git",
-            "ogulcancelik",
+            "Cod-Hash-Studios",
             "Cod-Hash-Studios/nagi-plugin-examples/../bad",
             "Cod-Hash-Studios/nagi-plugin-examples//bad",
         ] {
@@ -1737,13 +1737,13 @@ mod tests {
         let plugins = vec![
             github_plugin(
                 "examples.github-link-preview",
-                "ogulcancelik",
+                "Cod-Hash-Studios",
                 "nagi-plugin-examples",
                 Some("github-link-preview"),
             ),
             github_plugin(
                 "examples.agent-telegram-notify",
-                "ogulcancelik",
+                "Cod-Hash-Studios",
                 "nagi-plugin-examples",
                 Some("agent-telegram-notify"),
             ),
@@ -1758,7 +1758,7 @@ mod tests {
         let source = GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples").unwrap();
         let plugins = vec![github_plugin(
             "examples.agent-telegram-notify",
-            "ogulcancelik",
+            "Cod-Hash-Studios",
             "nagi-plugin-examples",
             Some("agent-telegram-notify"),
         )];
@@ -1771,7 +1771,7 @@ mod tests {
         let source = GithubPluginSource::parse("Cod-Hash-Studios/nagi-plugin-examples").unwrap();
         let mut plugin = github_plugin(
             "examples.local",
-            "ogulcancelik",
+            "Cod-Hash-Studios",
             "nagi-plugin-examples",
             None,
         );
