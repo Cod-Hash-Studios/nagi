@@ -283,19 +283,29 @@ impl AppState {
 
     pub(crate) fn navigator_search_rect(&self) -> Rect {
         let inner = self.navigator_inner_rect();
+        Rect::new(
+            inner.x,
+            inner.y.saturating_add(2),
+            inner.width,
+            inner.height.saturating_sub(2).min(1),
+        )
+    }
+
+    pub(crate) fn navigator_header_rect(&self) -> Rect {
+        let inner = self.navigator_inner_rect();
         Rect::new(inner.x, inner.y, inner.width, inner.height.min(1))
     }
 
     pub(crate) fn navigator_body_rect(&self) -> Rect {
         let inner = self.navigator_inner_rect();
-        if inner.height <= 4 {
+        if inner.height <= 6 {
             return Rect::default();
         }
         Rect::new(
             inner.x,
-            inner.y + 2,
+            inner.y + 4,
             inner.width,
-            inner.height.saturating_sub(4),
+            inner.height.saturating_sub(6),
         )
     }
 

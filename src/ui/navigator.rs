@@ -27,18 +27,93 @@ pub(super) fn render_navigator_overlay(
     };
 
     let search = app.navigator_search_rect();
+    let header = app.navigator_header_rect();
     let body = app.navigator_body_rect();
     let detail = app.navigator_detail_rect();
     let footer = app.navigator_footer_rect();
+    render_header(app, terminal_runtimes, frame, header);
+    render_separator(
+        frame,
+        Rect::new(inner.x, header.y.saturating_add(1), inner.width, 1),
+        app,
+    );
     render_search(app, frame, search);
 
     if body.height > 0 {
-        render_separator(frame, Rect::new(inner.x, search.y + 1, inner.width, 1), app);
+        render_separator(
+            frame,
+            Rect::new(inner.x, search.y.saturating_add(1), inner.width, 1),
+            app,
+        );
         render_rows(app, terminal_runtimes, frame, body);
         render_navigator_scrollbar(app, terminal_runtimes, frame, body);
     }
     render_detail(app, terminal_runtimes, frame, detail);
     render_footer(app, frame, footer);
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct CockpitCounts {
+    blocked: usize,
+    working: usize,
+    done: usize,
+}
+
+fn cockpit_counts(rows: &[NavigatorRow]) -> CockpitCounts {
+    let mut counts = CockpitCounts::default();
+    for row in rows.iter().filter(|row| !row.is_workspace && !row.is_tab) {
+        match (row.status, row.seen) {
+            (crate::detect::AgentState::Blocked, _) => counts.blocked += 1,
+            (crate::detect::AgentState::Working, _) => counts.working += 1,
+            (crate::detect::AgentState::Idle, false) => counts.done += 1,
+            _ => {}
+        }
+    }
+    counts
+}
+
+fn render_header(
+    app: &AppState,
+    terminal_runtimes: &TerminalRuntimeRegistry,
+    frame: &mut Frame,
+    area: Rect,
+) {
+    if area.height == 0 || area.width == 0 {
+        return;
+    }
+    let p = &app.palette;
+    let title = "  NAGI · AGENT COCKPIT";
+    let counts = cockpit_counts(&app.navigator_rows_from(terminal_runtimes));
+    let metrics = format!(
+        "{} need you   {} working   {} done  ",
+        counts.blocked, counts.working, counts.done
+    );
+    let gap = area
+        .width
+        .saturating_sub(display_width_u16(title))
+        .saturating_sub(display_width_u16(&metrics));
+    let mut spans = vec![Span::styled(
+        title,
+        Style::default().fg(p.text).add_modifier(Modifier::BOLD),
+    )];
+    if gap > 0 {
+        spans.push(Span::raw(" ".repeat(gap as usize)));
+        spans.push(Span::styled(
+            format!("{} need you", counts.blocked),
+            Style::default().fg(p.red).add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled("   ", Style::default()));
+        spans.push(Span::styled(
+            format!("{} working", counts.working),
+            Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled("   ", Style::default()));
+        spans.push(Span::styled(
+            format!("{} done  ", counts.done),
+            Style::default().fg(p.green).add_modifier(Modifier::BOLD),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
@@ -502,4 +577,48 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
         ])
     };
     frame.render_widget(Paragraph::new(line), area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pane_row(status: crate::detect::AgentState, seen: bool) -> NavigatorRow {
+        NavigatorRow {
+            target: NavigatorTarget::Workspace { ws_idx: 0 },
+            depth: 1,
+            label: "demo".into(),
+            meta: String::new(),
+            status,
+            seen,
+            is_current: false,
+            is_workspace: false,
+            is_tab: false,
+            expanded: false,
+            search_text: String::new(),
+        }
+    }
+
+    #[test]
+    fn cockpit_counts_only_actionable_panes() {
+        let mut workspace = pane_row(crate::detect::AgentState::Blocked, true);
+        workspace.is_workspace = true;
+        let rows = vec![
+            workspace,
+            pane_row(crate::detect::AgentState::Blocked, true),
+            pane_row(crate::detect::AgentState::Working, true),
+            pane_row(crate::detect::AgentState::Idle, false),
+            pane_row(crate::detect::AgentState::Idle, true),
+            pane_row(crate::detect::AgentState::Unknown, true),
+        ];
+
+        assert_eq!(
+            cockpit_counts(&rows),
+            CockpitCounts {
+                blocked: 1,
+                working: 1,
+                done: 1,
+            }
+        );
+    }
 }
