@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">The Nagi mission flow</title>
+  <desc id="desc">An animated vermilion sun travels from intent through work and proof into calm.</desc>
+  <defs>
+    <filter id="paper" x="-5%" y="-10%" width="110%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="31" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0" result="mono"/>
+      <feComponentTransfer in="mono" result="faded">
+        <feFuncA type="table" tableValues="0 0.045"/>
+      </feComponentTransfer>
+      <feBlend in="SourceGraphic" in2="faded" mode="multiply"/>
+    </filter>
+    <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <path id="journey" d="M166 226C284 146 347 306 460 226S636 146 748 226S924 306 1036 226"/>
+  </defs>
+
+  <g filter="url(#paper)">
+    <rect width="1200" height="420" rx="42" fill="#F7F1E3"/>
+    <path d="M-30 337C180 274 318 377 512 326S858 275 1230 332" fill="none"
+          stroke="#80CFC4" stroke-width="20" stroke-linecap="round" opacity="0.2"/>
+    <path d="M-28 365C204 317 350 389 548 350S908 317 1232 362" fill="none"
+          stroke="#23395B" stroke-width="8" stroke-linecap="round" opacity="0.12"/>
+
+    <text x="72" y="75" fill="#23395B" font-family="Georgia, 'Times New Roman', serif"
+          font-size="25" font-weight="600" letter-spacing="5">ONE MISSION. A CALM SURFACE.</text>
+
+    <use href="#journey" fill="none" stroke="#23395B" stroke-width="5" stroke-linecap="round"
+         stroke-dasharray="3 14" opacity="0.34">
+      <animate attributeName="stroke-dashoffset" from="0" to="-34" dur="3s" repeatCount="indefinite"/>
+    </use>
+    <use href="#journey" fill="none" stroke="#80CFC4" stroke-width="2" opacity="0.9"/>
+
+    <g transform="translate(166 226)">
+      <circle r="49" fill="#FBF7EC" stroke="#23395B" stroke-width="3"/>
+      <text y="13" text-anchor="middle" fill="#23395B"
+            font-family="Yu Mincho, Hiragino Mincho ProN, serif" font-size="44">意</text>
+      <text y="86" text-anchor="middle" fill="#526575" font-family="Avenir Next, Inter, sans-serif"
+            font-size="17" font-weight="600" letter-spacing="4">INTENT</text>
+      <circle r="63" fill="none" stroke="#EF624D" stroke-width="3" opacity="0">
+        <animate attributeName="opacity" values="0;0.45;0" dur="8s" repeatCount="indefinite" begin="0s"/>
+        <animate attributeName="r" values="51;70;70" dur="8s" repeatCount="indefinite" begin="0s"/>
+      </circle>
+    </g>
+
+    <g transform="translate(460 226)">
+      <circle r="49" fill="#FBF7EC" stroke="#23395B" stroke-width="3"/>
+      <text y="13" text-anchor="middle" fill="#23395B"
+            font-family="Yu Mincho, Hiragino Mincho ProN, serif" font-size="44">動</text>
+      <text y="86" text-anchor="middle" fill="#526575" font-family="Avenir Next, Inter, sans-serif"
+            font-size="17" font-weight="600" letter-spacing="4">WORK</text>
+      <circle r="63" fill="none" stroke="#EF624D" stroke-width="3" opacity="0">
+        <animate attributeName="opacity" values="0;0.45;0" dur="8s" repeatCount="indefinite" begin="2.2s"/>
+        <animate attributeName="r" values="51;70;70" dur="8s" repeatCount="indefinite" begin="2.2s"/>
+      </circle>
+    </g>
+
+    <g transform="translate(748 226)">
+      <circle r="49" fill="#FBF7EC" stroke="#23395B" stroke-width="3"/>
+      <text y="13" text-anchor="middle" fill="#23395B"
+            font-family="Yu Mincho, Hiragino Mincho ProN, serif" font-size="44">証</text>
+      <text y="86" text-anchor="middle" fill="#526575" font-family="Avenir Next, Inter, sans-serif"
+            font-size="17" font-weight="600" letter-spacing="4">PROOF</text>
+      <circle r="63" fill="none" stroke="#EF624D" stroke-width="3" opacity="0">
+        <animate attributeName="opacity" values="0;0.45;0" dur="8s" repeatCount="indefinite" begin="4.5s"/>
+        <animate attributeName="r" values="51;70;70" dur="8s" repeatCount="indefinite" begin="4.5s"/>
+      </circle>
+    </g>
+
+    <g transform="translate(1036 226)">
+      <circle r="58" fill="#EF624D"/>
+      <text y="17" text-anchor="middle" fill="#F7F1E3"
+            font-family="Yu Mincho, Hiragino Mincho ProN, serif" font-size="52">凪</text>
+      <text y="95" text-anchor="middle" fill="#526575" font-family="Avenir Next, Inter, sans-serif"
+            font-size="17" font-weight="600" letter-spacing="4">CALM</text>
+      <circle r="70" fill="#EF624D" opacity="0" filter="url(#softGlow)">
+        <animate attributeName="opacity" values="0;0.22;0" dur="8s" repeatCount="indefinite" begin="6.6s"/>
+      </circle>
+    </g>
+
+    <circle r="10" fill="#EF624D">
+      <animateMotion dur="8s" repeatCount="indefinite" rotate="auto">
+        <mpath href="#journey"/>
+      </animateMotion>
+    </circle>
+
+    <text x="72" y="374" fill="#526575" font-family="Avenir Next, Inter, sans-serif"
+          font-size="18" letter-spacing="2">INTENT BECOMES PROOF, WITHOUT THE NOISE.</text>
+  </g>
+</svg>
