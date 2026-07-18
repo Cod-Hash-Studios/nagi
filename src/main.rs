@@ -156,8 +156,9 @@ const DEFAULT_CONFIG: &str = r##"# nagi configuration
 # Check the configured Nagi release channel for new versions in the background.
 # version_check = true
 
-# Check the configured Nagi release channel for agent-detection manifest updates.
-# manifest_check = true
+# Opt in to Nagi-owned agent-detection manifest updates when a reviewed catalog is available.
+# Bundled manifests and local overrides work without this network check.
+# manifest_check = false
 
 [keys]
 # Prefix key to enter prefix mode (default: "ctrl+b")
