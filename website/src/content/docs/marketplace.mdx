@@ -1,53 +1,32 @@
 ---
 title: Marketplace
-description: Discover community Nagi plugins on GitHub, and get your own plugin listed.
+description: Understand the planned Nagi plugin registry and use direct installation today.
 ---
 
-The Nagi plugin marketplace is a discoverable index of community plugins.
-Browse it at [Nagi plugin registry](/plugins/). It is an automatic index of public
-GitHub repositories, not a reviewed catalog.
+The public Nagi plugin registry is planned, but it is not live yet. The
+[registry page](/plugins/) tracks that status without listing inherited or
+unverified repositories as Nagi plugins.
 
-## Browse plugins
+## What works today
 
-The [marketplace](/plugins/) lists every public repository tagged with the
-GitHub topic `nagi-plugin`. Search by name, owner, description, or language,
-and sort by popularity, recent activity, or newest. Each listing links straight
-to its source repository on GitHub.
-
-Discovery is automatic and unreviewed. A listing means a repository tagged
-itself, not that Nagi vetted it, so the
-[trust guidance](/docs/plugins/#trust-and-security) applies before you install
-anything.
-
-## Install a plugin
-
-The marketplace adds discovery on top of installation; it does not replace it.
-Install any plugin straight from GitHub:
+Local plugin development and direct GitHub installation work. Install a plugin
+from a repository you already trust:
 
 ```bash
 nagi plugin install owner/repo[/subdir...]
 ```
 
-Publish a normal public GitHub repository with a `nagi-plugin.toml` manifest at
-its root, or in a subdirectory, and that command works. See
-[Plugins](/docs/plugins/) for the manifest and authoring reference.
+The repository needs a `nagi-plugin.toml` manifest at its root or in the chosen
+subdirectory. You can also link a local checkout while developing. See
+[Plugins](/docs/plugins/) for the commands, manifest format, and
+[trust guidance](/docs/plugins/#trust-and-security).
 
-## Get your plugin listed
+## What does not work yet
 
-Add the GitHub topic `nagi-plugin` to a public repository. That topic is the
-only signal the index uses, so tagging a public plugin is all it takes. The
-index refreshes automatically every 30 minutes, so a newly tagged repository
-shows up shortly after, and one that drops the topic disappears on the next
-refresh.
+There is no automatic `nagi-plugin` topic index, listing refresh schedule, or
+public submission flow. Adding a topic to a repository will not make it appear
+on the Nagi site today.
 
-## What a listing shows
-
-Each card shows GitHub repository metadata: the repository name and owner, its
-description, star count, primary language, and the time it was last pushed, with
-a link back to the source. The index reads this from GitHub's repository search,
-so keeping your repository description and topics accurate is what makes your
-listing useful.
-
-The index does not parse `nagi-plugin.toml` yet, so manifest fields like the
-plugin `id`, declared `platforms`, and `min_nagi_version` are not shown in v1.
-Forks and archived repositories are excluded from the list.
+Before launch, the registry needs an explicit trust model, provenance display,
+abuse handling, and clear review boundaries. Progress will be published on the
+[Nagi repository](https://github.com/Cod-Hash-Studios/nagi).
