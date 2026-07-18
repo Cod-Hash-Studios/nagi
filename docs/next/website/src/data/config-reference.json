@@ -196,8 +196,8 @@
         {
           "key": "update.manifest_check",
           "type": "boolean",
-          "default": "true",
-          "description": "Reserved for future Nagi-owned manifest updates. Bundled manifests and local overrides still apply."
+          "default": "false",
+          "description": "Opt in only after Nagi publishes a reviewed manifest catalog. Bundled manifests and local overrides still apply without network access."
         }
       ]
     },
