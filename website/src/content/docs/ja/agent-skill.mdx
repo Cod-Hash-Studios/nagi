@@ -1,17 +1,17 @@
 ---
 title: エージェントスキルファイル
-description: Claude Code などのコーディングエージェントに Herdr の使い方をインストールします。
+description: Claude Code などのコーディングエージェントに Nagi の使い方をインストールします。
 ---
 
-Herdr は再利用可能なエージェントスキルファイルを [`SKILL.md`](https://github.com/ogulcancelik/herdr/blob/master/SKILL.md) として提供しています。
+Nagi は再利用可能なエージェントスキルファイルを [`SKILL.md`](https://github.com/Cod-Hash-Studios/nagi/blob/main/SKILL.md) として提供しています。
 
-このファイルを、再利用可能なスキルやカスタム指示に対応した任意のコーディングエージェントにインストールしてください。このスキルは、Herdr のペイン内から Herdr を制御する方法をエージェントに教えます。
+このファイルを、再利用可能なスキルやカスタム指示に対応した任意のコーディングエージェントにインストールしてください。このスキルは、Nagi のペイン内から Nagi を制御する方法をエージェントに教えます。
 
-Herdr は別の用途向けに [`herdr.dev/agent-guide.md`](https://herdr.dev/agent-guide.md) というガイドも提供しています。こちらは、人間が Herdr を学習・セットアップ・トラブルシューティングするのをエージェントが手伝うためのものです。スキルは Herdr を操作するエージェントのため、ガイドは人間に教えるエージェントのためのものです。
+Nagi は別の用途向けに [`Nagi agent guide`](https://cod-hash-studios.github.io/nagi/agent-guide.md) というガイドも提供しています。こちらは、人間が Nagi を学習・セットアップ・トラブルシューティングするのをエージェントが手伝うためのものです。スキルは Nagi を操作するエージェントのため、ガイドは人間に教えるエージェントのためのものです。
 
 ## スキルがすること
 
-このスキルは、`HERDR_ENV=1` が設定されているときに `herdr` CLI を使うようエージェントに指示します。これは、エージェントが Herdr 管理下のペイン内で動作しており、ローカルの Herdr ソケットと安全に通信できることを意味します。
+このスキルは、`NAGI_ENV=1` が設定されているときに `nagi` CLI を使うようエージェントに指示します。これは、エージェントが Nagi 管理下のペイン内で動作しており、ローカルの Nagi ソケットと安全に通信できることを意味します。
 
 スキルをインストールすると、エージェントは次のことができます:
 
@@ -28,7 +28,7 @@ Herdr は別の用途向けに [`herdr.dev/agent-guide.md`](https://herdr.dev/ag
 `npx skills` でスキルをインストールします:
 
 ```bash
-npx skills add ogulcancelik/herdr --skill herdr -g
+npx skills add Cod-Hash-Studios/nagi --skill nagi -g
 ```
 
 `-g` フラグは、対応エージェントにグローバルインストールします。現在のプロジェクトにインストールする場合は `-g` を省略してください。
@@ -36,25 +36,25 @@ npx skills add ogulcancelik/herdr --skill herdr -g
 手動でのフォールバックおよび信頼できるソースとしては、リポジトリのコピーを使ってください:
 
 ```text
-https://github.com/ogulcancelik/herdr/blob/master/SKILL.md
+https://github.com/Cod-Hash-Studios/nagi/blob/main/SKILL.md
 ```
 
-スキルシステムを持つエージェントには、このファイルを `herdr` という名前のスキルとしてインストールしてください。スキルシステムを持たないエージェントには、ファイルの内容をプロジェクト指示またはユーザー指示に貼り付けてください。
+スキルシステムを持つエージェントには、このファイルを `nagi` という名前のスキルとしてインストールしてください。スキルシステムを持たないエージェントには、ファイルの内容をプロジェクト指示またはユーザー指示に貼り付けてください。
 
-インストール後、Herdr の中でエージェントを起動します:
+インストール後、Nagi の中でエージェントを起動します:
 
 ```bash
-herdr
+nagi
 claude
 ```
 
-他のコーディングエージェントを Herdr のペインで使っても構いません。重要なのは、エージェントのプロセスが Herdr 内で動作していて `HERDR_ENV=1` が利用できることです。
+他のコーディングエージェントを Nagi のペインで使っても構いません。重要なのは、エージェントのプロセスが Nagi 内で動作していて `NAGI_ENV=1` が利用できることです。
 
 ## 安全ルール
 
-このスキルはひとつのガードレールから始まります: `HERDR_ENV=1` が設定されていない場合、エージェントは停止して、Herdr 管理下のペイン内で動作していないと伝えるべきです。
+このスキルはひとつのガードレールから始まります: `NAGI_ENV=1` が設定されていない場合、エージェントは停止して、Nagi 管理下のペイン内で動作していないと伝えるべきです。
 
-これにより、Herdr の外にいるエージェントが自分のものではないセッションを制御しようとするのを防ぎます。
+これにより、Nagi の外にいるエージェントが自分のものではないセッションを制御しようとするのを防ぎます。
 
 ## エージェント向けリファレンス
 
@@ -62,4 +62,4 @@ claude
 
 ソースファイルはこちら:
 
-[GitHub で `SKILL.md` を開く →](https://github.com/ogulcancelik/herdr/blob/master/SKILL.md)
+[GitHub で `SKILL.md` を開く →](https://github.com/Cod-Hash-Studios/nagi/blob/main/SKILL.md)
