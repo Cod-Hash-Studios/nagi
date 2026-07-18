@@ -3,41 +3,41 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Nagi: one mission, a calm surface</title>
+        <title>Nagi: one terminal for every coding agent</title>
         <meta
             name="description"
-            content="Nagi is a terminal-native mission runtime for coding agents. Keep real panes, durable intent, agent state, and evidence together without opening another app."
+            content="Keep Codex, Claude Code, OpenCode, and their shells running in one persistent terminal workspace."
         />
         <meta name="theme-color" content="#f0eee9" />
         <link rel="canonical" href="https://cod-hash-studios.github.io/nagi/" />
 
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Nagi" />
-        <meta property="og:title" content="Nagi: one mission, a calm surface" />
+        <meta property="og:title" content="Nagi: one terminal for every coding agent" />
         <meta
             property="og:description"
-            content="Give coding-agent work an objective, an owned checkout, a durable trail, and a definition of done. All inside the terminal."
+            content="Persistent agent terminals, an attention cockpit, SSH reattach, and a local API. One Rust binary."
         />
         <meta property="og:url" content="https://cod-hash-studios.github.io/nagi/" />
         <meta
             property="og:image"
-            content="https://cod-hash-studios.github.io/nagi/assets/nagi-hero.png"
+            content="https://cod-hash-studios.github.io/nagi/assets/nagi-agent-cockpit.png"
         />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="Nagi. One mission. A calm surface." />
+        <meta property="og:image:width" content="2976" />
+        <meta property="og:image:height" content="1216" />
+        <meta property="og:image:alt" content="The real Nagi agent cockpit" />
 
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Nagi: one mission, a calm surface" />
+        <meta name="twitter:title" content="Nagi: one terminal for every coding agent" />
         <meta
             name="twitter:description"
-            content="Give coding-agent work an objective, an owned checkout, a durable trail, and a definition of done. All inside the terminal."
+            content="Persistent agent terminals, an attention cockpit, SSH reattach, and a local API. One Rust binary."
         />
         <meta
             name="twitter:image"
-            content="https://cod-hash-studios.github.io/nagi/assets/nagi-hero.png"
+            content="https://cod-hash-studios.github.io/nagi/assets/nagi-agent-cockpit.png"
         />
-        <meta name="twitter:image:alt" content="Nagi. One mission. A calm surface." />
+        <meta name="twitter:image:alt" content="The real Nagi agent cockpit" />
 
         <link rel="icon" type="image/svg+xml" href="/nagi/assets/favicon.svg" />
         <link rel="apple-touch-icon" href="/nagi/assets/logo.svg" />
@@ -57,7 +57,7 @@
                 document.documentElement.setAttribute("data-palette", saved || system);
             })();
         </script>
-        <link rel="stylesheet" href="/nagi/css/style.css?v=59" />
+        <link rel="stylesheet" href="/nagi/css/style.css?v=60" />
     </head>
     <body>
         <header class="site-header">
@@ -100,7 +100,7 @@
                         </svg>
                         <span class="nav-star-count" data-stat-stars></span>
                     </a>
-                    <a class="nav-cta" href="/nagi/docs/install/">Install</a>
+                    <a class="nav-cta" href="/nagi/docs/quick-start/">Build it</a>
                 </div>
             </nav>
         </header>
@@ -113,26 +113,25 @@
                         <span class="status-dot dot-done"></span>
                         Agent multiplexer · a binary, not an app
                     </p>
-                    <h1>One mission. A calm surface.</h1>
+                    <h1>Every agent. One calm terminal.</h1>
                     <p class="hero-lede">
-                        Run all your coding agents from one terminal, on any
-                        box, even over ssh. Each runs in its own real terminal,
-                        on a server that keeps it alive when you close the
-                        laptop. See
+                        Keep Codex, Claude Code, OpenCode, and their shells
+                        running when your terminal disappears. Reattach over
+                        SSH, see
                         <span class="state blocked">blocked</span>,
                         <span class="state working">working</span>, and
-                        <span class="state done">done</span> at a glance, and
-                        reattach from your phone.
+                        <span class="state done">done</span> at a glance, then
+                        jump straight to the pane that needs you.
                     </p>
                     <div class="hero-actions">
                         <a class="button button-primary" href="/nagi/docs/quick-start/"
-                            >Quick start</a
+                            >Build from source</a
                         >
                         <a class="button button-secondary" href="/nagi/docs/"
                             >Read the docs</a
                         >
                     </div>
-                    <div class="install-panel" aria-label="Install options">
+                    <div class="install-panel" aria-label="Install options" hidden>
                         <div class="install-methods" role="group" aria-label="Install method">
                             <span class="install-label">Build from source</span>
                             <button
@@ -178,12 +177,21 @@
                             </div>
                         </div>
                     </div>
-                    <p class="hero-note">Source-first · no Electron · no account · no inherited download channel · <a href="/nagi/stats/">built in public</a></p>
+                    <p class="hero-note">Early access · source only · no Electron · no account · <a href="https://github.com/Cod-Hash-Studios/nagi">GitHub</a></p>
                 </div>
                 </div>
 
                 <div class="hero-right">
-                <figure class="hero-product-shot">
+                <figure class="hero-product-shot real-cockpit-shot">
+                    <img
+                        src="/nagi/assets/nagi-agent-cockpit.gif"
+                        alt="The real Nagi agent cockpit filtering blocked, working, and done agents"
+                    />
+                    <figcaption>
+                        Real Nagi build. Deterministic demo data. No mock interface.
+                    </figcaption>
+                </figure>
+                <figure class="hero-product-shot legacy-concept">
                     <div
                         class="nagi-ui-mock"
                         id="herd-mock"
@@ -472,7 +480,7 @@ $ nagi</code></pre>
                 </div>
             </section>
 
-            <section class="section compare-section">
+            <section class="section compare-section" hidden>
                 <div class="section-heading-wide">
                     <div>
                         <p class="section-kicker"># why different</p>
@@ -600,7 +608,7 @@ $ nagi</code></pre>
                 </div>
             </section>
 
-            <section class="section marketplace-teaser" id="marketplace">
+            <section class="section marketplace-teaser" id="marketplace" hidden>
                 <div class="marketplace-teaser-top">
                     <div class="marketplace-teaser-copy">
                         <p class="section-kicker"># plugins</p>
@@ -681,7 +689,7 @@ $ nagi</code></pre>
                 </div>
             </section>
 
-            <section class="section integrations-section">
+            <section class="section integrations-section" hidden>
                 <div class="section-heading">
                     <p class="section-kicker"># integrations</p>
                     <h2>Bring your existing agents into a calmer workflow.</h2>
@@ -712,18 +720,19 @@ $ nagi</code></pre>
             </section>
 
             <section class="final-cta">
-                <p class="section-kicker"># start a mission</p>
-                <h2>Build Nagi, run two agents, detach once.</h2>
+                <p class="section-kicker"># build it</p>
+                <h2>Run two agents. Close the terminal. Come back.</h2>
                 <p>
-                    The value shows up when the work keeps moving and its intent
-                    is still clear after your terminal disappears.
+                    Nagi is early access and ships from source today. The
+                    terminal workspace and cockpit work now. The deeper mission
+                    loop is still being finished in public.
                 </p>
                 <div class="hero-actions center">
-                    <a class="button button-primary" href="/nagi/docs/install/"
-                        >Install Nagi</a
+                    <a class="button button-primary" href="/nagi/docs/quick-start/"
+                        >Build from source</a
                     >
-                    <a class="button button-secondary" href="/nagi/docs/quick-start/"
-                        >Quick start</a
+                    <a class="button button-secondary" href="https://github.com/Cod-Hash-Studios/nagi#works-today"
+                        >Current status</a
                     >
                 </div>
             </section>

@@ -897,6 +897,24 @@ samp {
     z-index: 1;
 }
 
+.legacy-concept {
+    display: none;
+}
+
+.real-cockpit-shot {
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-lg);
+    background: var(--terminal);
+    box-shadow: 0 24px 70px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.real-cockpit-shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
 .eyebrow,
 .section-kicker {
     margin: 0 0 1rem;
