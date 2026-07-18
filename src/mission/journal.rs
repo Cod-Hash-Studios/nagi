@@ -128,6 +128,10 @@ impl FramedJournal {
         Ok(self.file.metadata()?.len())
     }
 
+    #[allow(
+        dead_code,
+        reason = "generic replay visitors are retained for the staged closure pipeline"
+    )]
     pub(crate) fn replay_with<E, F>(
         &mut self,
         mode: ReplayMode,
@@ -139,6 +143,10 @@ impl FramedJournal {
         self.replay_with_limits(mode, ReplayLimits::PRODUCTION, visitor)
     }
 
+    #[allow(
+        dead_code,
+        reason = "bounded replay visitors are retained for the staged closure pipeline"
+    )]
     pub(crate) fn replay_with_limits<E, F>(
         &mut self,
         mode: ReplayMode,
