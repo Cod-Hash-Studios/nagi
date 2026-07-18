@@ -6,15 +6,15 @@ description: Diagnose common installation, terminal input, session, keybinding, 
 Start with the versions and session status:
 
 ```bash
-herdr -V
-herdr status
+nagi -V
+nagi status
 ```
 
 Also record your operating system, outer terminal name and version, whether the session is local or remote, and whether tmux is involved.
 
 ## Enter, Tab, or Backspace fires twice
 
-Older terminal versions can emit the release of Enter, Tab, and Backspace as the same bytes as the press when an application enables Kitty keyboard event reporting. Herdr cannot distinguish those duplicate bytes after the terminal sends them.
+Older terminal versions can emit the release of Enter, Tab, and Backspace as the same bytes as the press when an application enables Kitty keyboard event reporting. Nagi cannot distinguish those duplicate bytes after the terminal sends them.
 
 Update the outer terminal to a version containing its upstream fix:
 
@@ -24,11 +24,11 @@ Update the outer terminal to a version containing its upstream fix:
 | foot | 1.20.0 |
 | Alacritty | 0.15.0 |
 
-This is especially common with older terminal packages from long-term-support Linux distributions. See [Herdr issue #1116](https://github.com/ogulcancelik/herdr/issues/1116) for the confirmed boundary captures and upstream references. If the problem remains on a current terminal version, report the exact terminal version and whether it also happens outside Herdr.
+This is especially common with older terminal packages from long-term-support Linux distributions. See [Nagi issue #1116](https://github.com/Cod-Hash-Studios/nagi/issues/1116) for the confirmed boundary captures and upstream references. If the problem remains on a current terminal version, report the exact terminal version and whether it also happens outside Nagi.
 
 ## Option+Left or Option+Right inserts `;3D` or `;3C`
 
-Terminals commonly send Alt+Left and Alt+Right as the standard modified-arrow sequences `ESC[1;3D` and `ESC[1;3C`. On macOS, the outer terminal must first be configured to treat Option as Alt. If the shell does not bind these sequences, zsh may display their remaining characters as `;3D` or `;3C`. This can happen with kitty, Alacritty, and other terminals; Herdr and tmux both preserve the original modified-arrow input.
+Terminals commonly send Alt+Left and Alt+Right as the standard modified-arrow sequences `ESC[1;3D` and `ESC[1;3C`. On macOS, the outer terminal must first be configured to treat Option as Alt. If the shell does not bind these sequences, zsh may display their remaining characters as `;3D` or `;3C`. This can happen with kitty, Alacritty, and other terminals; Nagi and tmux both preserve the original modified-arrow input.
 
 Add explicit zsh bindings if you want modified arrows to perform word navigation in every terminal and nested shell:
 
@@ -37,33 +37,33 @@ bindkey $'\e[1;3D' backward-word
 bindkey $'\e[1;3C' forward-word
 ```
 
-Kitty can appear to work differently outside Herdr because its automatic zsh integration adds these bindings only to shells started directly by kitty, not shells created by terminal multiplexers. Follow kitty's [manual shell integration instructions](https://sw.kovidgoyal.net/kitty/shell-integration/#manual-shell-integration), or map the keys in `kitty.conf` before they reach the shell:
+Kitty can appear to work differently outside Nagi because its automatic zsh integration adds these bindings only to shells started directly by kitty, not shells created by terminal multiplexers. Follow kitty's [manual shell integration instructions](https://sw.kovidgoyal.net/kitty/shell-integration/#manual-shell-integration), or map the keys in `kitty.conf` before they reach the shell:
 
 ```text
 map alt+left send_text all \x1bb
 map alt+right send_text all \x1bf
 ```
 
-Herdr deliberately does not rewrite modified arrows because terminal applications may use Alt+Left and Alt+Right directly. See [Herdr issue #1370](https://github.com/ogulcancelik/herdr/issues/1370) for the investigation.
+Nagi deliberately does not rewrite modified arrows because terminal applications may use Alt+Left and Alt+Right directly. See [Nagi issue #1370](https://github.com/Cod-Hash-Studios/nagi/issues/1370) for the investigation.
 
-## Herdr updated, but the running session is still old
+## Nagi updated, but the running session is still old
 
-Updating the binary does not always replace a compatible server that is already running. Check `herdr status`. To start the updated server, stop the session and launch Herdr again:
+Updating the binary does not always replace a compatible server that is already running. Check `nagi status`. To start the updated server, stop the session and launch Nagi again:
 
 ```bash
-herdr server stop
-herdr
+nagi server stop
+nagi
 ```
 
-Stopping a server exits its pane processes. Named sessions use `herdr session stop <name>`. See [Install Herdr](/docs/install/#update) for updater, package-manager, and live-handoff behavior.
+Stopping a server exits its pane processes. Named sessions use `nagi session stop <name>`. See [Build Nagi from source](/docs/install/) for the current update policy.
 
-## The `herdr` command is not found
+## The `nagi` command is not found
 
-Restart the terminal so it reloads its environment, then confirm the Herdr install directory is on `PATH`. Package-manager installs must be updated and exposed through that package manager. See [Install Herdr](/docs/install/#verify).
+If you built from source, run `./target/release/nagi` from the checkout or copy the reviewed binary to a directory already on `PATH`. See [Build Nagi from source](/docs/install/).
 
 ## A direct keybinding does nothing
 
-The operating system or outer terminal may consume the chord before Herdr receives it. Free the chord in that layer or choose another binding. See [Keyboard](/docs/keyboard/#going-prefix-free) for known conflicts and safe defaults.
+The operating system or outer terminal may consume the chord before Nagi receives it. Free the chord in that layer or choose another binding. See [Keyboard](/docs/keyboard/#going-prefix-free) for known conflicts and safe defaults.
 
 ## Remote attach cannot authenticate
 
@@ -71,12 +71,12 @@ First confirm that normal OpenSSH works with `ssh <host>`. For a passphrase-prot
 
 ## Find diagnostic logs
 
-Herdr logs live in `~/.config/herdr/` by default:
+Nagi logs live in `~/.config/nagi/` by default:
 
 ```text
-herdr.log
-herdr-client.log
-herdr-server.log
+nagi.log
+nagi-client.log
+nagi-server.log
 ```
 
-Set `HERDR_LOG=herdr=debug` for more detail. Include the current log and rotated siblings when reporting a problem. See [Configuration](/docs/configuration/#logs).
+Set `NAGI_LOG=nagi=debug` for more detail. Include the current log and rotated siblings when reporting a problem. See [Configuration](/docs/configuration/#logs).
