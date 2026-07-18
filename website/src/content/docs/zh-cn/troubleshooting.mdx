@@ -55,11 +55,11 @@ nagi server stop
 nagi
 ```
 
-停止服务器会结束窗格进程。命名会话使用 `nagi session stop <name>`。更新器、软件包管理器和实时移交行为见[安装 Nagi](/zh-cn/docs/install/#update)。
+停止服务器会结束窗格进程。命名会话使用 `nagi session stop <name>`。当前更新策略见[从源码构建 Nagi](/zh-cn/docs/install/)。
 
 ## 找不到 `nagi` 命令
 
-重启终端以重新加载环境，然后确认 Nagi 安装目录位于 `PATH` 中。通过软件包管理器安装的 Nagi 必须通过该管理器更新并加入环境。见[安装 Nagi](/zh-cn/docs/install/#verify)。
+如果你从源码构建,请在 checkout 中运行 `./target/release/nagi`,或把经过审核的二进制复制到已经位于 `PATH` 的目录。见[从源码构建 Nagi](/zh-cn/docs/install/)。
 
 ## 直接快捷键没有反应
 
