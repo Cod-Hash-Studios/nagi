@@ -52,7 +52,7 @@
     --logo-opacity: 0.72;
 }
 
-[data-palette="herdr"] {
+[data-palette="nagi"] {
   --bg: #0c0c0b; --bg-elevated: #131312; --ink: #f0ece0; --ink-soft: #dedad0;
   --muted: #8a8a80; --muted-2: #5c5c55; --line: #252522; --line-strong: #2e2e2b;
   --terminal: #0c0c0b; --terminal-2: #131312; --accent: #4a9eff;
@@ -273,7 +273,7 @@
   --term-dim: #7e7e7e; --term-blue: #ffc799; --term-green-bright: #99ffe4;
 }
 
-[data-palette="herdr"],
+[data-palette="nagi"],
 [data-palette="taat"],
 [data-palette="catppuccin"],
 [data-palette="terminal"],
@@ -389,8 +389,8 @@ samp {
     position: absolute;
     inset: 2px;
     background: var(--ink);
-    -webkit-mask: url("/assets/agent-icons/herdr-mask.svg") center / contain no-repeat;
-    mask: url("/assets/agent-icons/herdr-mask.svg") center / contain no-repeat;
+    -webkit-mask: url("/assets/agent-icons/nagi-mask.svg") center / contain no-repeat;
+    mask: url("/assets/agent-icons/nagi-mask.svg") center / contain no-repeat;
 }
 
 .logo-menu {
@@ -1205,7 +1205,7 @@ samp {
     font-family: var(--mono);
 }
 
-.herdr-ui-mock {
+.nagi-ui-mock {
     display: grid;
     grid-template-columns: minmax(120px, 17%) minmax(0, 1fr);
     overflow: hidden;
@@ -1453,35 +1453,35 @@ samp {
     color: var(--accent);
 }
 
-.herdr-ui-mock .cmd {
+.nagi-ui-mock .cmd {
     color: var(--term-cmd);
 }
 
-.herdr-ui-mock .str {
+.nagi-ui-mock .str {
     color: var(--term-str);
 }
 
-.herdr-ui-mock pre {
+.nagi-ui-mock pre {
     margin: 0.55rem 0 0.75rem;
     color: var(--term-text);
     white-space: pre;
 }
 
-.herdr-ui-mock .dim,
-.herdr-ui-mock .time {
+.nagi-ui-mock .dim,
+.nagi-ui-mock .time {
     color: var(--term-dim);
 }
 
-.herdr-ui-mock .blue,
-.herdr-ui-mock .url-line span {
+.nagi-ui-mock .blue,
+.nagi-ui-mock .url-line span {
     color: var(--term-blue);
 }
 
-.herdr-ui-mock .green {
+.nagi-ui-mock .green {
     color: var(--term-green-bright);
 }
 
-.herdr-ui-mock .badge {
+.nagi-ui-mock .badge {
     display: inline-block;
     padding: 0.1rem 0.45rem;
     background: var(--term-green-bright);
@@ -2602,12 +2602,12 @@ td:last-child {
         font-weight: 600;
     }
 
-    .compare-cards .herdr {
+    .compare-cards .nagi {
         background: var(--accent-soft);
         color: var(--accent);
     }
 
-    .compare-cards .herdr b {
+    .compare-cards .nagi b {
         color: var(--accent);
     }
 
@@ -2686,7 +2686,7 @@ td:last-child {
         font-size: 0.68rem;
     }
 
-    .herdr-ui-mock {
+    .nagi-ui-mock {
         grid-template-columns: 96px minmax(0, 1fr);
         aspect-ratio: 16 / 10;
         font-size: 0.38rem;
@@ -3248,7 +3248,7 @@ td:last-child {
     display: grid;
 }
 
-.herdr-ui-mock .mock-main {
+.nagi-ui-mock .mock-main {
     grid-template-rows: minmax(0, 1fr);
 }
 
@@ -3266,14 +3266,14 @@ td:last-child {
     margin-top: auto;
 }
 
-.herdr-ui-mock .mock-space,
-.herdr-ui-mock .mock-agent,
-.herdr-ui-mock .mock-tabs span {
+.nagi-ui-mock .mock-space,
+.nagi-ui-mock .mock-agent,
+.nagi-ui-mock .mock-tabs span {
     cursor: pointer;
 }
 
-.herdr-ui-mock .mock-space:hover,
-.herdr-ui-mock .mock-agent:hover {
+.nagi-ui-mock .mock-space:hover,
+.nagi-ui-mock .mock-agent:hover {
     background: var(--term-active-bg);
 }
 
@@ -3299,14 +3299,14 @@ td:last-child {
 }
 
 /* Claude Code header logo + status footer — colors hardcoded to match the
-   real agent UI, not the site theme (the pane renders the agent, not herdr) */
+   real agent UI, not the site theme (the pane renders the agent, not nagi) */
 .cc-header {
     display: flex;
     gap: 0.6em;
     align-items: center;
 }
 
-.herdr-ui-mock .cc-logo-art {
+.nagi-ui-mock .cc-logo-art {
     margin: 0;
     color: #d97757;
     line-height: 1;
@@ -3404,34 +3404,34 @@ td:last-child {
     font-weight: 700;
 }
 
-.herdr-ui-mock .dim {
+.nagi-ui-mock .dim {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
 /* sidebar rows must scale with the mock's clamped font size */
-.herdr-ui-mock .mock-sidebar-title {
+.nagi-ui-mock .mock-sidebar-title {
     padding: 0.55em 1.1em;
 }
 
-.herdr-ui-mock .mock-space {
+.nagi-ui-mock .mock-space {
     padding: 0.55em 1.1em;
     gap: 0.7em;
 }
 
-.herdr-ui-mock .mock-sidebar-row,
-.herdr-ui-mock .mock-agent-title {
+.nagi-ui-mock .mock-sidebar-row,
+.nagi-ui-mock .mock-agent-title {
     padding: 0.45em 1.1em;
 }
 
-.herdr-ui-mock .mock-agent {
+.nagi-ui-mock .mock-agent {
     padding: 0.38em 1.1em;
     gap: 0.6em;
 }
 
-.herdr-ui-mock .mock-space small,
-.herdr-ui-mock .mock-agent small {
+.nagi-ui-mock .mock-space small,
+.nagi-ui-mock .mock-agent small {
     margin-top: 0.18em;
 }
 
@@ -3456,28 +3456,28 @@ td:last-child {
     }
 }
 
-.herdr-ui-mock .mock-sidebar > * {
+.nagi-ui-mock .mock-sidebar > * {
     animation: mock-attach 0.3s ease backwards;
 }
 
-.herdr-ui-mock .mock-sidebar > *:nth-child(1) { animation-delay: 0.05s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(2) { animation-delay: 0.12s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(3) { animation-delay: 0.19s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(4) { animation-delay: 0.26s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(6) { animation-delay: 0.33s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(7) { animation-delay: 0.4s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(8) { animation-delay: 0.47s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(9) { animation-delay: 0.54s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(10) { animation-delay: 0.61s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(11) { animation-delay: 0.68s; }
-.herdr-ui-mock .mock-sidebar > *:nth-child(12) { animation-delay: 0.75s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(1) { animation-delay: 0.05s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(2) { animation-delay: 0.12s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(3) { animation-delay: 0.19s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(4) { animation-delay: 0.26s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(6) { animation-delay: 0.33s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(7) { animation-delay: 0.4s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(8) { animation-delay: 0.47s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(9) { animation-delay: 0.54s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(10) { animation-delay: 0.61s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(11) { animation-delay: 0.68s; }
+.nagi-ui-mock .mock-sidebar > *:nth-child(12) { animation-delay: 0.75s; }
 
 .mock-view.active .mock-panes.active .mock-pane {
     animation: mock-swap 0.18s ease backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .herdr-ui-mock .mock-sidebar > *,
+    .nagi-ui-mock .mock-sidebar > *,
     .mock-view.active .mock-tabs,
     .mock-view.active .mock-pane {
         animation: none;
