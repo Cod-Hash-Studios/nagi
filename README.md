@@ -113,7 +113,8 @@ trusted commands, not a security sandbox.
 
 ## Try it from source
 
-Nagi currently targets Unix systems. You need Rust 1.96.1 and Zig 0.15.2.
+The mission runtime currently targets Unix systems. You need Rust 1.96.1 and
+Zig 0.15.2 to build Nagi.
 
 ```bash
 git clone https://github.com/Cod-Hash-Studios/nagi.git
@@ -124,8 +125,8 @@ cargo build --release --locked
 ./target/release/nagi
 ```
 
-The first run creates an isolated Nagi config and runtime namespace. It does not
-reuse Herdr sockets, sessions, logs, or environment variables.
+Nagi uses isolated config and runtime paths. It does not reuse Herdr sockets,
+sessions, logs, or environment variables.
 
 To inspect the live API contract:
 
@@ -136,7 +137,7 @@ To inspect the live API contract:
 ```
 
 <details>
-<summary><strong>What a mission starts with</strong></summary>
+<summary><strong>Wire-format example for socket clients</strong></summary>
 
 ```json
 {
