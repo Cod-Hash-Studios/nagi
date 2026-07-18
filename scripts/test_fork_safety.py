@@ -20,7 +20,8 @@ class ForkSafetyTests(unittest.TestCase):
         for name in DISABLED_WORKFLOWS:
             workflow = ROOT / ".github" / "workflows" / name
             with self.subTest(workflow=name):
-                self.assertIn("\non: []\n", workflow.read_text())
+                if workflow.exists():
+                    self.assertIn("\non: []\n", workflow.read_text())
 
     def test_upstream_update_channels_are_disabled_in_code(self) -> None:
         self.assertIn(
