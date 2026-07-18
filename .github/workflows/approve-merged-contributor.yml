@@ -1,8 +1,7 @@
 name: Approve Merged Contributor
 
-on:
-  pull_request_target:
-    types: [closed]
+# Upstream maintainer automation must not run in the fork.
+on: []
 
 jobs:
   approve:

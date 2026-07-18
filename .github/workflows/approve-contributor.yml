@@ -1,8 +1,7 @@
 name: Approve Contributor
 
-on:
-  issue_comment:
-    types: [created, edited]
+# Upstream maintainer automation must not run in the fork.
+on: []
 
 jobs:
   approve:

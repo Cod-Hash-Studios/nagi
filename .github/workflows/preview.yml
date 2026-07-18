@@ -1,12 +1,7 @@
 name: Preview
 
-on:
-  workflow_dispatch:
-    inputs:
-      commit:
-        description: Optional master commit SHA to publish
-        required: false
-        type: string
+# Disabled while the fork has no signed release-readiness artifact.
+on: []
 
 permissions:
   contents: read

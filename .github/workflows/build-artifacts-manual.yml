@@ -1,36 +1,7 @@
 name: Build artifacts (manual)
 
-on:
-  workflow_dispatch:
-    inputs:
-      build_group:
-        description: which artifacts to build
-        required: true
-        default: linux
-        type: choice
-        options:
-          - linux
-          - macos
-          - windows
-          - all
-      libghostty_optimize:
-        description: libghostty-vt optimize mode for this build
-        required: true
-        default: ReleaseSafe
-        type: choice
-        options:
-          - ReleaseSafe
-          - ReleaseFast
-          - ReleaseSmall
-          - Debug
-      libghostty_simd:
-        description: build libghostty-vt with SIMD-accelerated code paths
-        required: true
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
+# Disabled while the fork has no signed release-readiness artifact.
+on: []
 
 permissions:
   contents: read

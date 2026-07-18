@@ -1,8 +1,7 @@
 name: Issue Gate
 
-on:
-  issues:
-    types: [opened]
+# Upstream maintainer automation must not run in the fork.
+on: []
 
 permissions:
   issues: write
