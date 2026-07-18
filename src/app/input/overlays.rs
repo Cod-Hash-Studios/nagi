@@ -18,6 +18,15 @@ fn rect_contains(rect: Rect, col: u16, row: u16) -> bool {
     col >= rect.x && col < rect.x + rect.width && row >= rect.y && row < rect.y + rect.height
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct NavigatorLayout {
+    header: Rect,
+    search: Rect,
+    body: Rect,
+    detail: Rect,
+    footer: Rect,
+}
+
 impl App {
     pub(super) fn handle_overlay_mouse(&mut self, mouse: MouseEvent) -> bool {
         if self.state.mode == Mode::ReleaseNotes {
@@ -281,52 +290,60 @@ impl AppState {
             .inner(self.navigator_popup_rect())
     }
 
-    pub(crate) fn navigator_search_rect(&self) -> Rect {
+    fn navigator_layout(&self) -> NavigatorLayout {
         let inner = self.navigator_inner_rect();
-        Rect::new(
-            inner.x,
-            inner.y.saturating_add(2),
-            inner.width,
-            inner.height.saturating_sub(2).min(1),
-        )
+        if inner.height >= 7 {
+            return NavigatorLayout {
+                header: Rect::new(inner.x, inner.y, inner.width, 1),
+                search: Rect::new(inner.x, inner.y + 2, inner.width, 1),
+                body: Rect::new(inner.x, inner.y + 4, inner.width, inner.height - 6),
+                detail: Rect::new(inner.x, inner.y + inner.height - 2, inner.width, 1),
+                footer: Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1),
+            };
+        }
+
+        NavigatorLayout {
+            header: (inner.height >= 1)
+                .then(|| Rect::new(inner.x, inner.y, inner.width, 1))
+                .unwrap_or_default(),
+            search: (inner.height >= 3)
+                .then(|| Rect::new(inner.x, inner.y + 1, inner.width, 1))
+                .unwrap_or_default(),
+            body: (inner.height >= 4)
+                .then(|| {
+                    Rect::new(
+                        inner.x,
+                        inner.y + 2,
+                        inner.width,
+                        inner.height.saturating_sub(3),
+                    )
+                })
+                .unwrap_or_default(),
+            detail: Rect::default(),
+            footer: (inner.height >= 2)
+                .then(|| Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1))
+                .unwrap_or_default(),
+        }
+    }
+
+    pub(crate) fn navigator_search_rect(&self) -> Rect {
+        self.navigator_layout().search
     }
 
     pub(crate) fn navigator_header_rect(&self) -> Rect {
-        let inner = self.navigator_inner_rect();
-        Rect::new(inner.x, inner.y, inner.width, inner.height.min(1))
+        self.navigator_layout().header
     }
 
     pub(crate) fn navigator_body_rect(&self) -> Rect {
-        let inner = self.navigator_inner_rect();
-        if inner.height <= 6 {
-            return Rect::default();
-        }
-        Rect::new(
-            inner.x,
-            inner.y + 4,
-            inner.width,
-            inner.height.saturating_sub(6),
-        )
+        self.navigator_layout().body
     }
 
     pub(crate) fn navigator_detail_rect(&self) -> Rect {
-        let inner = self.navigator_inner_rect();
-        Rect::new(
-            inner.x,
-            inner.y + inner.height.saturating_sub(2),
-            inner.width,
-            inner.height.min(1),
-        )
+        self.navigator_layout().detail
     }
 
     pub(crate) fn navigator_footer_rect(&self) -> Rect {
-        let inner = self.navigator_inner_rect();
-        Rect::new(
-            inner.x,
-            inner.y + inner.height.saturating_sub(1),
-            inner.width,
-            inner.height.min(1),
-        )
+        self.navigator_layout().footer
     }
 
     pub(crate) fn navigator_popup_contains(&self, col: u16, row: u16) -> bool {
@@ -720,6 +737,58 @@ mod tests {
 
     use super::super::{app_for_mouse_test, mouse};
     use super::*;
+
+    fn set_terminal_size(app: &mut App, width: u16, height: u16) {
+        let sidebar_width = width.min(20);
+        app.state.view.sidebar_rect = Rect::new(0, 0, sidebar_width, height);
+        app.state.view.terminal_area = Rect::new(
+            sidebar_width,
+            0,
+            width.saturating_sub(sidebar_width),
+            height,
+        );
+    }
+
+    fn rects_overlap(left: Rect, right: Rect) -> bool {
+        left.width > 0
+            && left.height > 0
+            && right.width > 0
+            && right.height > 0
+            && left.x < right.x.saturating_add(right.width)
+            && right.x < left.x.saturating_add(left.width)
+            && left.y < right.y.saturating_add(right.height)
+            && right.y < left.y.saturating_add(left.height)
+    }
+
+    #[test]
+    fn compact_navigator_keeps_rows_at_eighty_by_ten() {
+        let mut app = app_for_mouse_test();
+        set_terminal_size(&mut app, 80, 10);
+
+        assert!(app.state.navigator_body_rect().height > 0);
+    }
+
+    #[test]
+    fn tiny_navigator_regions_do_not_overlap() {
+        let mut app = app_for_mouse_test();
+        set_terminal_size(&mut app, 40, 8);
+
+        let regions = [
+            app.state.navigator_header_rect(),
+            app.state.navigator_search_rect(),
+            app.state.navigator_body_rect(),
+            app.state.navigator_detail_rect(),
+            app.state.navigator_footer_rect(),
+        ];
+        for (index, left) in regions.iter().enumerate() {
+            for right in regions.iter().skip(index + 1) {
+                assert!(
+                    !rects_overlap(*left, *right),
+                    "navigator regions overlap: {left:?} and {right:?}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn clicking_keybind_help_close_button_closes_overlay() {
