@@ -39,6 +39,7 @@ socket API 可以:
 - 通过 CLI 辅助命令列出、检查、读取、发送、重命名、聚焦、启动和附加智能体
 - 从钩子和插件上报自定义智能体状态
 - 订阅事件并等待输出或状态变化
+- 创建、检查、配置和启动持久化的编程智能体任务
 - 安装和卸载内置集成
 - 停止服务器并重载配置
 
@@ -96,6 +97,7 @@ nagi pane read w1:p2 --source recent --lines 50
 | 通知 | `notification.show` |
 | 客户端 | `client.window_title.set`、`client.window_title.clear` |
 | 会话 | `session.snapshot` |
+| 任务 | `mission.create`、`mission.list`、`mission.get`、`mission.configure`、`mission.start`、`mission.respond` |
 | 工作区 | `workspace.create`、`workspace.list`、`workspace.get`、`workspace.focus`、`workspace.rename`、`workspace.move`、`workspace.report_metadata`、`workspace.close` |
 | Worktree | `worktree.list`、`worktree.create`、`worktree.open`、`worktree.remove` |
 | 标签页 | `tab.create`、`tab.list`、`tab.get`、`tab.focus`、`tab.rename`、`tab.move`、`tab.close` |
@@ -106,6 +108,35 @@ nagi pane read w1:p2 --source recent --lines 50
 | 事件 | `events.subscribe`、`events.wait` |
 | 集成 | `integration.install`、`integration.uninstall` |
 | 插件 | `plugin.link`、`plugin.list`、`plugin.unlink`、`plugin.enable`、`plugin.disable`、`plugin.action.list`、`plugin.action.invoke`、`plugin.log.list`、`plugin.pane.open`、`plugin.pane.focus`、`plugin.pane.close` |
+
+### 任务方法: Early Access 契约
+
+任务 API 现在会持久保存意图和所有权,但托管 provider 的边界被有意限制:
+
+| 方法 | 必填参数 | 当前行为 |
+| --- | --- | --- |
+| `mission.create` | `mission_id`、`title`、绝对路径 `repository_path`、`objective`、`acceptance_criteria` | 创建持久草稿。ID 长度为 1–128 个字符,非空验收标准为 1–16 条。重复完全相同的请求是幂等的,修改内容会返回 `mission_conflict`。 |
+| `mission.list` | 无 | 返回持久化的任务摘要。 |
+| `mission.get` | `mission_id` | 返回完整的公开任务投影。 |
+| `mission.configure` | `mission_id`、`checks` | 固定 1–32 个命令或人工检查。每条验收标准都必须被覆盖,不同的第二次配置会被拒绝。 |
+| `mission.start` | `mission_id`、`run_id`、`provider`、`mode`;可选 `worktree_path` | 独占一个规范 Git checkout,以托管只读模式启动 Codex 或 Claude Code。必须先配置 closure plan。 |
+| `mission.respond` | `mission_id`、`run_id`、`attention_id`、`decision`;可选 `answers` | 为交互式同意流程保留。当前总是返回 `interactive_consent_required`,不会向 provider 发送响应。 |
+
+`provider` 接受 `codex`、`claude_code` 或 `open_code`;`mode` 接受 `managed`
+或 `passthrough`。当前构建中,OpenCode 任务启动和所有 passthrough 启动都会返回
+不可用错误。托管 Codex 和 Claude Code 进程只获得工作区读取权限。
+
+| 错误码 | 含义 |
+| --- | --- |
+| `feature_unavailable` | 当前平台不支持任务存储。 |
+| `mission_not_found`、`mission_conflict` | 任务不存在,或不可变的定义/配置不一致。 |
+| `invalid_mission`、`invalid_repository`、`invalid_closure` | ID、文本、Git root、验收标准覆盖或检查声明无效。 |
+| `provider_unavailable`、`provider_mode_unavailable` | OpenCode 启动或 passthrough 模式尚未接通。 |
+| `run_conflict`、`invalid_run`、`provider_start_failed` | run ID 冲突、无法形成 claim identity,或 provider 进程启动失败。 |
+| `interactive_consent_required` | 在任务 cockpit 能确认决定之前,`mission.respond` 会被阻止。 |
+
+嵌套的 `checks`、路径规则、响应决定、结果对象和字段长度限制,以被控制的
+同一 Nagi 二进制中附带的生成 schema 为准。
 
 一些 CLI 命令是这些方法的便捷包装。比如 `nagi agent wait` 先解析智能体目标,然后订阅窗格智能体状态事件。
 
