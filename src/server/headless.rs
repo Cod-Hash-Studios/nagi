@@ -177,6 +177,10 @@ fn stable_runtime_id(domain: &str, values: &[&str]) -> String {
     format!("{domain}:{encoded}")
 }
 
+#[allow(
+    dead_code,
+    reason = "answer validation stays private until provider replies are public"
+)]
 fn validate_managed_answers(
     answers: &std::collections::BTreeMap<String, Vec<String>>,
 ) -> Result<(), ()> {
@@ -393,6 +397,10 @@ struct ManagedRun {
 }
 
 #[derive(Clone)]
+#[allow(
+    dead_code,
+    reason = "response routes are captured now but consumed only after interactive consent"
+)]
 struct AvailableManagedResponse {
     token: crate::managed_provider::ResponseToken,
     class: crate::managed_provider::AttentionClass,
@@ -2367,6 +2375,10 @@ impl HeadlessServer {
         )
     }
 
+    #[allow(
+        dead_code,
+        reason = "authorized replies stay unreachable until interactive consent is public"
+    )]
     fn handle_mission_respond_authorized(
         &mut self,
         request_id: &str,
