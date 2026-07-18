@@ -1,6 +1,6 @@
 name: Release
 
-# Disabled while the fork has no signed release-readiness artifact.
+# Archived until the fork has a signed release-readiness artifact.
 on: []
 
 permissions:

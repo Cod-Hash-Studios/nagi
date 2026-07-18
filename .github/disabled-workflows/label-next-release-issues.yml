@@ -1,6 +1,6 @@
 name: Close pending-release issues
 
-# Upstream maintainer automation must not run in the fork.
+# Archived upstream maintainer automation. Files here are not executable workflows.
 on: []
 
 permissions:
