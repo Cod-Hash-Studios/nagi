@@ -10,9 +10,10 @@ The fork started from:
 - upstream commit: `50aaa2ec046ee26ff407c20f49de496f522512a8`;
 - upstream license: `AGPL-3.0-or-later`.
 
-The complete upstream history is retained in Git. The `upstream` remote is
-fetch-only in the development checkout so changes cannot accidentally be
-pushed to the original project.
+The `v0.7.4` source tree was imported as Nagi's root commit. The complete
+pre-fork history remains available in the canonical upstream repository linked
+above. The local `upstream` remote is fetch-only so Nagi changes cannot be
+accidentally pushed to the original project.
 
 ## License
 

@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="assets/brand/nagi-lockup.svg" alt="Nagi. Calm for agent work." width="760" />
+  <img src="assets/brand/nagi-lockup.svg" alt="Nagi" width="680" />
 </p>
 
-<p align="center"><strong>Your agents can keep moving. Your surface stays calm.</strong></p>
+<h3 align="center">Keep coding agents running. Keep one terminal in control.</h3>
+
+<p align="center">
+  A fast, persistent terminal workspace for Codex, Claude Code, OpenCode, and the shells around them.
+</p>
 
 <p align="center">
   <a href="https://github.com/Cod-Hash-Studios/nagi/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Cod-Hash-Studios/nagi/ci.yml?branch=main&style=flat-square&label=build&labelColor=F7F1E3&color=80CFC4" alt="Build status" /></a>
@@ -12,180 +16,106 @@
 </p>
 
 <p align="center">
-  <a href="#why-nagi">Why Nagi</a> ·
-  <a href="#what-is-already-here">What works</a> ·
-  <a href="#try-it-from-source">Build it</a> ·
-  <a href="#the-honest-status">Status</a> ·
-  <a href="CONTRIBUTING.md">Contribute</a>
+  <img src="assets/screenshots/nagi-agent-cockpit.gif" alt="The real Nagi agent cockpit filtering blocked, working, and done agents" width="100%" />
 </p>
 
-<p align="center">
-  <img src="assets/brand/nagi-hero.png" alt="A calm Japanese seascape in indigo, seafoam, rice paper, and vermilion" width="100%" />
-</p>
+<p align="center"><sub>Real Nagi build. Deterministic demo data. No mock interface.</sub></p>
 
-Nagi is a terminal-native mission runtime for coding agents. It gives work an
-objective, a claimed Git checkout, a durable trail, and a definition of done
-that can survive the agent that started it.
+Nagi is a native terminal multiplexer with an agent-aware cockpit. Your panes
+keep running when the terminal disappears. Reattach locally, over SSH, or from
+a phone. Press `Ctrl+B`, then `G`, to see what needs you and jump straight to it.
 
-It is not a graphical chat client. It is not another dashboard you have to keep
-open. It lives in the terminal you already use.
-
-> [!IMPORTANT]
-> Nagi is under active development and currently ships from source only. There
-> is no signed public release channel yet. Self-update, remote binary download,
-> and publishing workflows stay disabled until their security review is done.
+| Stay running | See attention | Automate it |
+|---|---|---|
+| Persistent panes, tabs, and workspaces | Blocked, working, idle, and done at a glance | Typed CLI and Unix socket API |
+| Detach and reattach over SSH | Search and filter every live agent pane | Durable mission journal and worktree claims |
+| One Rust binary, no Electron | Mouse and keyboard navigation | Headless server for scripts and agents |
 
 ## Why Nagi
 
-Starting more agents is easy. Staying oriented is the hard part.
+Starting agents is easy. Keeping track of them is not.
 
-Which agent owns which checkout? What was it actually asked to finish? Is it
-working, waiting, or blocked on a decision? Did the tests pass before or after
-the last edit? Can you close the work with evidence, or only with a confident
-sentence from a model?
+Nagi keeps real terminal processes, their current state, and the workspace they
+own on one calm surface. It does not replace Codex, Claude Code, or OpenCode. It
+gives them somewhere reliable to run.
 
-Most terminal multiplexers show processes. Nagi is being built to show intent.
+## Works today
 
-| A pane can tell you | A Nagi mission adds |
+| Surface | Status |
 |---|---|
-| what is running | what outcome was requested |
-| what the process printed | what needs your attention |
-| whether the process exited | whether the closure checks are fresh |
-| where the shell is | which worktree the run owns |
-| what happened recently | a durable, replayable mission journal |
+| Persistent terminal sessions, splits, tabs, mouse, SSH reattach | working |
+| Agent cockpit with search, state filters, counts, and direct switching | working |
+| CLI and Unix socket API | working |
+| Mission create, list, get, configure, journal replay, and worktree claims | working |
+| Managed Codex and Claude Code mission start | early read-only path |
+| Managed OpenCode mission start | actor tested, final wiring pending |
+| Proof execution, provider consent UI, and mission closure | in progress |
+| Signed binaries and public release channel | not available yet |
 
-<p align="center">
-  <img src="assets/brand/nagi-flow.svg" alt="Intent becomes work, proof, then calm" width="100%" />
-</p>
+The cockpit is real and usable now. The deeper mission-to-proof loop is an early
+preview, and this README labels it that way on purpose.
 
-## What is already here
+## Agent compatibility
 
-### A terminal workspace that feels current
+| Agent | Runs in Nagi | Managed mission path |
+|---|:---:|---|
+| Codex | yes | early read-only path |
+| Claude Code | yes | early read-only path |
+| OpenCode | yes | start wiring pending |
 
-One Rust binary. No Electron. Persistent sessions, panes, tabs, workspaces,
-mouse resizing, keyboard control, SSH-friendly detach and reattach, and a Unix
-socket API for automation.
+Any terminal program can run in a pane. The managed mission column is narrower:
+it means Nagi understands that provider's lifecycle instead of merely hosting
+its process.
 
-You should not need to memorize tmux before you can keep several agents tidy.
-Use the mouse when it is faster. Use the keyboard when you know exactly where
-you want to go.
+## Build from source
 
-### A durable mission foundation
-
-The implemented mission store and tested domain model bind together:
-
-- a human-readable objective;
-- explicit acceptance criteria;
-- an immutable closure plan;
-- one canonical Git checkout and an exclusive run lease;
-- an append-only journal with snapshots and crash recovery;
-- durable attention and provider-response records;
-- evidence and proof primitives scoped to the workspace state they describe.
-
-The journal is single-writer. Runtime directories and records use private Unix
-permissions. Symlinked or weakly protected state is rejected instead of quietly
-trusted.
-
-### Managed coding-agent adapters
-
-Nagi speaks to coding agents through typed adapters, then normalizes their very
-different protocols into one mission model.
-
-| Agent | Terminal workspace | Managed actor | Mission start |
-|---|:---:|:---:|:---:|
-| Codex | yes | tested | read-only start wired |
-| Claude Code | yes | tested | read-only start wired |
-| OpenCode | yes | tested | wiring in progress |
-
-The OpenCode actor has its own authenticated loopback lifecycle, SSE limits,
-deduplication, permission handling, resume logic, and failure tests. Nagi does
-not label that path complete until `mission.start` exposes it end to end.
-
-### Proof, not vibes
-
-The tested closure model maps every acceptance criterion to command or manual
-checks. Its evidence is bound to relevant files, base tree, result tree, diff,
-artifacts, and timestamps, so a workspace change can invalidate stale proof.
-Executing those checks and closing a mission through the public API is still in
-progress.
-
-When check execution is wired, commands will run with the user's
-operating-system permissions. They are trusted commands, not a security
-sandbox.
-
-## Try it from source
-
-The mission runtime currently targets Unix systems. You need Rust 1.96.1 and
-Zig 0.15.2 to build Nagi.
+The mission runtime currently targets Unix systems. You need Rust `1.96.1` and
+Zig `0.15.2`.
 
 ```bash
 git clone https://github.com/Cod-Hash-Studios/nagi.git
 cd nagi
 
-zig version  # must print 0.15.2
+zig version  # 0.15.2
 cargo build --release --locked
 ./target/release/nagi
 ```
 
-Nagi uses isolated config and runtime paths. It does not reuse Herdr sockets,
-sessions, logs, or environment variables.
+Nagi uses its own config, runtime paths, sockets, logs, and environment
+variables. It does not reuse an existing Herdr session.
 
-To inspect the live API contract:
+## Run the cockpit demo
+
+Build Nagi, then start an isolated development server:
 
 ```bash
-./target/release/nagi api schema
-./target/release/nagi api schema --json
-./target/release/nagi api snapshot
+cargo run -- server
 ```
 
-<details>
-<summary><strong>Wire-format example for socket clients</strong></summary>
+In another terminal:
 
-```json
-{
-  "id": "mission-create-1",
-  "method": "mission.create",
-  "params": {
-    "mission_id": "login-redirect",
-    "title": "Preserve the login redirect",
-    "repository_path": "/home/me/project",
-    "objective": "Return users to the page they requested after login.",
-    "acceptance_criteria": [
-      "The redirect integration test passes",
-      "An invalid redirect cannot leave the application origin"
-    ]
-  }
-}
+```bash
+scripts/seed_navigator_demo.sh
+cargo run
 ```
 
-The next step is `mission.configure`, where every criterion is covered by a
-required command or manual check. The generated schema is committed at
+Open the cockpit with `Ctrl+B`, then `G`. Use `b`, `w`, `i`, `d`, and `a` to
+filter by state. The script inserts simulated status data into real Nagi
+workspaces and panes, and refuses to touch the main socket unless explicitly
+allowed.
+
+## API
+
+```bash
+nagi api schema
+nagi api snapshot
+```
+
+The generated mission schema lives at
 [`docs/next/api/nagi-api.schema.json`](docs/next/api/nagi-api.schema.json).
 
-</details>
-
-## The honest status
-
-This repository contains a serious foundation, not a finished public release.
-
-| Surface | Status |
-|---|---|
-| Persistent terminal sessions and socket API | working |
-| Durable mission create, list, get, and configure | working |
-| Worktree claims, journal replay, crash recovery, and handoff | working |
-| Managed Codex and Claude Code start paths | working in read-only mode |
-| Provider replies and workspace-write consent | in progress |
-| Managed OpenCode actor | tested, start wiring pending |
-| Full check execution and closure through the public API | in progress |
-| Mission cockpit in the TUI | in progress |
-| Live consent UI for provider questions and permissions | in progress |
-| Signed binaries and release channel | intentionally blocked |
-
-The first public release should make the whole loop feel obvious: define the
-outcome, let agents work, answer only the decisions that matter, see fresh
-evidence, close the mission, breathe.
-
-## Under the surface
+<details>
+<summary><strong>Architecture in 20 seconds</strong></summary>
 
 ```text
 terminal clients
@@ -193,19 +123,22 @@ terminal clients
       ▼
 single-writer Nagi server
       ├── panes, tabs, sessions, render streams
-      ├── mission journal, snapshots, leases, attention
-      ├── closure plan, evidence, proof
+      ├── mission journal, worktree claims, attention
       └── managed provider adapters
              ├── Codex
              ├── Claude Code
              └── OpenCode
 ```
 
-The TUI is a client of the runtime, not the owner of mission truth. That keeps
-headless automation, SSH sessions, and future interfaces on the same durable
-contract.
+The TUI is a client of the server. Mission truth stays in the durable runtime,
+so SSH clients, headless automation, and future interfaces share one contract.
 
-## Development
+</details>
+
+## Contributing
+
+Read [`AGENTS.md`](AGENTS.md) before changing runtime contracts and
+[`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
 ```bash
 cargo fmt --check
@@ -214,20 +147,17 @@ python3 -m unittest scripts.test_brand_isolation scripts.test_fork_safety
 bun test src/integration/assets/nagi-agent-state.test.ts
 ```
 
-Read [`AGENTS.md`](AGENTS.md) before changing runtime contracts and
-[`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
-
-## Provenance and license
+## Provenance
 
 Nagi is an independent derivative of
 [Herdr](https://github.com/ogulcancelik/herdr), starting from `v0.7.4` at
-commit `50aaa2ec046ee26ff407c20f49de496f522512a8`. The complete upstream Git
-history and required attribution are preserved. See [`FORK.md`](FORK.md).
+`50aaa2ec046ee26ff407c20f49de496f522512a8`. Required copyright and attribution
+notices remain intact. See [`FORK.md`](FORK.md).
 
 Nagi is licensed under [`AGPL-3.0-or-later`](LICENSE). The separate commercial
-license offered by the upstream project is not granted by this repository.
+license offered upstream is not granted by this repository.
 
 <p align="center">
-  <strong>One mission. A calm surface.</strong><br />
+  <strong>Less tab hunting. More finished work.</strong><br />
   <sub>凪</sub>
 </p>
