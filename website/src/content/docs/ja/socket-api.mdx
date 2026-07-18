@@ -39,6 +39,7 @@ nagi api schema --output nagi-api.schema.json
 - CLI ヘルパーを通じたエージェントの一覧、調査、読み取り、送信、名前変更、フォーカス、起動、アタッチ
 - フックやプラグインからのカスタムエージェント状態の報告
 - イベントの購読と、出力や状態変化の待機
+- 永続的なコーディングエージェントミッションの作成、確認、設定、開始
 - 組み込みインテグレーションのインストールとアンインストール
 - サーバーの停止と設定のリロード
 
@@ -96,6 +97,7 @@ nagi pane read w1:p2 --source recent --lines 50
 | 通知 | `notification.show` |
 | クライアント | `client.window_title.set`、`client.window_title.clear` |
 | セッション | `session.snapshot` |
+| ミッション | `mission.create`、`mission.list`、`mission.get`、`mission.configure`、`mission.start`、`mission.respond` |
 | ワークスペース | `workspace.create`、`workspace.list`、`workspace.get`、`workspace.focus`、`workspace.rename`、`workspace.move`、`workspace.report_metadata`、`workspace.close` |
 | Worktree | `worktree.list`、`worktree.create`、`worktree.open`、`worktree.remove` |
 | タブ | `tab.create`、`tab.list`、`tab.get`、`tab.focus`、`tab.rename`、`tab.move`、`tab.close` |
@@ -106,6 +108,37 @@ nagi pane read w1:p2 --source recent --lines 50
 | イベント | `events.subscribe`、`events.wait` |
 | インテグレーション | `integration.install`、`integration.uninstall` |
 | プラグイン | `plugin.link`、`plugin.list`、`plugin.unlink`、`plugin.enable`、`plugin.disable`、`plugin.action.list`、`plugin.action.invoke`、`plugin.log.list`、`plugin.pane.open`、`plugin.pane.focus`、`plugin.pane.close` |
+
+### ミッションメソッド: Early Access 契約
+
+ミッション API は現在、意図と所有権を永続化しますが、管理プロバイダーとの境界は
+意図的に限定されています:
+
+| メソッド | 必須パラメータ | 現在の動作 |
+| --- | --- | --- |
+| `mission.create` | `mission_id`、`title`、絶対パスの `repository_path`、`objective`、`acceptance_criteria` | 永続的なドラフトを作成します。ID は 1–128 文字、空でない基準は 1–16 件です。同一リクエストの再実行は冪等で、内容を変えると `mission_conflict` になります。 |
+| `mission.list` | なし | 永続化されたミッション概要を返します。 |
+| `mission.get` | `mission_id` | 公開ミッション投影全体を返します。 |
+| `mission.configure` | `mission_id`、`checks` | 1–32 件のコマンドまたは手動チェックを固定します。すべての受け入れ基準をカバーする必要があり、異なる再設定は拒否されます。 |
+| `mission.start` | `mission_id`、`run_id`、`provider`、`mode`。`worktree_path` は省略可能 | 正規の Git checkout を 1 つ占有し、Codex または Claude Code を管理対象の読み取り専用モードで開始します。事前に closure plan が必要です。 |
+| `mission.respond` | `mission_id`、`run_id`、`attention_id`、`decision`。`answers` は省略可能 | 対話的な同意経路向けに予約されています。現在は常に `interactive_consent_required` を返し、プロバイダーへ応答を送りません。 |
+
+`provider` は `codex`、`claude_code`、`open_code`、`mode` は `managed` または
+`passthrough` を受け付けます。現在のビルドでは OpenCode のミッション開始とすべての
+passthrough 開始は利用不可エラーになります。管理対象の Codex と Claude Code には
+読み取り専用のワークスペースアクセスだけが与えられます。
+
+| エラーコード | 意味 |
+| --- | --- |
+| `feature_unavailable` | このプラットフォームではミッションストレージを利用できません。 |
+| `mission_not_found`、`mission_conflict` | ミッションがないか、不変の定義または設定が異なります。 |
+| `invalid_mission`、`invalid_repository`、`invalid_closure` | ID、テキスト、Git root、基準の網羅、またはチェック宣言が不正です。 |
+| `provider_unavailable`、`provider_mode_unavailable` | OpenCode 開始または passthrough モードは未配線です。 |
+| `run_conflict`、`invalid_run`、`provider_start_failed` | run ID が競合している、claim identity を作れない、またはプロバイダープロセスを開始できません。 |
+| `interactive_consent_required` | ミッション cockpit が判断を確認できるまで `mission.respond` はブロックされます。 |
+
+入れ子の `checks`、パス規則、応答判断、結果オブジェクト、フィールド長の制約は、
+操作対象と同じ Nagi バイナリに同梱された生成済みスキーマを正としてください。
 
 一部の CLI コマンドは、これらのメソッドの便利ラッパーです。たとえば `nagi agent wait` は、エージェントターゲットを解決してからペインのエージェント状態イベントを購読します。
 

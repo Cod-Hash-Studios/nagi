@@ -43,6 +43,7 @@ The socket API can:
 - list, inspect, read, send to, rename, focus, start, and attach agents through CLI helpers
 - report custom agent state from hooks and plugins
 - subscribe to events and wait for output or state changes
+- create, inspect, configure, and start durable coding-agent missions
 - install and uninstall built-in integrations
 - stop the server and reload config
 
@@ -100,6 +101,7 @@ Raw socket method names use dot notation:
 | Notification | `notification.show` |
 | Client | `client.window_title.set`, `client.window_title.clear` |
 | Session | `session.snapshot` |
+| Mission | `mission.create`, `mission.list`, `mission.get`, `mission.configure`, `mission.start`, `mission.respond` |
 | Workspace | `workspace.create`, `workspace.list`, `workspace.get`, `workspace.focus`, `workspace.rename`, `workspace.move`, `workspace.report_metadata`, `workspace.close` |
 | Worktree | `worktree.list`, `worktree.create`, `worktree.open`, `worktree.remove` |
 | Tab | `tab.create`, `tab.list`, `tab.get`, `tab.focus`, `tab.rename`, `tab.move`, `tab.close` |
@@ -110,6 +112,41 @@ Raw socket method names use dot notation:
 | Events | `events.subscribe`, `events.wait` |
 | Integrations | `integration.install`, `integration.uninstall` |
 | Plugins | `plugin.link`, `plugin.list`, `plugin.unlink`, `plugin.enable`, `plugin.disable`, `plugin.action.list`, `plugin.action.invoke`, `plugin.log.list`, `plugin.pane.open`, `plugin.pane.focus`, `plugin.pane.close` |
+
+### Mission methods: early-access contract
+
+The mission API persists intent and ownership today, but its managed provider
+boundary is intentionally narrow:
+
+| Method | Required parameters | Current behavior |
+| --- | --- | --- |
+| `mission.create` | `mission_id`, `title`, absolute `repository_path`, `objective`, `acceptance_criteria` | Creates a durable draft. IDs are 1–128 characters; there must be 1–16 non-empty criteria. Repeating the exact request is idempotent; changing it returns `mission_conflict`. |
+| `mission.list` | none | Returns durable mission summaries. |
+| `mission.get` | `mission_id` | Returns the full public mission projection. |
+| `mission.configure` | `mission_id`, `checks` | Freezes 1–32 command or manual checks. Every acceptance criterion must be covered. A different second configuration is rejected. |
+| `mission.start` | `mission_id`, `run_id`, `provider`, `mode`; optional `worktree_path` | Claims one canonical Git checkout and starts Codex or Claude Code in managed, read-only mode. The closure plan must already exist. |
+| `mission.respond` | `mission_id`, `run_id`, `attention_id`, `decision`; optional `answers` | Reserved for the interactive consent path. It currently always returns `interactive_consent_required` and does not send a provider response. |
+
+`provider` accepts `codex`, `claude_code`, or `open_code`; `mode` accepts
+`managed` or `passthrough`. In the current build, OpenCode mission start and
+all passthrough starts return an availability error. Managed Codex and Claude
+Code processes receive read-only workspace access. There is no API switch that
+silently grants write access.
+
+Mission errors use stable codes where callers need branching behavior:
+
+| Code | Meaning |
+| --- | --- |
+| `feature_unavailable` | Mission storage is unavailable on this platform. |
+| `mission_not_found`, `mission_conflict` | The mission is missing, or an immutable definition/configuration differs. |
+| `invalid_mission`, `invalid_repository`, `invalid_closure` | IDs, text, Git root, criteria coverage, or check declarations are invalid. |
+| `provider_unavailable`, `provider_mode_unavailable` | OpenCode start or passthrough mode is not wired in the current build. |
+| `run_conflict`, `invalid_run`, `provider_start_failed` | The run ID conflicts, cannot form a claim identity, or the provider process did not start. |
+| `interactive_consent_required` | `mission.respond` is blocked until the mission cockpit can confirm the decision. |
+
+The generated schema is the source of truth for nested `checks`, path rules,
+response decisions, result objects, and field-length constraints. Check the
+schema bundled with the exact Nagi binary you are controlling.
 
 Some CLI commands are conveniences around these methods. For example, `nagi agent wait` resolves an agent target and then subscribes to pane agent state events.
 
