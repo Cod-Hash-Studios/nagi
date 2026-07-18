@@ -1,3 +1,8 @@
+#![allow(
+    dead_code,
+    reason = "structured run observations are tested ahead of the public mission cockpit"
+)]
+
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
