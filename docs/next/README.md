@@ -79,6 +79,10 @@ ready only when its version matches the tested managed runtime above. Other
 versions still run as ordinary terminal processes, but are not advertised as a
 supported managed mission path.
 
+For Codex and Claude Code, `nagi doctor --probe-providers` also performs the
+real initialize handshake and exits before creating a thread or sending a user
+turn. It verifies the installed protocol without spending a model turn.
+
 ## Build from source
 
 The mission runtime currently targets Unix systems. You need Rust `1.96.1` and
@@ -101,7 +105,7 @@ variables. It does not reuse an existing Herdr session.
 Check the machine, launch Nagi, then open the cockpit:
 
 ```bash
-nagi doctor
+nagi doctor --probe-providers
 nagi
 ```
 
