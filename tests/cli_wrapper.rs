@@ -1223,13 +1223,28 @@ fn api_schema_json_prints_bundled_schema() {
         .get("protocol")
         .and_then(serde_json::Value::as_u64)
         .is_some_and(|protocol| protocol > 0));
-    assert_eq!(
-        schema
-            .get("schemas")
-            .and_then(serde_json::Value::as_object)
-            .map(serde_json::Map::len),
-        Some(5)
-    );
+    let schemas = schema
+        .get("schemas")
+        .and_then(serde_json::Value::as_object)
+        .expect("bundled API schema should expose named schemas");
+    for required in [
+        "attention_item_v1",
+        "error_response",
+        "event",
+        "mission_view_v1",
+        "plugin_inspector_input_v1",
+        "plugin_ui_document_v1",
+        "proof_receipt_v1",
+        "provider_capabilities_v1",
+        "request",
+        "subscription_event",
+        "success_response",
+    ] {
+        assert!(
+            schemas.contains_key(required),
+            "bundled API schema should include {required}"
+        );
+    }
 }
 
 #[test]
