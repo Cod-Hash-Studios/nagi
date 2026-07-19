@@ -542,8 +542,16 @@ mod tests {
         let request_id = service_request_id("mission", "run", "web");
         let mut reservation = allocator.reserve(owner, &request_id, 1).unwrap();
         let lease = reservation.prepare_service_spawn();
+        let mut service_process = Command::new("git")
+            .args(["cat-file", "--batch"])
+            .current_dir(repository.path())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
         allocator
-            .bind_service_process(lease.lease_id(), std::process::id())
+            .bind_service_process(lease.lease_id(), service_process.id())
             .unwrap();
 
         let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, lease.port())).unwrap();
@@ -584,6 +592,7 @@ mod tests {
         assert_eq!(set.ports().get("web"), Some(&lease.port()));
         set.detach();
         worker.join().unwrap();
+        terminate(&mut service_process).unwrap();
         assert!(allocator.release(&lease).unwrap());
     }
 }
