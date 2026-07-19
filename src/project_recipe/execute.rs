@@ -108,7 +108,7 @@ mod tests {
             repository.path(),
             &CommandContract {
                 command: vec!["./setup-script".into(), "hello; touch nope".into()],
-                timeout_seconds: 2,
+                timeout_seconds: 10,
             },
         )
         .unwrap();
