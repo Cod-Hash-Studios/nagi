@@ -1,28 +1,49 @@
 ---
 title: 插件市场
-description: 了解规划中的 Nagi 插件注册表,以及现在可用的直接安装方式。
+description: 安装经过验证的 Nagi 插件,并了解注册表究竟证明了什么。
 ---
 
-公开的 Nagi 插件注册表仍在规划中,尚未上线。
-[注册表页面](/plugins/)只展示当前状态,不会把继承自上游或未经验证的仓库
-列为 Nagi 插件。
+[Nagi 插件目录](/plugins/)只列出可从不可变 Git 提交复现其发布版本的
+manifest v2 沙箱插件。
 
-## 现在可用的功能
+列表不是模糊的信任徽章。它会公开清单、组件校验和、运行时、请求的能力、
+自动扫描结果、发布者、源提交,以及相较上一索引版本的能力变化。
 
-本地插件开发和从你已信任的 GitHub 仓库直接安装都可以使用:
+## 安装已列出的插件
 
 ```bash
 nagi plugin install owner/repo[/subdir...]
+nagi plugin inspect plugin.id
+nagi plugin approve plugin.id
+nagi plugin enable plugin.id
 ```
 
-仓库根目录或指定子目录必须包含 `nagi-plugin.toml`。开发时也可以链接本地
-checkout。命令、清单格式和[信任与安全](/zh-cn/docs/plugins/#信任与安全)
-请见[插件](/zh-cn/docs/plugins/)。
+插件市场中的插件使用 WASI 组件沙箱。请求能力的插件会以禁用状态安装。
+批准会绑定精确的版本、清单、组件校验和、提交和能力集合。更新只要改变其中
+任何一项,就必须重新审核。
 
-## 尚不可用的功能
+## 审核标签
 
-目前没有 `nagi-plugin` 主题的自动索引、定时刷新或公开提交流程。现在给仓库
-添加主题标签,不会让它出现在 Nagi 网站上。
+- **Official:** 由 Nagi 组织维护,并通过相同的不可变元数据和自动制品检查。
+- **Verified metadata:** 注册表已复现源代码、版本、清单、组件校验和、能力和自动扫描。
+- **Unreviewed:** 不会出现在安装目录中。GitHub 主题只是发现线索。
 
-上线前,注册表需要明确的信任模型、来源展示、滥用处理机制和清晰的审核边界。
-进展会发布在 [Nagi 仓库](https://github.com/Cod-Hash-Studios/nagi)。
+元数据已验证不代表每一行代码都经过人工审核。Star 数只表示受欢迎程度,不是安全评分。
+
+## 发布
+
+1. 发布一个 manifest v2 `wasi-component` 插件,其 `.wasm` 入口点使用相对路径。
+2. 运行 `nagi plugin validate`、`nagi plugin test` 和 `nagi plugin pack`。
+3. 从公开 GitHub 仓库发布源代码和组件。
+4. 提交[注册表申请](https://github.com/Cod-Hash-Studios/nagi/issues/new),注明仓库和插件 ID。
+
+注册表会在获取清单或组件之前,把默认分支固定到 40 字符的提交 SHA。无效清单、
+原生运行时、超大制品、扫描失败、黑名单仓库以及可变或缺失的制品都会被拒绝。
+
+## 报告与紧急移除
+
+请通过 [Nagi 安全与滥用入口](https://github.com/Cod-Hash-Studios/nagi/security)
+报告列表。维护者可以使用注册表紧急开关立即禁用仓库。刷新失败不会覆盖最后一个
+已知良好的快照。
+
+本地开发和完整能力模型请参阅[插件](/zh-cn/docs/plugins/)。

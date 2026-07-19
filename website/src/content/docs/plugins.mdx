@@ -1,9 +1,10 @@
 ---
 title: Plugins
-description: Author local Nagi plugins with manifest actions, event hooks, and panes.
+description: Build sandboxed WASI components or explicitly trusted native Nagi plugins.
 ---
 
-Nagi plugins are shareable, executable workflow packages. A plugin can be a
+Nagi plugins are shareable, executable workflow packages. Manifest v2 plugins
+are WebAssembly components hosted by Nagi. Legacy plugins can be a
 Bash script, JavaScript app, Lua script, Rust binary, or any other argv command
 your machine can run. Nagi owns the host surface: installation, manifest
 validation, keybindings, terminal panes, events, invocation context, and socket
@@ -21,7 +22,7 @@ manifest, injects runtime context, starts the declared commands, and records
 logs. The commands call back into Nagi through the CLI or socket when they need
 to do more work.
 
-There is no separate plugin SDK or restricted command set. The entire Nagi CLI
+For legacy native plugins, there is no separate restricted command set. The entire Nagi CLI
 is the plugin API: every command in the [CLI reference](/docs/cli-reference/) is
 available to a plugin, and anything you can run as `nagi ...` yourself a plugin
 can run too. Most plugins should call Nagi through `NAGI_BIN_PATH`, which
@@ -35,24 +36,71 @@ the manifest.
 
 ## Trust and security
 
-A plugin is ordinary code that runs on your machine. When you install or link
-one, its build and runtime commands run as your user, with your environment, and
-can call the full Nagi CLI — the same as any extension you add to an editor,
-shell, or coding agent. That openness is the point, and a little judgment keeps
-it safe.
+Manifest v2 components run in Wasmtime using the WASI Component Model. Nagi
+bounds component size, linear memory, tables, instances, output, fuel and wall
+time. It does not inherit the host environment, preopen filesystem paths, or
+inherit network access. A component can run without capabilities. Requested
+capabilities require `nagi plugin approve <id>` before enablement and are bound
+to the exact plugin version, manifest checksum and package checksum. A changed
+package or manifest is blocked until reviewed again. `nagi plugin revoke <id>`
+revokes the grant and disables the plugin.
+
+Approval does not synthesize host APIs. Capabilities whose broker binding is
+not implemented remain unavailable to the component. This keeps new capability
+families fail-closed.
+
+A native plugin is ordinary code that runs on your machine. Its build and
+runtime commands run as your user and can call the full Nagi CLI, just like an
+extension added to an editor, shell, or coding agent.
 
 Install plugins from authors and repositories you trust, and skim what a new one
 does first: the `nagi-plugin.toml` manifest and the scripts or binaries it runs.
-`nagi plugin install` shows a preview of the source and the commands it will run
-in interactive terminals, so you can review before confirming. Use `--yes` for
-sources you already trust, and pin `--ref` when you want a specific revision.
+`nagi plugin install` shows the source, revision, build commands, and the
+unrestricted-access warning before asking for confirmation. In an interactive
+terminal, accepting that prompt records native trust. Non-interactive installs
+must pass both `--yes` and `--trust-native`. Local links use
+`nagi plugin link <path> --trust-native`; without that flag they are registered
+disabled and cannot be enabled. Relink an existing disabled plugin with the
+flag to grant trust. Pin `--ref` when you want a specific revision.
 
-Nagi validates the manifest and keeps each plugin's config and state in its own
-directory, but it does not review or sandbox what a plugin does. Third-party
-plugins come from their authors, not from Nagi, so they are yours to vet and run
-at your own discretion.
+Nagi validates the manifest, requires this explicit trust gate, scrubs inherited
+environment variables, and keeps each plugin's config and state in its own
+directory. It does not sandbox a native plugin. Existing registry entries that
+predate the trust field migrate to disabled and untrusted.
 
-## Manifest
+## Manifest v2: sandboxed component
+
+```toml
+manifest_version = 2
+id = "example.review"
+name = "Review current mission"
+version = "1.0.0"
+min_nagi_version = "0.7.4"
+runtime = "wasi-component"
+entrypoint = "plugin.wasm"
+capabilities = []
+
+[[contributions.commands]]
+id = "review"
+title = "Review current mission"
+contexts = ["mission"]
+```
+
+Link a zero-capability component directly:
+
+```bash
+nagi plugin link ./example-review
+```
+
+If the manifest requests capabilities, Nagi links remote installs disabled.
+Review the source and declared capabilities, then run:
+
+```bash
+nagi plugin approve example.review
+nagi plugin enable example.review
+```
+
+## Legacy manifest: trusted native
 
 The manifest is the contract between Nagi and the plugin. It declares package
 metadata, supported platforms, optional build commands, and the entrypoints

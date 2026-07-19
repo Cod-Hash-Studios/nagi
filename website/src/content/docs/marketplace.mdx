@@ -1,32 +1,61 @@
 ---
 title: Marketplace
-description: Understand the planned Nagi plugin registry and use direct installation today.
+description: Install verified Nagi plugins and understand exactly what the registry proves.
 ---
 
-The public Nagi plugin registry is planned, but it is not live yet. The
-[registry page](/plugins/) tracks that status without listing inherited or
-unverified repositories as Nagi plugins.
+The [Nagi plugin directory](/plugins/) lists sandboxed manifest v2 plugins whose
+published version can be reproduced from an immutable Git commit.
 
-## What works today
+A listing is not a vague trust badge. It exposes the manifest, component
+checksum, runtime, requested capabilities, automated scan result, publisher,
+source commit, and capability changes from the previous indexed version.
 
-Local plugin development and direct GitHub installation work. Install a plugin
-from a repository you already trust:
+## Install a listed plugin
 
 ```bash
 nagi plugin install owner/repo[/subdir...]
+nagi plugin inspect plugin.id
+nagi plugin approve plugin.id
+nagi plugin enable plugin.id
 ```
 
-The repository needs a `nagi-plugin.toml` manifest at its root or in the chosen
-subdirectory. You can also link a local checkout while developing. See
-[Plugins](/docs/plugins/) for the commands, manifest format, and
-[trust guidance](/docs/plugins/#trust-and-security).
+Marketplace plugins use the WASI component sandbox. A plugin that requests
+capabilities installs disabled. Approval binds the exact version, manifest,
+component checksum, commit, and capability set. An update that changes any of
+those bindings returns to review.
 
-## What does not work yet
+## Review labels
 
-There is no automatic `nagi-plugin` topic index, listing refresh schedule, or
-public submission flow. Adding a topic to a repository will not make it appear
-on the Nagi site today.
+- **Official:** maintained in the Nagi organization and passed the same
+  immutable metadata and automated artifact checks.
+- **Verified metadata:** source, version, manifest, component checksum,
+  capabilities, and automated scans were reproduced by the registry.
+- **Unreviewed:** never appears in the install directory. A GitHub topic alone
+  is only a discovery signal.
 
-Before launch, the registry needs an explicit trust model, provenance display,
-abuse handling, and clear review boundaries. Progress will be published on the
-[Nagi repository](https://github.com/Cod-Hash-Studios/nagi).
+Verified metadata does not claim that a human audited every line. Stars are
+popularity metadata, never a security score.
+
+## Publish
+
+1. Ship a manifest v2 `wasi-component` plugin with a relative `.wasm`
+   entrypoint.
+2. Run `nagi plugin validate`, `nagi plugin test`, and `nagi plugin pack`.
+3. Publish the source and component from a public GitHub repository.
+4. Open a [registry submission](https://github.com/Cod-Hash-Studios/nagi/issues/new)
+   with the repository and intended plugin id.
+
+The registry pins the default branch to a 40-character commit SHA before it
+fetches the manifest or component. Invalid manifests, native runtimes,
+oversized artifacts, failed scans, blacklisted repositories, and mutable or
+missing artifacts fail closed.
+
+## Reports and emergency removal
+
+Report a listing through the
+[Nagi security and abuse intake](https://github.com/Cod-Hash-Studios/nagi/security).
+Maintainers can disable a repository immediately through the registry kill
+switch. A failed refresh never overwrites the last known-good snapshot.
+
+For local development and the complete capability model, see
+[Plugins](/docs/plugins/).
