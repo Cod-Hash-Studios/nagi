@@ -1,6 +1,6 @@
 use std::{
     path::Path,
-    sync::mpsc,
+    sync::{mpsc, OnceLock},
     time::{Duration, Instant},
 };
 
@@ -208,17 +208,26 @@ fn load_component(path: &Path) -> Result<(Engine, Component), String> {
             "sandbox component must be a non-empty file no larger than {MAX_COMPONENT_BYTES} bytes"
         ));
     }
-    let mut config = Config::new();
-    config
-        .wasm_component_model(true)
-        .consume_fuel(true)
-        .epoch_interruption(true)
-        .cranelift_nan_canonicalization(true);
-    let engine = Engine::new(&config)
-        .map_err(|error| format!("sandbox engine configuration failed: {error}"))?;
+    let engine = sandbox_engine()?;
     let component = Component::from_file(&engine, path)
         .map_err(|error| format!("sandbox component validation failed: {error}"))?;
     Ok((engine, component))
+}
+
+fn sandbox_engine() -> Result<Engine, String> {
+    static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
+    ENGINE
+        .get_or_init(|| {
+            let mut config = Config::new();
+            config
+                .wasm_component_model(true)
+                .consume_fuel(true)
+                .epoch_interruption(true)
+                .cranelift_nan_canonicalization(true);
+            Engine::new(&config)
+                .map_err(|error| format!("sandbox engine configuration failed: {error}"))
+        })
+        .clone()
 }
 
 #[cfg(test)]
@@ -273,6 +282,33 @@ mod tests {
         assert_eq!(result.stdout, "");
         assert_eq!(result.stderr, "");
         assert_eq!(result.error, None);
+    }
+
+    #[test]
+    fn component_loads_share_the_process_sandbox_engine() {
+        let directory = write_component(
+            "shared-engine",
+            r#"
+                (component
+                    (core module $module
+                        (func (export "run") (result i32)
+                            i32.const 0))
+                    (core instance $instance (instantiate $module))
+                    (type $result (result))
+                    (type $run (func (result $result)))
+                    (func $run (type $run)
+                        (canon lift (core func $instance "run")))
+                    (instance $exports
+                        (export "run" (func $run)))
+                    (export "wasi:cli/run@0.2.0" (instance $exports)))
+            "#,
+        );
+        let path = directory.path().join("plugin.wasm");
+
+        let (first, _) = load_component(&path).unwrap();
+        let (second, _) = load_component(&path).unwrap();
+
+        assert!(Engine::same(&first, &second));
     }
 
     #[test]
