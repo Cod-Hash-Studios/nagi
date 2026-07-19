@@ -3467,7 +3467,11 @@ command = ["sh", "-c", "sleep 5"]
     );
     assert_eq!(workspace["result"]["type"], "workspace_created");
 
-    let linked = run_cli_json_in_dir(&socket_path, &["plugin", "link", "plugins/layout"], &base);
+    let linked = run_cli_json_in_dir(
+        &socket_path,
+        &["plugin", "link", "plugins/layout", "--trust-native"],
+        &base,
+    );
     assert_eq!(linked["result"]["type"], "plugin_linked");
     assert_eq!(linked["result"]["plugin"]["plugin_id"], "example.layout");
     assert_eq!(linked["result"]["plugin"]["actions"][0]["id"], "apply");
