@@ -36,9 +36,8 @@ fn registry_exposes_one_versioned_adapter_per_first_party_provider() {
         assert_eq!(
             descriptor.runtime_version,
             match provider {
-                ProviderKind::Codex | ProviderKind::ClaudeCode => {
-                    ProviderRuntimeVersion::NotPinned
-                }
+                ProviderKind::Codex => ProviderRuntimeVersion::Exact("0.144.5"),
+                ProviderKind::ClaudeCode => ProviderRuntimeVersion::Exact("2.1.212"),
                 ProviderKind::OpenCode => ProviderRuntimeVersion::Exact("1.18.3"),
                 ProviderKind::Acp => ProviderRuntimeVersion::NotPinned,
             }

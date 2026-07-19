@@ -18,6 +18,8 @@ pub(crate) use acp::AcpEndpoint;
 pub(crate) use adapter::{
     AdapterContractVersion, ProviderAdapterDescriptor, ProviderCapabilities, ProviderRuntimeVersion,
 };
+pub(crate) use claude::TESTED_VERSION as CLAUDE_TESTED_VERSION;
+pub(crate) use codex::TESTED_VERSION as CODEX_TESTED_VERSION;
 pub(crate) use opencode::TESTED_VERSION as OPENCODE_TESTED_VERSION;
 
 const COMMAND_CHANNEL_CAPACITY: usize = 32;

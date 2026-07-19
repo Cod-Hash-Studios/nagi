@@ -21,7 +21,7 @@ static CODEX: FirstPartyAdapter = FirstPartyAdapter::new(
         provider: ProviderKind::Codex,
         contract_version: AdapterContractVersion::CURRENT,
         capabilities: FULL_MANAGED_CAPABILITIES,
-        runtime_version: ProviderRuntimeVersion::NotPinned,
+        runtime_version: ProviderRuntimeVersion::Exact(super::codex::TESTED_VERSION),
     },
     super::codex::spawn,
 );
@@ -31,7 +31,7 @@ static CLAUDE_CODE: FirstPartyAdapter = FirstPartyAdapter::new(
         provider: ProviderKind::ClaudeCode,
         contract_version: AdapterContractVersion::CURRENT,
         capabilities: FULL_MANAGED_CAPABILITIES,
-        runtime_version: ProviderRuntimeVersion::NotPinned,
+        runtime_version: ProviderRuntimeVersion::Exact(super::claude::TESTED_VERSION),
     },
     super::claude::spawn,
 );

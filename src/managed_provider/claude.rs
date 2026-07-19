@@ -20,6 +20,7 @@ use super::{
 
 const MAX_PROVIDER_FRAME_BYTES: usize = 1024 * 1024;
 const MAX_VISIBLE_TEXT_BYTES: usize = 16 * 1024;
+pub(crate) const TESTED_VERSION: &str = "2.1.212";
 const MAX_IDENTIFIER_BYTES: usize = 1024;
 const MAX_QUESTION_BYTES: usize = 4 * 1024;
 const MAX_ANSWER_BYTES: usize = 4 * 1024;

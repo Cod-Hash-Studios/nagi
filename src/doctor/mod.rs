@@ -70,8 +70,18 @@ pub(crate) fn inspect(cwd: &Path) -> DoctorReport {
 
     let mut provider_count = 0;
     for (id, label, binary, exact_version) in [
-        ("codex", "Codex", "codex", None),
-        ("claude", "Claude Code", "claude", None),
+        (
+            "codex",
+            "Codex",
+            "codex",
+            Some(crate::managed_provider::CODEX_TESTED_VERSION),
+        ),
+        (
+            "claude",
+            "Claude Code",
+            "claude",
+            Some(crate::managed_provider::CLAUDE_TESTED_VERSION),
+        ),
         (
             "opencode",
             "OpenCode",
@@ -109,10 +119,10 @@ pub(crate) fn inspect(cwd: &Path) -> DoctorReport {
                 id,
                 label,
                 format!(
-                    "{}; Nagi's tested OpenCode version is {expected}",
+                    "{}; Nagi's tested {label} version is {expected}",
                     version.unwrap_or_else(|error| error)
                 ),
-                format!("Install OpenCode {expected} or choose another provider"),
+                format!("Install {label} {expected} or choose another provider"),
             ));
         }
     }
@@ -290,11 +300,63 @@ fn extract_version(output: &str) -> Option<&str> {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    fn write_version_fixture(directory: &Path, binary: &str, version: &str) {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let executable = directory.join(binary);
+        std::fs::write(
+            &executable,
+            format!("#!/bin/sh\nprintf '%s\\n' '{version}'\n"),
+        )
+        .unwrap();
+        let mut permissions = std::fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(executable, permissions).unwrap();
+    }
+
     #[test]
     fn version_extraction_accepts_common_provider_outputs() {
         assert_eq!(extract_version("opencode 1.18.3"), Some("1.18.3"));
         assert_eq!(extract_version("claude v2.1.0"), Some("2.1.0"));
         assert_eq!(extract_version("version unavailable"), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn doctor_accepts_only_pinned_first_party_provider_versions() {
+        let _guard = crate::config::test_config_env_lock().lock().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        for binary in ["codex", "claude", "opencode"] {
+            write_version_fixture(directory.path(), binary, "0.0.0");
+        }
+        let previous_path = std::env::var_os("PATH");
+        let previous_term = std::env::var_os("TERM");
+        unsafe {
+            std::env::set_var("PATH", directory.path());
+            std::env::set_var("TERM", "xterm-256color");
+        }
+
+        let unsupported = inspect(directory.path());
+
+        write_version_fixture(directory.path(), "codex", "codex-cli 0.144.5");
+        write_version_fixture(directory.path(), "claude", "2.1.212 (Claude Code)");
+        write_version_fixture(directory.path(), "opencode", "opencode 1.18.3");
+        let supported = inspect(directory.path());
+
+        unsafe {
+            match previous_path {
+                Some(path) => std::env::set_var("PATH", path),
+                None => std::env::remove_var("PATH"),
+            }
+            match previous_term {
+                Some(term) => std::env::set_var("TERM", term),
+                None => std::env::remove_var("TERM"),
+            }
+        }
+
+        assert_eq!(unsupported.provider_count, 0);
+        assert_eq!(supported.provider_count, 3);
     }
 
     #[cfg(unix)]

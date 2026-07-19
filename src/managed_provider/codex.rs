@@ -19,6 +19,7 @@ use super::{
 
 const MAX_PROVIDER_FRAME_BYTES: usize = 1024 * 1024;
 const MAX_VISIBLE_TEXT_BYTES: usize = 16 * 1024;
+pub(crate) const TESTED_VERSION: &str = "0.144.5";
 #[cfg(not(test))]
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(test)]
