@@ -1743,6 +1743,7 @@ mod tests {
         app.state.installed_plugins.insert(
             "example.ui-worktree-create".into(),
             crate::api::schema::InstalledPluginInfo {
+                manifest_version: 1,
                 plugin_id: "example.ui-worktree-create".into(),
                 name: "UI Worktree Create".into(),
                 version: "0.1.0".into(),
@@ -1751,6 +1752,10 @@ mod tests {
                 manifest_path: manifest_path.display().to_string(),
                 plugin_root: plugin_root.display().to_string(),
                 enabled: true,
+                runtime: crate::api::schema::PluginRuntimeV2::TrustedNative,
+                entrypoint: None,
+                requested_capabilities: Vec::new(),
+                native_trusted: true,
                 platforms: None,
                 build: Vec::new(),
                 actions: Vec::new(),
@@ -1761,6 +1766,7 @@ mod tests {
                 }],
                 panes: Vec::new(),
                 link_handlers: Vec::new(),
+                inspector_tabs: Vec::new(),
                 source: crate::api::schema::PluginSourceInfo::default(),
                 warnings: Vec::new(),
             },

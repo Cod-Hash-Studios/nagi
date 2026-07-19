@@ -350,6 +350,12 @@ fn api_method_name(method: &Method) -> &'static str {
         Method::MissionConfigure(_) => "mission.configure",
         Method::MissionStart(_) => "mission.start",
         Method::MissionRespond(_) => "mission.respond",
+        Method::MissionProofGet(_) => "mission.proof.get",
+        Method::MissionHandoffPreview(_) => "mission.handoff.preview",
+        Method::MissionHandoffStart(_) => "mission.handoff.start",
+        Method::MissionClose(_) => "mission.close",
+        Method::AttentionList(_) => "attention.list",
+        Method::AttentionGet(_) => "attention.get",
         Method::WorkspaceCreate(_) => "workspace.create",
         Method::WorkspaceList(_) => "workspace.list",
         Method::WorkspaceGet(_) => "workspace.get",
@@ -423,6 +429,8 @@ fn api_method_name(method: &Method) -> &'static str {
         Method::PluginUnlink(_) => "plugin.unlink",
         Method::PluginEnable(_) => "plugin.enable",
         Method::PluginDisable(_) => "plugin.disable",
+        Method::PluginCapabilityApprove(_) => "plugin.capability.approve",
+        Method::PluginCapabilityRevoke(_) => "plugin.capability.revoke",
         Method::PluginActionList(_) => "plugin.action.list",
         Method::PluginActionInvoke(_) => "plugin.action.invoke",
         Method::PluginLogList(_) => "plugin.log.list",
@@ -814,12 +822,10 @@ mod tests {
     use std::io::{BufRead, BufReader};
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixListener;
-    use std::sync::{Mutex, OnceLock};
     use tokio::sync::mpsc;
 
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
+    fn env_lock() -> &'static std::sync::Mutex<()> {
+        crate::config::test_config_env_lock()
     }
 
     fn unique_test_path(name: &str) -> PathBuf {

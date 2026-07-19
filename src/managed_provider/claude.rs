@@ -13,8 +13,9 @@ use tokio::{
 };
 
 use super::{
-    AttentionClass, ProviderAttention, ProviderCommand, ProviderEvent, ProviderResponse,
-    ResponseToken, RpcId, StartOrResume, TransportFailure, TurnOutcome,
+    AttentionClass, ProviderAttention, ProviderCommand, ProviderEvent, ProviderQuestion,
+    ProviderQuestionOption, ProviderResponse, ResponseToken, RpcId, StartOrResume,
+    TransportFailure, TurnOutcome,
 };
 
 const MAX_PROVIDER_FRAME_BYTES: usize = 1024 * 1024;
@@ -472,6 +473,7 @@ impl Actor {
             turn_id,
             item_id: request.tool_use_id.clone(),
             requested_action: request.requested_action.clone(),
+            questions: request.provider_questions(),
         };
         self.pending_attentions.insert(audit_id, request);
         self.turn_deadline = None;
@@ -746,6 +748,30 @@ impl NormalizedControlRequest {
             NormalizedRequestKind::Permission { .. } => PERMISSION_METHOD,
             NormalizedRequestKind::Questions { .. } => QUESTION_METHOD,
         }
+    }
+
+    fn provider_questions(&self) -> Vec<ProviderQuestion> {
+        let NormalizedRequestKind::Questions { questions } = &self.kind else {
+            return Vec::new();
+        };
+        questions
+            .iter()
+            .map(|question| ProviderQuestion {
+                id: question.question.clone(),
+                header: question.header.clone(),
+                prompt: question.question.clone(),
+                options: question
+                    .options
+                    .iter()
+                    .map(|option| ProviderQuestionOption {
+                        label: option.label.clone(),
+                        description: option.description.clone(),
+                    })
+                    .collect(),
+                multiple: question.multi_select,
+                custom_allowed: true,
+            })
+            .collect()
     }
 
     #[cfg(test)]
@@ -1253,6 +1279,9 @@ mod tests {
         .unwrap();
         assert_eq!(question.class(), AttentionClass::UserInput);
         assert_eq!(question.requested_action(), "Which database?");
+        let provider_questions = question.provider_questions();
+        assert_eq!(provider_questions[0].id, "Which database?");
+        assert_eq!(provider_questions[0].options[0].label, "Postgres");
         let question_response = question
             .response_payload(ProviderResponse::Answers(BTreeMap::from([(
                 "Which database?".to_owned(),

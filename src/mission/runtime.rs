@@ -1,7 +1,7 @@
-use std::path::Path;
-
-#[cfg(test)]
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use thiserror::Error;
 
@@ -11,23 +11,21 @@ use super::{
         WorktreeLease,
     },
     digest::CanonicalDigest,
-    evidence::CheckDeclaration,
-    model::{MissionDefinition, MissionStatus, ProviderKind, ProviderMode},
-    proof::ClosurePlan,
+    evidence::{CheckDeclaration, EvidenceRecord, WorkspaceSnapshot},
+    evidence_pack::{EvidencePack, EvidencePackError, EvidencePackStore},
+    handoff::MissionHandoffError,
+    model::{MissionDefinition, MissionStatus, ProviderKind, ProviderMode, ReadyProof},
+    proof::{ClosurePlan, ProofError, ProofEvaluator, ProofIdentity},
     store::{
-        CommitOutcome, MissionStore, MissionStoreError, MissionStoreReader, MissionView,
-        PersistableMissionEvent, PreparedMissionStore, ReleasedMissionStore,
+        CommitOutcome, DurableAttentionView, MissionStore, MissionStoreError, MissionStoreReader,
+        MissionView, PersistableMissionEvent, PreparedMissionStore, ReleasedMissionStore,
     },
 };
 
 #[cfg(unix)]
 use super::store::HandoffFence;
 
-#[cfg(test)]
-use super::{
-    evidence::{EvidenceRecord, WorkspaceSnapshot},
-    proof::{digest_attention, digest_evidence, ProofIdentity},
-};
+use super::proof::{digest_attention, digest_evidence};
 
 #[derive(Debug)]
 pub(crate) struct AuthoritySnapshot {
@@ -145,6 +143,7 @@ enum Ownership {
 pub(crate) struct MissionRuntime {
     ownership: Ownership,
     claims: Option<WorktreeClaimRegistry>,
+    evidence_packs: Option<EvidencePackStore>,
 }
 
 #[derive(Debug)]
@@ -184,6 +183,20 @@ pub(crate) struct StartRun {
     pub(crate) mode: ProviderMode,
     pub(crate) worktree_path: String,
     pub(crate) request_id: ClaimRequestId,
+    pub(crate) execute_declared_checks: bool,
+    pub(crate) execute_project_recipe: bool,
+    pub(crate) at_millis: u64,
+}
+
+#[derive(Debug)]
+pub(crate) struct ContinueRun {
+    pub(crate) mission_id: String,
+    pub(crate) source_run_id: String,
+    pub(crate) run_id: String,
+    pub(crate) provider: ProviderKind,
+    pub(crate) mode: ProviderMode,
+    pub(crate) request_id: ClaimRequestId,
+    pub(crate) handoff_artifact_sha256: String,
     pub(crate) at_millis: u64,
 }
 
@@ -193,14 +206,24 @@ pub(crate) struct StartRunOutcome {
     pub(crate) lease: WorktreeLease,
 }
 
+#[derive(Debug)]
+pub(crate) struct FinalizeEvidenceOutcome {
+    pub(crate) mission: MissionView,
+    pub(crate) pack_digest: String,
+    pub(crate) verified: bool,
+}
+
 impl MissionRuntime {
     pub(crate) fn open_owned(
         session_data_dir: &Path,
         global_claim_directory: &Path,
     ) -> Result<Self, MissionRuntimeError> {
+        let store = MissionStore::open(session_data_dir)?;
+        let evidence_packs = EvidencePackStore::open(session_data_dir)?;
         Ok(Self {
-            ownership: Ownership::Owned(MissionStore::open(session_data_dir)?),
+            ownership: Ownership::Owned(store),
             claims: Some(WorktreeClaimRegistry::new(global_claim_directory)?),
+            evidence_packs: Some(evidence_packs),
         })
     }
 
@@ -212,6 +235,7 @@ impl MissionRuntime {
         Self {
             ownership: Ownership::Disabled,
             claims: None,
+            evidence_packs: None,
         }
     }
 
@@ -246,10 +270,10 @@ impl MissionRuntime {
         Ok(Self {
             ownership: Ownership::Observing(reader),
             claims: Some(WorktreeClaimRegistry::new(global_claim_directory)?),
+            evidence_packs: Some(EvidencePackStore::open(session_data_dir)?),
         })
     }
 
-    #[cfg(test)]
     pub(crate) fn capture_authority(
         &self,
         lease: &WorktreeLease,
@@ -284,6 +308,206 @@ impl MissionRuntime {
             sequence,
             captured_at_millis,
         })
+    }
+
+    pub(crate) fn finalize_evidence_pack(
+        &mut self,
+        pack: EvidencePack,
+        lease: &WorktreeLease,
+        at_millis: u64,
+    ) -> Result<FinalizeEvidenceOutcome, MissionRuntimeError> {
+        self.ensure_available()?;
+        let mission = self
+            .mission(pack.mission_id())
+            .ok_or(MissionRuntimeError::MissionMissing)?;
+        let archive_requested = mission.status == MissionStatus::ReadyToClose;
+        if !matches!(
+            mission.status,
+            MissionStatus::ReviewRequired | MissionStatus::ReadyToClose
+        ) {
+            return Err(MissionRuntimeError::EvidenceNotReviewable);
+        }
+        let run = mission
+            .run
+            .as_ref()
+            .ok_or(MissionRuntimeError::EvidenceScopeMismatch)?;
+        let expected_identity = ProofIdentity::new(
+            &mission.mission_id,
+            &run.run_id,
+            &mission.repository_path,
+            &run.worktree_path,
+            &run.base_revision,
+        )
+        .map_err(|_| MissionRuntimeError::EvidenceScopeMismatch)?;
+        if pack.run_id() != run.run_id
+            || pack.identity() != &expected_identity
+            || pack.created_at_millis() > at_millis
+        {
+            return Err(MissionRuntimeError::EvidenceScopeMismatch);
+        }
+        if !self.claims()?.is_current(lease)? {
+            return Err(MissionRuntimeError::LeaseNotCurrent);
+        }
+        let checkout_root = std::fs::canonicalize(&run.worktree_path)
+            .map_err(|_| MissionRuntimeError::LeaseScopeMismatch)?;
+        if !lease.matches_scope(&mission.mission_id, &run.run_id, &checkout_root) {
+            return Err(MissionRuntimeError::LeaseScopeMismatch);
+        }
+
+        let pack_store = self
+            .evidence_packs
+            .as_ref()
+            .ok_or(MissionRuntimeError::FeatureUnavailable)?;
+        let pack_digest = pack_store.persist(&pack)?;
+        let workspace_hash = pack.current_workspace().digest();
+        let mut pack_event_id = CanonicalDigest::new(b"mission-evidence-pack-event-id-v1");
+        pack_event_id.string(&mission.mission_id);
+        pack_event_id.string(&run.run_id);
+        pack_event_id.string(&pack_digest);
+        self.commit(
+            &format!("evidence-pack:{}", pack_event_id.finish()),
+            PersistableMissionEvent::EvidencePackRecorded {
+                mission_id: mission.mission_id.clone(),
+                run_id: run.run_id.clone(),
+                pack_digest: pack_digest.clone(),
+                workspace_hash: workspace_hash.clone(),
+                at_millis,
+            },
+        )?;
+        for (check_id, status) in pack.summaries() {
+            let mut event_id = CanonicalDigest::new(b"mission-evidence-summary-event-id-v1");
+            event_id.string(&mission.mission_id);
+            event_id.string(&pack_digest);
+            event_id.string(check_id);
+            self.commit(
+                &format!("evidence-summary:{}", event_id.finish()),
+                PersistableMissionEvent::EvidenceChanged {
+                    mission_id: mission.mission_id.clone(),
+                    check_id: check_id.clone(),
+                    status: *status,
+                    workspace_hash: workspace_hash.clone(),
+                    at_millis,
+                },
+            )?;
+        }
+
+        let definition = MissionDefinition::new(
+            &mission.mission_id,
+            &mission.title,
+            &mission.repository_path,
+            &mission.objective,
+            mission.acceptance_criteria.clone(),
+        )
+        .map_err(|_| MissionRuntimeError::InvalidClosurePlan)?;
+        let closure_plan = ClosurePlan::new(
+            &definition.acceptance_criterion_ids(),
+            &mission.check_declarations,
+        )
+        .map_err(|_| MissionRuntimeError::InvalidClosurePlan)?;
+        let unresolved_attention_ids = self.unresolved_attention_ids(&mission.mission_id)?;
+        let authority = self.capture_authority(
+            lease,
+            &expected_identity,
+            pack.current_workspace(),
+            pack.records(),
+            &unresolved_attention_ids,
+            at_millis,
+        )?;
+        let report = ProofEvaluator::evaluate(
+            &expected_identity,
+            &closure_plan,
+            &mission.check_declarations,
+            pack.records(),
+            pack.current_workspace(),
+            &unresolved_attention_ids,
+            &authority,
+        )?;
+        let verified = match report.into_verified() {
+            Ok(verified) => Some(verified),
+            Err(ProofError::ReportNotVerified) => None,
+            Err(error) => return Err(error.into()),
+        };
+        if let Some(verified) = verified {
+            if archive_requested {
+                let ready_receipt = mission
+                    .ready_receipt
+                    .as_ref()
+                    .ok_or(MissionRuntimeError::ProofUnavailable)?;
+                if verified.subject_digest() != ready_receipt.subject_digest()
+                    || verified.authority_sequence() <= ready_receipt.authority_sequence()
+                    || verified.verified_at_millis() < ready_receipt.verified_at_millis()
+                {
+                    self.transition_run(&mission.mission_id, MissionStatus::Blocked, at_millis)?;
+                    return Err(MissionRuntimeError::ProofBindingMismatch);
+                }
+                let mut reason = CanonicalDigest::new(b"mission-archive-reason-v1");
+                reason.string(&pack_digest);
+                let event = PersistableMissionEvent::mission_archived(
+                    &mission.mission_id,
+                    crate::mission::model::ArchiveProof::from_verified(
+                        &mission.mission_id,
+                        ready_receipt.seal_digest(),
+                        verified,
+                    ),
+                    "nagi-verifier",
+                    reason.finish(),
+                    at_millis,
+                )?;
+                let mut event_id = CanonicalDigest::new(b"mission-archive-event-id-v1");
+                event_id.string(&mission.mission_id);
+                event_id.string(&pack_digest);
+                self.commit(&format!("mission-archive:{}", event_id.finish()), event)?;
+            } else {
+                let mut reason = CanonicalDigest::new(b"mission-ready-reason-v1");
+                reason.string(&pack_digest);
+                let event = PersistableMissionEvent::mission_ready(
+                    &mission.mission_id,
+                    ReadyProof::from_verified(&mission.mission_id, verified),
+                    "nagi-verifier",
+                    reason.finish(),
+                    at_millis,
+                )?;
+                let mut event_id = CanonicalDigest::new(b"mission-ready-event-id-v1");
+                event_id.string(&mission.mission_id);
+                event_id.string(&pack_digest);
+                self.commit(&format!("mission-ready:{}", event_id.finish()), event)?;
+            }
+        } else if archive_requested {
+            self.transition_run(&mission.mission_id, MissionStatus::Blocked, at_millis)?;
+        }
+        let mission = self
+            .mission(&mission.mission_id)
+            .ok_or(MissionRuntimeError::MissionMissing)?;
+        Ok(FinalizeEvidenceOutcome {
+            verified: if archive_requested {
+                mission.status == MissionStatus::Archived
+            } else {
+                mission.status == MissionStatus::ReadyToClose
+            },
+            mission,
+            pack_digest,
+        })
+    }
+
+    pub(crate) fn load_evidence_pack(
+        &self,
+        digest: &str,
+    ) -> Result<EvidencePack, MissionRuntimeError> {
+        Ok(self
+            .evidence_packs
+            .as_ref()
+            .ok_or(MissionRuntimeError::FeatureUnavailable)?
+            .load(digest)?)
+    }
+
+    fn unresolved_attention_ids(
+        &self,
+        mission_id: &str,
+    ) -> Result<BTreeSet<String>, MissionRuntimeError> {
+        let Ownership::Owned(store) = &self.ownership else {
+            return Err(MissionRuntimeError::InvalidOwnership);
+        };
+        Ok(store.projection().unresolved_attention_ids(mission_id)?)
     }
 
     pub(crate) fn commit(
@@ -433,13 +657,15 @@ impl MissionRuntime {
                 return Err(error);
             }
         };
-        let event = match PersistableMissionEvent::run_started(
+        let event = match PersistableMissionEvent::run_started_with_check_execution(
             &request.mission_id,
             &request.run_id,
             request.provider,
             request.mode,
             worktree.to_string_lossy(),
             base_revision,
+            request.execute_declared_checks,
+            request.execute_project_recipe,
             request.at_millis,
         ) {
             Ok(event) => event,
@@ -452,6 +678,81 @@ impl MissionRuntime {
         event_id.string(&request.mission_id);
         event_id.string(&request.run_id);
         if let Err(error) = self.commit(&format!("run-start:{}", event_id.finish()), event) {
+            let _ = self.release_worktree(&lease);
+            return Err(error);
+        }
+        Ok(StartRunOutcome {
+            mission: self
+                .mission(&request.mission_id)
+                .ok_or(MissionRuntimeError::MissionMissing)?,
+            lease,
+        })
+    }
+
+    pub(crate) fn continue_run(
+        &mut self,
+        request: ContinueRun,
+    ) -> Result<StartRunOutcome, MissionRuntimeError> {
+        let mission = self
+            .mission(&request.mission_id)
+            .ok_or(MissionRuntimeError::MissionMissing)?;
+        if !matches!(
+            mission.status,
+            MissionStatus::Blocked
+                | MissionStatus::Failed
+                | MissionStatus::ReviewRequired
+                | MissionStatus::ReadyToClose
+        ) {
+            return Err(MissionHandoffError::InvalidSourceState.into());
+        }
+        if mission.unresolved_attention_count != 0 {
+            return Err(MissionHandoffError::UnresolvedAttention.into());
+        }
+        let source = mission
+            .run
+            .as_ref()
+            .ok_or(MissionHandoffError::SourceRunMissing)?;
+        if source.run_id != request.source_run_id {
+            return Err(MissionStoreError::RunMismatch.into());
+        }
+        if source.provider == request.provider {
+            return Err(MissionHandoffError::SameProvider.into());
+        }
+        let repository = std::fs::canonicalize(&mission.repository_path)
+            .map_err(|_| MissionRuntimeError::RepositoryUnavailable)?;
+        let worktree = std::fs::canonicalize(&source.worktree_path)
+            .map_err(|_| MissionRuntimeError::RepositoryUnavailable)?;
+        let lease = self.claim_worktree(
+            LeaseOwner::new(&request.mission_id, &request.run_id)?,
+            &repository,
+            &worktree,
+            request.request_id,
+        )?;
+        let event = match PersistableMissionEvent::run_continued(
+            &request.mission_id,
+            &request.source_run_id,
+            &request.run_id,
+            request.provider,
+            request.mode,
+            worktree.to_string_lossy(),
+            &source.base_revision,
+            source.execute_declared_checks,
+            source.execute_project_recipe,
+            &request.handoff_artifact_sha256,
+            request.at_millis,
+        ) {
+            Ok(event) => event,
+            Err(error) => {
+                let _ = self.release_worktree(&lease);
+                return Err(error.into());
+            }
+        };
+        let mut event_id = CanonicalDigest::new(b"mission-run-continue-event-id-v1");
+        event_id.string(&request.mission_id);
+        event_id.string(&request.source_run_id);
+        event_id.string(&request.run_id);
+        event_id.string(&request.handoff_artifact_sha256);
+        if let Err(error) = self.commit(&format!("run-continue:{}", event_id.finish()), event) {
             let _ = self.release_worktree(&lease);
             return Err(error);
         }
@@ -564,6 +865,13 @@ impl MissionRuntime {
             return Vec::new();
         };
         store.projection().mission_views()
+    }
+
+    pub(crate) fn attention_items(&self) -> Vec<DurableAttentionView> {
+        let Ownership::Owned(store) = &self.ownership else {
+            return Vec::new();
+        };
+        store.projection().attention_views()
     }
 
     pub(crate) fn claim_worktree(
@@ -685,6 +993,12 @@ pub(crate) enum MissionRuntimeError {
     Store(#[from] MissionStoreError),
     #[error(transparent)]
     WorktreeClaim(#[from] WorktreeClaimError),
+    #[error(transparent)]
+    EvidencePack(#[from] EvidencePackError),
+    #[error(transparent)]
+    Proof(#[from] ProofError),
+    #[error(transparent)]
+    Handoff(#[from] MissionHandoffError),
     #[error("mission handoff fence does not match the observed journal")]
     FenceMismatch,
     #[error("mission runtime is not in the required ownership state")]
@@ -703,6 +1017,10 @@ pub(crate) enum MissionRuntimeError {
         reason = "proof authority validation is staged until public mission closure"
     )]
     EmptyAuthority,
+    #[error("mission evidence does not match the durable run scope")]
+    EvidenceScopeMismatch,
+    #[error("mission evidence can only be finalized from review_required or ready_to_close")]
+    EvidenceNotReviewable,
     #[error("mission projection is missing after a durable commit")]
     MissionMissing,
     #[error("mission id already exists with a different specification")]
@@ -725,6 +1043,10 @@ pub(crate) enum MissionRuntimeError {
     RevisionUnavailable,
     #[error("managed mission run cannot be recovered without an active session and zero unresolved attention items")]
     RecoveryNotSafe,
+    #[error("mission does not have a sealed proof receipt")]
+    ProofUnavailable,
+    #[error("mission proof receipt does not bind the latest evidence pack")]
+    ProofBindingMismatch,
 }
 
 fn declaration_set_digest(declarations: &[CheckDeclaration]) -> String {

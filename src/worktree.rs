@@ -302,7 +302,14 @@ pub(crate) fn run_worktree_add_command(
     } else {
         build_worktree_add_new_branch_command(repo_root, path, branch, base)
     };
-    run_worktree_command(&command)
+    run_worktree_command(&command)?;
+    let contract = crate::project_recipe::load_contract(repo_root)
+        .map_err(|error| format!("created worktree but .nagi/project.toml is invalid: {error}"))?;
+    if let Some(contract) = contract {
+        crate::project_recipe::copy_declared_ignored_files(repo_root, path, &contract)
+            .map_err(|error| format!("created worktree but copy_ignored failed: {error}"))?;
+    }
+    Ok(())
 }
 
 pub(crate) fn run_worktree_command(command: &WorktreeCommand) -> Result<(), String> {
@@ -541,6 +548,37 @@ mod tests {
     fn generated_branch_slug_is_worktree_namespaced_and_stable() {
         assert_eq!(generated_branch_slug(0), "worktree/brave-river-0000");
         assert_eq!(generated_branch_slug(9), "worktree/calm-cloud-0009");
+    }
+
+    #[test]
+    fn worktree_creation_copies_only_recipe_declared_ignored_files() {
+        let repo = create_committed_repo("recipe-copy-repo");
+        std::fs::create_dir(repo.join(".nagi")).unwrap();
+        std::fs::write(repo.join(".gitignore"), "local.txt\nother.txt\n").unwrap();
+        std::fs::write(
+            repo.join(".nagi/project.toml"),
+            "schema = 1\n[worktree]\ncopy_ignored = [\"local.txt\"]\n",
+        )
+        .unwrap();
+        std::fs::write(repo.join("local.txt"), "copy me").unwrap();
+        std::fs::write(repo.join("other.txt"), "do not copy").unwrap();
+        run_git(&repo, &["add", ".gitignore", ".nagi/project.toml"]);
+        run_git(&repo, &["commit", "--quiet", "-m", "recipe"]);
+        let root = unique_temp_path("recipe-copy-root");
+        let checkout = root.join("checkout");
+        std::fs::create_dir_all(&root).unwrap();
+
+        run_worktree_add_command(&repo, &checkout, "worktree/recipe-copy", "HEAD").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(checkout.join("local.txt")).unwrap(),
+            "copy me"
+        );
+        assert!(!checkout.join("other.txt").exists());
+
+        let remove = build_worktree_remove_command(&repo, &checkout, true);
+        run_worktree_command(&remove).unwrap();
+        let _ = std::fs::remove_dir_all(root);
+        let _ = std::fs::remove_dir_all(repo);
     }
 
     #[test]

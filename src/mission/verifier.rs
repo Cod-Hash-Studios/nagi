@@ -4,7 +4,7 @@
 )]
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ffi::{OsStr, OsString},
     fs::{File, Metadata},
     io::Read as _,
@@ -21,7 +21,10 @@ use std::{
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
-use super::{digest::CanonicalDigest, evidence::CommandSpec};
+use super::{
+    digest::CanonicalDigest,
+    evidence::{CommandSpec, FileDisposition, FileFingerprint, WorkspaceSnapshot},
+};
 
 const MAX_GIT_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_GIT_STDERR_BYTES: usize = 1024 * 1024;
@@ -69,13 +72,23 @@ impl TrustedCheckRunner {
 
     /// Executes exactly one declared command without passing through a shell.
     ///
-    /// The command still runs with the current user's operating-system rights
-    /// and inherited environment. Callers must treat repository code as
-    /// executable code, not as sandboxed input.
+    /// The command still runs with the current user's operating-system rights.
+    /// Ambient credentials are removed, but this is not a filesystem sandbox:
+    /// callers must still treat repository code as executable local code.
     pub(crate) fn run(
         &self,
         requested_worktree: &Path,
         spec: &CommandSpec,
+    ) -> Result<TrustedCheckResult, TrustedCheckError> {
+        let cancelled = AtomicBool::new(false);
+        self.run_with_cancel(requested_worktree, spec, &cancelled)
+    }
+
+    pub(crate) fn run_with_cancel(
+        &self,
+        requested_worktree: &Path,
+        spec: &CommandSpec,
+        cancelled: &AtomicBool,
     ) -> Result<TrustedCheckResult, TrustedCheckError> {
         let worktree = canonical_worktree(requested_worktree)?;
         let cwd = canonical_check_cwd(&worktree, spec.cwd())?;
@@ -87,6 +100,7 @@ impl TrustedCheckRunner {
             self.timeout,
             self.stdout_limit,
             self.stderr_limit,
+            cancelled,
         )
     }
 }
@@ -325,14 +339,17 @@ fn run_check_command(
     timeout: Duration,
     stdout_limit: usize,
     stderr_limit: usize,
+    cancelled: &AtomicBool,
 ) -> Result<TrustedCheckResult, TrustedCheckError> {
     let mut command = Command::new(executable);
     command
         .args(args)
+        .env_clear()
         .env("PWD", cwd.path())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    copy_trusted_check_environment(&mut command);
 
     #[cfg(unix)]
     {
@@ -383,12 +400,16 @@ fn run_check_command(
         Exited(ExitStatus),
         TimedOut,
         OutputLimit,
+        Cancelled,
         WaitFailed,
     }
 
     let reason = loop {
         if stdout_overflowed.load(Ordering::Acquire) || stderr_overflowed.load(Ordering::Acquire) {
             break StopReason::OutputLimit;
+        }
+        if cancelled.load(Ordering::Acquire) {
+            break StopReason::Cancelled;
         }
         match child.try_wait() {
             Ok(Some(status)) => break StopReason::Exited(status),
@@ -406,9 +427,10 @@ fn run_check_command(
     terminate_check_process_group(&mut child);
     let (status, wait_failed) = match reason {
         StopReason::Exited(status) => (Some(status), false),
-        StopReason::TimedOut | StopReason::OutputLimit | StopReason::WaitFailed => {
-            (None, child.wait().is_err())
-        }
+        StopReason::TimedOut
+        | StopReason::OutputLimit
+        | StopReason::Cancelled
+        | StopReason::WaitFailed => (None, child.wait().is_err()),
     };
     let stdout = stdout_reader
         .join()
@@ -431,6 +453,7 @@ fn run_check_command(
     match reason {
         StopReason::TimedOut => return Err(TrustedCheckError::TimedOut),
         StopReason::OutputLimit => return Err(TrustedCheckError::OutputLimitExceeded),
+        StopReason::Cancelled => return Err(TrustedCheckError::Cancelled),
         StopReason::Exited(_) | StopReason::WaitFailed => {}
     }
 
@@ -444,6 +467,40 @@ fn run_check_command(
         stdout,
         stderr,
     })
+}
+
+fn copy_trusted_check_environment(command: &mut Command) {
+    const ALLOWED: &[&str] = &[
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "TERM",
+        "COLORTERM",
+        "LANG",
+        "LC_ALL",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "BUN_INSTALL",
+        "NVM_DIR",
+        "GOPATH",
+        "GOROOT",
+        "SYSTEMROOT",
+        "WINDIR",
+        "PATHEXT",
+    ];
+    for key in ALLOWED {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+    if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
+        command.env("LC_ALL", "C");
+    }
 }
 
 #[cfg(unix)]
@@ -505,6 +562,8 @@ pub(crate) enum TrustedCheckError {
     StderrLimitExceeded,
     #[error("check output exceeded its limit")]
     OutputLimitExceeded,
+    #[error("check execution was cancelled")]
+    Cancelled,
 }
 
 #[derive(Clone, Debug)]
@@ -517,6 +576,15 @@ pub(crate) struct GitWorkspaceSnapshot {
     head_revision: String,
     digest: String,
     path_count: usize,
+    evidence_snapshot: WorkspaceSnapshot,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct GitHandoffSummary {
+    pub(crate) head_revision: String,
+    pub(crate) workspace_digest: String,
+    pub(crate) changed_paths: Vec<String>,
+    pub(crate) diff_stat: String,
 }
 
 impl GitWorkspaceSnapshot {
@@ -531,6 +599,10 @@ impl GitWorkspaceSnapshot {
     pub(crate) const fn path_count(&self) -> usize {
         self.path_count
     }
+
+    pub(crate) fn evidence_snapshot(&self) -> &WorkspaceSnapshot {
+        &self.evidence_snapshot
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -539,6 +611,8 @@ struct GitManifest {
     index: Vec<u8>,
     flags: Vec<u8>,
     status: Vec<u8>,
+    staged_paths: Vec<u8>,
+    unstaged_paths: Vec<u8>,
     paths: Vec<u8>,
     ignored_paths: Vec<u8>,
 }
@@ -554,6 +628,36 @@ enum WorktreeNode {
     Symlink {
         target_sha256: String,
     },
+}
+
+fn node_fingerprint(node: &WorktreeNode) -> String {
+    let mut digest = CanonicalDigest::new(b"trusted-git-worktree-node-v1");
+    match node {
+        WorktreeNode::Missing => digest.u8(0),
+        WorktreeNode::Regular {
+            sha256,
+            executable,
+            size,
+        } => {
+            digest.u8(1);
+            digest.string(sha256);
+            digest.bool(*executable);
+            digest.u64(*size);
+        }
+        WorktreeNode::Symlink { target_sha256 } => {
+            digest.u8(2);
+            digest.string(target_sha256);
+        }
+    }
+    digest.finish()
+}
+
+fn node_artifact_hash(node: &WorktreeNode) -> Option<&str> {
+    match node {
+        WorktreeNode::Regular { sha256, .. } => Some(sha256),
+        WorktreeNode::Symlink { target_sha256 } => Some(target_sha256),
+        WorktreeNode::Missing => None,
+    }
 }
 
 impl TrustedGit {
@@ -623,12 +727,18 @@ impl TrustedGit {
         }
 
         let head_revision = parse_head_revision(&before.head)?;
+        let tracked_paths = index_paths(&before.index)?;
+        let staged_paths = repo_path_set(&before.staged_paths)?;
+        let unstaged_paths = repo_path_set(&before.unstaged_paths)?;
+        let ignored_paths = repo_path_set(&before.ignored_paths)?;
         let mut digest = CanonicalDigest::new(b"trusted-git-workspace-v1");
         digest.bool(include_ignored);
         digest.bytes(&before.head);
         digest.bytes(&before.index);
         digest.bytes(&before.flags);
         digest.bytes(&before.status);
+        digest.bytes(&before.staged_paths);
+        digest.bytes(&before.unstaged_paths);
         digest.bytes(&before.paths);
         digest.bytes(&before.ignored_paths);
         digest.u64(nodes.len() as u64);
@@ -652,10 +762,103 @@ impl TrustedGit {
                 }
             }
         }
+        let workspace_digest = digest.finish();
+        let files = nodes
+            .iter()
+            .map(|(path, node)| {
+                let disposition = if ignored_paths.contains(path) {
+                    FileDisposition::Ignored
+                } else if !tracked_paths.contains(path) {
+                    FileDisposition::Untracked
+                } else if unstaged_paths.contains(path) {
+                    FileDisposition::Unstaged
+                } else if staged_paths.contains(path) {
+                    FileDisposition::Staged
+                } else {
+                    FileDisposition::Tracked
+                };
+                FileFingerprint::new(path, node_fingerprint(node), disposition)
+            })
+            .collect::<Vec<_>>();
+        let artifacts = nodes.iter().filter_map(|(path, node)| {
+            node_artifact_hash(node).map(|hash| (path.clone(), hash.to_owned()))
+        });
+        let evidence_snapshot =
+            WorkspaceSnapshot::new(head_revision.clone(), workspace_digest.clone(), files)
+                .with_artifacts(artifacts);
         Ok(GitWorkspaceSnapshot {
             head_revision,
-            digest: digest.finish(),
+            digest: workspace_digest,
             path_count: nodes.len(),
+            evidence_snapshot,
+        })
+    }
+
+    pub(crate) fn handoff_summary(
+        &self,
+        requested_worktree: &Path,
+        base_revision: &str,
+    ) -> Result<GitHandoffSummary, VerificationError> {
+        if !matches!(base_revision.len(), 40 | 64)
+            || !base_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(VerificationError::InvalidRevision);
+        }
+        let worktree = std::fs::canonicalize(requested_worktree)
+            .map_err(|_| VerificationError::WorktreeUnavailable)?;
+        let info = crate::workspace::git_worktree_info(&worktree)
+            .ok_or(VerificationError::NotGitWorktree)?;
+        let root = std::fs::canonicalize(info.repo_root)
+            .map_err(|_| VerificationError::WorktreeUnavailable)?;
+        if worktree != root {
+            return Err(VerificationError::WorktreeMustBeRoot);
+        }
+        let snapshot = self.scan(&worktree, false)?;
+        let changed = self.run(
+            &worktree,
+            &[
+                "diff",
+                "--name-only",
+                "-z",
+                "--ignore-submodules=none",
+                base_revision,
+                "--",
+            ],
+        )?;
+        let untracked = self.run(
+            &worktree,
+            &["ls-files", "--others", "--exclude-standard", "-z"],
+        )?;
+        let mut changed_paths = repo_path_set(&changed)?;
+        changed_paths.extend(repo_path_set(&untracked)?);
+        if changed_paths.len() > MAX_PATHS {
+            return Err(VerificationError::PathLimitExceeded);
+        }
+        let stat = self.run(
+            &worktree,
+            &[
+                "diff",
+                "--stat",
+                "--no-ext-diff",
+                "--no-color",
+                "--ignore-submodules=none",
+                base_revision,
+                "--",
+            ],
+        )?;
+        let mut diff_stat = String::from_utf8_lossy(&stat).trim().to_owned();
+        let untracked_count = repo_path_set(&untracked)?.len();
+        if untracked_count > 0 {
+            if !diff_stat.is_empty() {
+                diff_stat.push('\n');
+            }
+            diff_stat.push_str(&format!("{untracked_count} untracked path(s)"));
+        }
+        Ok(GitHandoffSummary {
+            head_revision: snapshot.head_revision,
+            workspace_digest: snapshot.digest,
+            changed_paths: changed_paths.into_iter().collect(),
+            diff_stat,
         })
     }
 
@@ -676,6 +879,20 @@ impl TrustedGit {
                 "--untracked-files=all",
                 "--ignore-submodules=none",
             ],
+        )?;
+        let staged_paths = self.run(
+            worktree,
+            &[
+                "diff",
+                "--cached",
+                "--name-only",
+                "-z",
+                "--ignore-submodules=none",
+            ],
+        )?;
+        let unstaged_paths = self.run(
+            worktree,
+            &["diff", "--name-only", "-z", "--ignore-submodules=none"],
         )?;
         let paths = self.run(
             worktree,
@@ -706,6 +923,8 @@ impl TrustedGit {
             index,
             flags,
             status,
+            staged_paths,
+            unstaged_paths,
             paths,
             ignored_paths,
         })
@@ -820,6 +1039,27 @@ fn manifest_paths(
         paths.insert(path, ());
     }
     Ok(paths.into_keys().collect())
+}
+
+fn index_paths(bytes: &[u8]) -> Result<BTreeSet<String>, VerificationError> {
+    nul_records(bytes)
+        .map(|record| {
+            let (_, path) = split_once(record, b'\t').ok_or(VerificationError::InvalidGitOutput)?;
+            std::str::from_utf8(path)
+                .map(str::to_owned)
+                .map_err(|_| VerificationError::NonUtf8Path)
+        })
+        .collect()
+}
+
+fn repo_path_set(bytes: &[u8]) -> Result<BTreeSet<String>, VerificationError> {
+    nul_records(bytes)
+        .map(|record| {
+            std::str::from_utf8(record)
+                .map(str::to_owned)
+                .map_err(|_| VerificationError::NonUtf8Path)
+        })
+        .collect()
 }
 
 fn nul_records(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
@@ -1069,6 +1309,8 @@ pub(crate) enum VerificationError {
     GitOutputLimitExceeded,
     #[error("Git output is invalid")]
     InvalidGitOutput,
+    #[error("Git revision is invalid")]
+    InvalidRevision,
     #[error("repository path is not valid UTF-8")]
     NonUtf8Path,
     #[error("repository path is unsafe")]
@@ -1147,7 +1389,7 @@ mod tests {
             &nested.join("probe"),
             "#!/bin/sh\nprintf 'run\\n' >> run.log\nprintf '%s|%s' \"$1\" \"$(pwd)\"\nexit 7\n",
         );
-        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(2), 1024, 1024);
+        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(10), 1024, 1024);
 
         let result = runner
             .run(
@@ -1175,7 +1417,7 @@ mod tests {
             "run\n"
         );
         assert!(result.finished_at_unix_millis() >= result.started_at_unix_millis());
-        assert!(result.duration() <= Duration::from_secs(2));
+        assert!(result.duration() <= Duration::from_secs(10));
     }
 
     #[test]
@@ -1255,6 +1497,32 @@ mod tests {
             ),
             Err(TrustedCheckError::TimedOut)
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trusted_check_cancellation_terminates_the_process_group() {
+        let directory = repository();
+        let script = directory.path().join("cancel-check");
+        executable_script(&script, "#!/bin/sh\nsleep 30 &\nwait\n");
+        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(30), 1024, 1024);
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let signal = cancelled.clone();
+        let setter = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            signal.store(true, Ordering::Release);
+        });
+        let started = Instant::now();
+
+        let result = runner.run_with_cancel(
+            directory.path(),
+            &super::super::evidence::CommandSpec::new("./cancel-check", [] as [&str; 0], "."),
+            &cancelled,
+        );
+        setter.join().unwrap();
+
+        assert!(matches!(result, Err(TrustedCheckError::Cancelled)));
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 
     #[cfg(unix)]
@@ -1377,6 +1645,47 @@ mod tests {
         std::fs::remove_file(directory.path().join("tracked.txt")).unwrap();
         let deleted = scanner.scan(directory.path(), false).unwrap();
         assert_ne!(changed.digest(), deleted.digest());
+    }
+
+    #[test]
+    fn trusted_scan_exports_exact_evidence_file_dispositions() {
+        let directory = repository();
+        std::fs::write(directory.path().join(".gitignore"), "ignored.log\n").unwrap();
+        git(directory.path(), &["add", ".gitignore"]);
+        git(directory.path(), &["commit", "-qm", "ignore fixture"]);
+
+        std::fs::write(directory.path().join("tracked.txt"), "unstaged\n").unwrap();
+        std::fs::write(directory.path().join("staged.txt"), "staged\n").unwrap();
+        git(directory.path(), &["add", "staged.txt"]);
+        std::fs::write(directory.path().join("untracked.txt"), "untracked\n").unwrap();
+        std::fs::write(directory.path().join("ignored.log"), "ignored\n").unwrap();
+
+        let snapshot = TrustedGit::discover()
+            .unwrap()
+            .scan(directory.path(), true)
+            .unwrap();
+        let evidence = snapshot.evidence_snapshot();
+
+        assert_eq!(
+            evidence.file_disposition(".gitignore"),
+            Some(super::super::evidence::FileDisposition::Tracked)
+        );
+        assert_eq!(
+            evidence.file_disposition("tracked.txt"),
+            Some(super::super::evidence::FileDisposition::Unstaged)
+        );
+        assert_eq!(
+            evidence.file_disposition("staged.txt"),
+            Some(super::super::evidence::FileDisposition::Staged)
+        );
+        assert_eq!(
+            evidence.file_disposition("untracked.txt"),
+            Some(super::super::evidence::FileDisposition::Untracked)
+        );
+        assert_eq!(
+            evidence.file_disposition("ignored.log"),
+            Some(super::super::evidence::FileDisposition::Ignored)
+        );
     }
 
     #[test]

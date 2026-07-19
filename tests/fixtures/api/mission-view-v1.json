@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "mission_id": "mission-1",
+  "title": "Fix login redirect",
+  "repository_path": "/repo",
+  "objective": "Preserve the requested page after login",
+  "criteria": [
+    {
+      "criterion_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "description": "Redirect test passes",
+      "coverage": "covered",
+      "required_check_ids": [
+        "tests"
+      ]
+    }
+  ],
+  "closure_configured": true,
+  "declared_check_count": 1,
+  "checks": [
+    {
+      "check_id": "tests",
+      "kind": "command",
+      "required": true,
+      "covered_criterion_ids": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "status": "passed"
+    }
+  ],
+  "evidence": [
+    {
+      "check_id": "tests",
+      "kind": "command",
+      "assessment": "passed",
+      "workspace_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "recorded_at_millis": 110,
+      "duration_millis": 10,
+      "exit_code": 0,
+      "artifact_count": 1
+    }
+  ],
+  "details_available": true,
+  "status": "ready_to_close",
+  "run": {
+    "run_id": "run-1",
+    "provider": "codex",
+    "mode": "managed",
+    "worktree_path": "/repo",
+    "base_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "execute_declared_checks": true,
+    "execute_project_recipe": false
+  },
+  "unresolved_attention_count": 0,
+  "updated_at_millis": 120
+}

@@ -41,8 +41,154 @@ fn protocol_schema_document() -> serde_json::Value {
             "error_response": protocol_schema_entry::<ErrorResponse>("error_response"),
             "event": protocol_schema_entry::<EventEnvelope>("event"),
             "subscription_event": protocol_schema_entry::<SubscriptionEventEnvelope>("subscription_event"),
+            "mission_view_v1": protocol_schema_entry::<MissionViewV1>("mission_view_v1"),
+            "attention_item_v1": protocol_schema_entry::<AttentionItemV1>("attention_item_v1"),
+            "proof_receipt_v1": protocol_schema_entry::<ProofReceiptV1>("proof_receipt_v1"),
+            "provider_capabilities_v1": protocol_schema_entry::<ProviderCapabilitiesV1>("provider_capabilities_v1"),
+            "plugin_inspector_input_v1": protocol_schema_entry::<PluginInspectorInputV1>("plugin_inspector_input_v1"),
+            "plugin_ui_document_v1": protocol_schema_entry::<PluginUiDocumentV1>("plugin_ui_document_v1"),
         },
     })
+}
+
+fn contract_snapshot<T>(fixture: &str) -> T
+where
+    T: serde::de::DeserializeOwned + Serialize,
+{
+    let expected: serde_json::Value = serde_json::from_str(fixture).unwrap();
+    let contract: T = serde_json::from_value(expected.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&contract).unwrap(), expected);
+    contract
+}
+
+fn assert_projection_unknown_field_policy<T>(fixture: &str)
+where
+    T: serde::de::DeserializeOwned,
+{
+    let mut future: serde_json::Value = serde_json::from_str(fixture).unwrap();
+    future
+        .as_object_mut()
+        .unwrap()
+        .insert("future_addition".into(), serde_json::json!({"safe": true}));
+    assert!(serde_json::from_value::<T>(future.clone()).is_ok());
+
+    future["schema_version"] = serde_json::json!(2);
+    assert!(serde_json::from_value::<T>(future).is_err());
+}
+
+#[test]
+fn versioned_product_contracts_match_serialization_snapshots() {
+    let mission = contract_snapshot::<MissionViewV1>(include_str!(
+        "../../../tests/fixtures/api/mission-view-v1.json"
+    ));
+    assert!(mission.details_available);
+    assert_eq!(mission.declared_check_count, 1);
+
+    let attention = contract_snapshot::<AttentionItemV1>(include_str!(
+        "../../../tests/fixtures/api/attention-item-v1.json"
+    ));
+    assert_eq!(attention.risk, AttentionRiskV1::High);
+
+    let proof = contract_snapshot::<ProofReceiptV1>(include_str!(
+        "../../../tests/fixtures/api/proof-receipt-v1.json"
+    ));
+    assert_eq!(proof.decision, ProofClosureDecisionV1::ReadyToClose);
+
+    let capabilities = contract_snapshot::<ProviderCapabilitiesV1>(include_str!(
+        "../../../tests/fixtures/api/provider-capabilities-v1.json"
+    ));
+    assert!(matches!(
+        capabilities.usage,
+        ProviderCapabilityV1::Unknown { .. }
+    ));
+}
+
+#[test]
+fn versioned_projections_accept_additive_fields_but_reject_future_versions() {
+    assert_projection_unknown_field_policy::<MissionViewV1>(include_str!(
+        "../../../tests/fixtures/api/mission-view-v1.json"
+    ));
+    assert_projection_unknown_field_policy::<AttentionItemV1>(include_str!(
+        "../../../tests/fixtures/api/attention-item-v1.json"
+    ));
+    assert_projection_unknown_field_policy::<ProofReceiptV1>(include_str!(
+        "../../../tests/fixtures/api/proof-receipt-v1.json"
+    ));
+    assert_projection_unknown_field_policy::<ProviderCapabilitiesV1>(include_str!(
+        "../../../tests/fixtures/api/provider-capabilities-v1.json"
+    ));
+}
+
+#[test]
+fn current_mission_info_fixture_migrates_without_inventing_details() {
+    let legacy: MissionInfo = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/api/legacy-mission-info-v0.json"
+    ))
+    .unwrap();
+    let migrated = MissionViewV1::try_from(legacy).unwrap();
+
+    assert_eq!(migrated.schema_version, ContractVersionV1);
+    assert_eq!(migrated.declared_check_count, 2);
+    assert!(!migrated.details_available);
+    assert!(migrated.checks.is_empty());
+    assert!(migrated.evidence.is_empty());
+    assert!(migrated.criteria.iter().all(|criterion| {
+        criterion.criterion_id.is_none()
+            && criterion.coverage == MissionCriterionCoverageV1::Unknown
+            && criterion.required_check_ids.is_empty()
+    }));
+}
+
+#[test]
+fn legacy_mission_migration_rejects_values_outside_the_v1_projection_bounds() {
+    let mut legacy: MissionInfo = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/api/legacy-mission-info-v0.json"
+    ))
+    .unwrap();
+    legacy.acceptance_criteria.clear();
+
+    assert!(matches!(
+        MissionViewV1::try_from(legacy),
+        Err(MissionViewMigrationError::InvalidLegacyField {
+            field: "acceptance_criteria"
+        })
+    ));
+}
+
+#[test]
+fn product_contract_schemas_are_published_and_bounded() {
+    let document = protocol_schema_document();
+    let schemas = document["schemas"].as_object().unwrap();
+    for name in [
+        "mission_view_v1",
+        "attention_item_v1",
+        "proof_receipt_v1",
+        "provider_capabilities_v1",
+    ] {
+        assert!(schemas.contains_key(name), "missing product schema {name}");
+        assert_ne!(
+            schemas[name].get("additionalProperties"),
+            Some(&serde_json::json!(false)),
+            "projection schema {name} must allow additive fields"
+        );
+    }
+
+    assert_eq!(
+        schemas["mission_view_v1"]["properties"]["criteria"]["maxItems"],
+        16
+    );
+    assert_eq!(
+        schemas["mission_view_v1"]["properties"]["checks"]["maxItems"],
+        32
+    );
+    assert_eq!(
+        schemas["proof_receipt_v1"]["properties"]["fresh_evidence"]["maxItems"],
+        32
+    );
+    assert_eq!(
+        serde_json::to_value(schemars::schema_for!(ContractVersionV1)).unwrap()["const"],
+        1
+    );
 }
 
 #[test]
@@ -104,6 +250,65 @@ fn mission_requests_and_responses_round_trip() {
         get_request
     );
 
+    let proof_request = Request {
+        id: "mission_req_proof".into(),
+        method: Method::MissionProofGet(MissionTarget {
+            mission_id: "mission-1".into(),
+        }),
+    };
+    let proof_json = serde_json::to_value(&proof_request).unwrap();
+    assert_eq!(proof_json["method"], "mission.proof.get");
+    assert_eq!(
+        serde_json::from_value::<Request>(proof_json).unwrap(),
+        proof_request
+    );
+
+    let handoff_request = Request {
+        id: "mission_req_handoff".into(),
+        method: Method::MissionHandoffPreview(MissionHandoffPreviewParams {
+            mission_id: "mission-1".into(),
+            to: MissionProvider::ClaudeCode,
+        }),
+    };
+    let handoff_json = serde_json::to_value(&handoff_request).unwrap();
+    assert_eq!(handoff_json["method"], "mission.handoff.preview");
+    assert_eq!(handoff_json["params"]["to"], "claude_code");
+    assert_eq!(
+        serde_json::from_value::<Request>(handoff_json).unwrap(),
+        handoff_request
+    );
+
+    let handoff_start_request = Request {
+        id: "mission_req_handoff_start".into(),
+        method: Method::MissionHandoffStart(MissionHandoffStartParams {
+            mission_id: "mission-1".into(),
+            to: MissionProvider::ClaudeCode,
+            generated_at_millis: 42,
+            artifact_sha256: "a".repeat(64),
+        }),
+    };
+    let handoff_start_json = serde_json::to_value(&handoff_start_request).unwrap();
+    assert_eq!(handoff_start_json["method"], "mission.handoff.start");
+    assert_eq!(handoff_start_json["params"]["to"], "claude_code");
+    assert_eq!(handoff_start_json["params"]["generated_at_millis"], 42);
+    assert_eq!(
+        serde_json::from_value::<Request>(handoff_start_json).unwrap(),
+        handoff_start_request
+    );
+
+    let close_request = Request {
+        id: "mission_req_close".into(),
+        method: Method::MissionClose(MissionTarget {
+            mission_id: "mission-1".into(),
+        }),
+    };
+    let close_json = serde_json::to_value(&close_request).unwrap();
+    assert_eq!(close_json["method"], "mission.close");
+    assert_eq!(
+        serde_json::from_value::<Request>(close_json).unwrap(),
+        close_request
+    );
+
     let configure_request = Request {
         id: "mission_req_configure".into(),
         method: Method::MissionConfigure(MissionConfigureParams {
@@ -134,7 +339,7 @@ fn mission_requests_and_responses_round_trip() {
     let configured_response = SuccessResponse {
         id: "mission_req_configure".into(),
         result: ResponseResult::MissionConfigured {
-            mission: MissionInfo {
+            mission: MissionViewV1::try_from(MissionInfo {
                 mission_id: "mission-1".into(),
                 title: "Fix login redirect".into(),
                 repository_path: "/repo".into(),
@@ -146,7 +351,8 @@ fn mission_requests_and_responses_round_trip() {
                 run: None,
                 unresolved_attention_count: 0,
                 updated_at_millis: 15,
-            },
+            })
+            .unwrap(),
             configured: true,
         },
     };
@@ -166,6 +372,8 @@ fn mission_requests_and_responses_round_trip() {
             provider: MissionProvider::Codex,
             mode: MissionProviderMode::Managed,
             worktree_path: Some("/repo".into()),
+            execute_declared_checks: true,
+            execute_project_recipe: false,
         }),
     };
     let start_json = serde_json::to_value(&start_request).unwrap();
@@ -198,6 +406,33 @@ fn mission_requests_and_responses_round_trip() {
         respond_request
     );
 
+    let attention_list = Request {
+        id: "attention_req_1".into(),
+        method: Method::AttentionList(AttentionListParams {
+            mission_id: Some("mission-1".into()),
+            include_closed: false,
+        }),
+    };
+    let attention_list_json = serde_json::to_value(&attention_list).unwrap();
+    assert_eq!(attention_list_json["method"], "attention.list");
+    assert_eq!(
+        serde_json::from_value::<Request>(attention_list_json).unwrap(),
+        attention_list
+    );
+
+    let attention_get = Request {
+        id: "attention_req_2".into(),
+        method: Method::AttentionGet(AttentionTarget {
+            attention_id: "attention-1".into(),
+        }),
+    };
+    let attention_get_json = serde_json::to_value(&attention_get).unwrap();
+    assert_eq!(attention_get_json["method"], "attention.get");
+    assert_eq!(
+        serde_json::from_value::<Request>(attention_get_json).unwrap(),
+        attention_get
+    );
+
     let response = SuccessResponse {
         id: "mission_req_1".into(),
         result: ResponseResult::MissionList {
@@ -221,7 +456,7 @@ fn mission_requests_and_responses_round_trip() {
     let info = SuccessResponse {
         id: "mission_req_3".into(),
         result: ResponseResult::MissionInfo {
-            mission: MissionInfo {
+            mission: MissionViewV1::try_from(MissionInfo {
                 mission_id: "mission-1".into(),
                 title: "Fix login redirect".into(),
                 repository_path: "/repo".into(),
@@ -233,7 +468,8 @@ fn mission_requests_and_responses_round_trip() {
                 run: None,
                 unresolved_attention_count: 1,
                 updated_at_millis: 20,
-            },
+            })
+            .unwrap(),
         },
     };
     let info_json = serde_json::to_value(&info).unwrap();
@@ -246,7 +482,7 @@ fn mission_requests_and_responses_round_trip() {
     let run_info = SuccessResponse {
         id: "mission_req_4".into(),
         result: ResponseResult::MissionRunStarted {
-            mission: MissionInfo {
+            mission: MissionViewV1::try_from(MissionInfo {
                 mission_id: "mission-1".into(),
                 title: "Fix login redirect".into(),
                 repository_path: "/repo".into(),
@@ -261,10 +497,13 @@ fn mission_requests_and_responses_round_trip() {
                     mode: MissionProviderMode::Managed,
                     worktree_path: "/repo".into(),
                     base_revision: "a".repeat(40),
+                    execute_declared_checks: true,
+                    execute_project_recipe: false,
                 }),
                 unresolved_attention_count: 0,
                 updated_at_millis: 30,
-            },
+            })
+            .unwrap(),
         },
     };
     let run_info_json = serde_json::to_value(&run_info).unwrap();
@@ -1032,6 +1271,7 @@ fn plugin_link_list_unlink_round_trip() {
             path: "/plugins/worktree-bootstrap".into(),
             enabled: true,
             source: None,
+            trust_native: true,
         }),
     };
     let json = serde_json::to_string(&link).unwrap();
@@ -1062,6 +1302,7 @@ fn plugin_link_list_unlink_round_trip() {
     assert_eq!(restored, unlink);
 
     let plugin = InstalledPluginInfo {
+        manifest_version: 1,
         plugin_id: "example.worktree-bootstrap".into(),
         name: "Worktree Bootstrap".into(),
         version: "0.1.0".into(),
@@ -1070,6 +1311,10 @@ fn plugin_link_list_unlink_round_trip() {
         manifest_path: "/plugins/worktree-bootstrap/nagi-plugin.toml".into(),
         plugin_root: "/plugins/worktree-bootstrap".into(),
         enabled: true,
+        runtime: PluginRuntimeV2::TrustedNative,
+        entrypoint: None,
+        requested_capabilities: Vec::new(),
+        native_trusted: true,
         platforms: None,
         build: vec![PluginManifestBuild {
             platforms: None,
@@ -1105,6 +1350,7 @@ fn plugin_link_list_unlink_round_trip() {
             action: "bootstrap".into(),
             platforms: None,
         }],
+        inspector_tabs: Vec::new(),
         source: Default::default(),
         warnings: vec![],
     };

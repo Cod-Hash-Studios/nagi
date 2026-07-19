@@ -404,6 +404,7 @@ const fn provider_tag(provider: ProviderKind) -> u8 {
         ProviderKind::Codex => 0,
         ProviderKind::ClaudeCode => 1,
         ProviderKind::OpenCode => 2,
+        ProviderKind::Acp => 3,
     }
 }
 

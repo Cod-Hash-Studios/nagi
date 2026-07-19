@@ -232,7 +232,7 @@ impl CheckDeclaration {
         &self.id
     }
 
-    fn command_spec(&self) -> Option<&CommandSpec> {
+    pub(crate) fn command_spec(&self) -> Option<&CommandSpec> {
         match &self.kind {
             CheckKind::Command { command } => Some(command),
             CheckKind::Manual => None,
@@ -245,6 +245,16 @@ impl CheckDeclaration {
 
     pub(crate) const fn is_required(&self) -> bool {
         self.required
+    }
+
+    pub(crate) const fn includes_ignored(&self) -> bool {
+        self.include_ignored
+    }
+
+    pub(crate) fn required_artifact_paths(&self) -> impl Iterator<Item = &str> {
+        self.required_artifacts
+            .iter()
+            .map(|artifact| artifact.path.as_str())
     }
 
     pub(crate) fn covered_criteria(&self) -> &BTreeSet<String> {
@@ -428,7 +438,7 @@ pub enum FileDisposition {
     Ignored,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct FileFingerprint {
     path: String,
     content_hash: String,
@@ -450,7 +460,7 @@ impl FileFingerprint {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkspaceSnapshot {
     tree_hash: String,
     diff_hash: String,
@@ -490,6 +500,11 @@ impl WorkspaceSnapshot {
         self
     }
 
+    #[cfg(test)]
+    pub(crate) fn file_disposition(&self, path: &str) -> Option<FileDisposition> {
+        self.files.get(path).map(|file| file.disposition)
+    }
+
     fn relevant_files(
         &self,
         rules: &[PathRule],
@@ -510,6 +525,10 @@ impl WorkspaceSnapshot {
 
     pub(crate) fn artifact_hash(&self, path: &str) -> Option<&str> {
         self.artifacts.get(path).map(String::as_str)
+    }
+
+    pub(crate) fn head_revision(&self) -> &str {
+        &self.tree_hash
     }
 
     pub(crate) fn digest(&self) -> String {
@@ -537,7 +556,7 @@ impl WorkspaceSnapshot {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ArtifactEvidence {
     path: String,
     content_hash: String,
@@ -562,6 +581,14 @@ impl ArtifactEvidence {
     pub fn content_hash(&self) -> &str {
         &self.content_hash
     }
+
+    pub(crate) fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub(crate) fn media_type(&self) -> &str {
+        &self.media_type
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -572,7 +599,7 @@ pub enum EvidenceStatus {
     Stale,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CommandEvidence {
     check_id: String,
     declaration_digest: String,
@@ -709,6 +736,18 @@ impl CommandEvidence {
         &self.artifacts
     }
 
+    pub(crate) fn declaration_digest(&self) -> &str {
+        &self.declaration_digest
+    }
+
+    pub(crate) const fn started_at_millis(&self) -> u64 {
+        self.started_at_millis
+    }
+
+    pub(crate) const fn finished_at_millis(&self) -> u64 {
+        self.finished_at_millis
+    }
+
     fn assess(
         &self,
         declaration: &CheckDeclaration,
@@ -742,7 +781,7 @@ impl CommandEvidence {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ManualEvidence {
     check_id: String,
     declaration_digest: String,
@@ -813,6 +852,10 @@ impl ManualEvidence {
         self.is_override
     }
 
+    pub(crate) fn declaration_digest(&self) -> &str {
+        &self.declaration_digest
+    }
+
     fn assess(
         &self,
         declaration: &CheckDeclaration,
@@ -835,7 +878,7 @@ impl ManualEvidence {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProviderClaim {
     check_id: String,
     claim: String,
@@ -860,7 +903,7 @@ impl ProviderClaim {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EvidenceRecord {
     Command(Box<CommandEvidence>),
@@ -881,6 +924,14 @@ pub(crate) enum EvidenceAssessment {
 }
 
 impl EvidenceRecord {
+    pub(crate) fn check_id(&self) -> &str {
+        match self {
+            Self::Command(evidence) => evidence.check_id(),
+            Self::Manual(evidence) => evidence.check_id(),
+            Self::ProviderClaim(claim) => &claim.check_id,
+        }
+    }
+
     pub(crate) fn assess(
         &self,
         declaration: &CheckDeclaration,

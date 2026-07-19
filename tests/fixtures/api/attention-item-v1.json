@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "attention_id": "attention-1",
+  "mission_id": "mission-1",
+  "run_id": "run-1",
+  "session_id": "session-1",
+  "pane": {
+    "workspace_id": "workspace-1",
+    "pane_id": "pane-1"
+  },
+  "kind": "permission_request",
+  "requested_action": "Run database migration",
+  "scope": "workspace:/repo",
+  "risk": "high",
+  "provider": "codex",
+  "source": "provider_api",
+  "response_capability": "reliable",
+  "created_at_millis": 100,
+  "expires_at_millis": 300,
+  "occurrence_count": 1,
+  "unread": false,
+  "state": {
+    "state": "pending_response",
+    "decision": "approve_once",
+    "actor": "user",
+    "requested_at_millis": 110
+  },
+  "delivery": {
+    "state": "pending",
+    "attempt": 1,
+    "requested_at_millis": 110
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mission_id": "mission-legacy",
+  "title": "Legacy mission projection",
+  "repository_path": "/repo",
+  "objective": "Keep existing clients readable",
+  "acceptance_criteria": [
+    "The old projection loads",
+    "Unknown details stay unknown"
+  ],
+  "closure_configured": true,
+  "check_count": 2,
+  "status": "review_required",
+  "run": null,
+  "unresolved_attention_count": 1,
+  "updated_at_millis": 90
+}

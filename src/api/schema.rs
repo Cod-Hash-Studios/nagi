@@ -1,32 +1,105 @@
+use std::borrow::Cow;
+
 use serde::{Deserialize, Serialize};
 
 pub mod agents;
+pub mod attention;
 pub mod common;
 pub mod events;
 pub mod integrations;
 pub mod missions;
 pub mod panes;
+pub mod plugin_v2;
 pub mod plugins;
+pub mod proof;
+pub mod providers;
 pub mod response;
 pub mod server;
 pub mod session;
 pub mod tabs;
+pub mod ui_contributions;
 pub mod workspaces;
 pub mod worktrees;
 
 pub use agents::*;
+#[allow(
+    unused_imports,
+    reason = "standalone product projections are published before endpoint adoption"
+)]
+pub use attention::*;
 pub use common::*;
 pub use events::*;
 pub use integrations::*;
 pub use missions::*;
 pub use panes::*;
+pub use plugin_v2::*;
 pub use plugins::*;
+#[allow(
+    unused_imports,
+    reason = "standalone product projections are published before endpoint adoption"
+)]
+pub use proof::*;
+#[allow(
+    unused_imports,
+    reason = "standalone product projections are published before endpoint adoption"
+)]
+pub use providers::*;
 pub use response::*;
 pub use server::*;
 pub use session::*;
 pub use tabs::*;
+pub use ui_contributions::*;
 pub use workspaces::*;
 pub use worktrees::*;
+
+/// Numeric marker embedded in every first-generation product projection.
+///
+/// Keeping the version as a type, rather than a freely writable integer,
+/// prevents a value with a newer shape from being mislabeled as V1.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ContractVersionV1;
+
+impl Serialize for ContractVersionV1 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(1)
+    }
+}
+
+impl<'de> Deserialize<'de> for ContractVersionV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let version = u64::deserialize(deserializer)?;
+        if version == 1 {
+            Ok(Self)
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "unsupported product contract version {version}; expected 1"
+            )))
+        }
+    }
+}
+
+impl schemars::JsonSchema for ContractVersionV1 {
+    fn inline_schema() -> bool {
+        true
+    }
+
+    fn schema_name() -> Cow<'static, str> {
+        "ContractVersionV1".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "integer",
+            "const": 1
+        })
+    }
+}
 
 fn is_false(value: &bool) -> bool {
     !*value
@@ -71,6 +144,18 @@ pub enum Method {
     MissionStart(MissionStartParams),
     #[serde(rename = "mission.respond")]
     MissionRespond(MissionRespondParams),
+    #[serde(rename = "mission.proof.get")]
+    MissionProofGet(MissionTarget),
+    #[serde(rename = "mission.handoff.preview")]
+    MissionHandoffPreview(MissionHandoffPreviewParams),
+    #[serde(rename = "mission.handoff.start")]
+    MissionHandoffStart(MissionHandoffStartParams),
+    #[serde(rename = "mission.close")]
+    MissionClose(MissionTarget),
+    #[serde(rename = "attention.list")]
+    AttentionList(AttentionListParams),
+    #[serde(rename = "attention.get")]
+    AttentionGet(AttentionTarget),
     #[serde(rename = "client.window_title.set")]
     ClientWindowTitleSet(ClientWindowTitleSetParams),
     #[serde(rename = "client.window_title.clear")]
@@ -227,6 +312,10 @@ pub enum Method {
     PluginEnable(PluginSetEnabledParams),
     #[serde(rename = "plugin.disable")]
     PluginDisable(PluginSetEnabledParams),
+    #[serde(rename = "plugin.capability.approve")]
+    PluginCapabilityApprove(PluginCapabilityApproveParams),
+    #[serde(rename = "plugin.capability.revoke")]
+    PluginCapabilityRevoke(PluginSetEnabledParams),
     #[serde(rename = "plugin.action.list")]
     PluginActionList(PluginActionListParams),
     #[serde(rename = "plugin.action.invoke")]

@@ -102,6 +102,7 @@ pub enum ProviderKind {
     Codex,
     ClaudeCode,
     OpenCode,
+    Acp,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -334,6 +335,13 @@ impl ProofReceipt {
     reason = "sealed ready transitions are staged behind public mission closure"
 )]
 impl ReadyProof {
+    pub(crate) fn from_verified(mission_id: impl Into<String>, verified: VerifiedProof) -> Self {
+        Self {
+            mission_id: mission_id.into(),
+            verified,
+        }
+    }
+
     pub(crate) fn into_receipt(self) -> (String, ProofReceipt) {
         let receipt = ProofReceipt::from_verified(&self.verified);
         (self.mission_id, receipt)
@@ -345,6 +353,18 @@ impl ReadyProof {
     reason = "sealed archive transitions are staged behind public mission closure"
 )]
 impl ArchiveProof {
+    pub(crate) fn from_verified(
+        mission_id: impl Into<String>,
+        ready_seal_digest: impl Into<String>,
+        verified: VerifiedProof,
+    ) -> Self {
+        Self {
+            mission_id: mission_id.into(),
+            verified,
+            ready_seal_digest: ready_seal_digest.into(),
+        }
+    }
+
     pub(crate) fn into_receipt(self) -> (String, String, ProofReceipt) {
         let receipt = ProofReceipt::from_verified(&self.verified);
         (self.mission_id, self.ready_seal_digest, receipt)

@@ -13,10 +13,13 @@ use crate::api::schema::{
 mod agent;
 mod api;
 mod completion;
+mod doctor;
 mod integration;
+mod mission;
 mod notification;
 mod pane;
 mod plugin;
+mod project;
 mod runtime;
 mod server;
 mod spec;
@@ -74,6 +77,7 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "status" => status::run_status_command(&args[2..])?,
         "completion" | "completions" => completion::run_completion_command(&args[2..])?,
         "config" => run_config_command(&args[2..])?,
+        "doctor" => doctor::run_doctor_command(&args[2..])?,
         "channel" => run_channel_command(&args[2..])?,
         "workspace" => workspace::run_workspace_command(&args[2..])?,
         "worktree" => worktree::run_worktree_command(&args[2..])?,
@@ -83,8 +87,10 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "terminal" => run_terminal_command(&args[2..])?,
         "pane" => pane::run_pane_command(&args[2..])?,
         "plugin" => plugin::run_plugin_command(&args[2..])?,
+        "project" => project::run_project_command(&args[2..])?,
         "wait" => run_wait_command(&args[2..])?,
         "integration" => integration::run_integration_command(&args[2..])?,
+        "mission" => mission::run_mission_command(&args[2..])?,
         "session" => run_session_command(&args[2..])?,
         _ => return Ok(CommandOutcome::NotCli),
     };
@@ -235,6 +241,7 @@ fn run_config_command(args: &[String]) -> std::io::Result<i32> {
 
     match subcommand {
         "check" => config_check(&args[1..]),
+        "import-ghostty-theme" => config_import_ghostty_theme(&args[1..]),
         "reset-keys" => config_reset_keys(&args[1..]),
         "help" | "--help" | "-h" => {
             print_config_help();
@@ -260,7 +267,9 @@ fn config_check(args: &[String]) -> std::io::Result<i32> {
         }
     }
 
-    let diagnostics = crate::config::Config::load().diagnostics;
+    let loaded = crate::config::Config::load();
+    let mut diagnostics = loaded.diagnostics;
+    diagnostics.extend(crate::theme::loader::config_diagnostics(&loaded.config));
     if diagnostics.is_empty() {
         println!("config: ok");
     } else {
@@ -271,6 +280,107 @@ fn config_check(args: &[String]) -> std::io::Result<i32> {
     }
 
     Ok(i32::from(!diagnostics.is_empty()))
+}
+
+fn config_import_ghostty_theme(args: &[String]) -> std::io::Result<i32> {
+    use std::io::Write;
+
+    let mut source = None;
+    let mut name = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--name" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --name");
+                    return Ok(2);
+                };
+                name = Some(value.as_str());
+                index += 2;
+            }
+            "help" | "--help" | "-h" => {
+                eprintln!("usage: nagi config import-ghostty-theme <path> --name <name>");
+                return Ok(0);
+            }
+            value if source.is_none() => {
+                source = Some(value);
+                index += 1;
+            }
+            _ => {
+                eprintln!("usage: nagi config import-ghostty-theme <path> --name <name>");
+                return Ok(2);
+            }
+        }
+    }
+    let (Some(source), Some(name)) = (source, name) else {
+        eprintln!("usage: nagi config import-ghostty-theme <path> --name <name>");
+        return Ok(2);
+    };
+    if !crate::theme::loader::is_safe_theme_name(name) {
+        eprintln!("theme name must contain only letters, numbers, '-' or '_'");
+        return Ok(2);
+    }
+    let source_path = std::path::Path::new(source);
+    let metadata = std::fs::symlink_metadata(source_path)?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        eprintln!("Ghostty theme must be a regular file, not a symlink");
+        return Ok(1);
+    }
+    let source_content = std::fs::read_to_string(source_path)?;
+    let imported = match crate::theme::loader::import_ghostty_color_source(&source_content, name) {
+        Ok(imported) => imported,
+        Err(error) => {
+            eprintln!("cannot import Ghostty theme: {error}");
+            return Ok(1);
+        }
+    };
+    let manifest = match crate::theme::loader::export_manifest(&imported.theme) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            eprintln!("cannot export Nagi theme: {error}");
+            return Ok(1);
+        }
+    };
+    let theme_directory = crate::config::config_path()
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("themes");
+    std::fs::create_dir_all(&theme_directory)?;
+    let destination = theme_directory.join(format!("{name}.toml"));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = match options.open(&destination) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            eprintln!(
+                "refusing to overwrite existing theme {}; choose another name",
+                destination.display()
+            );
+            return Ok(1);
+        }
+        Err(error) => return Err(error),
+    };
+    if let Err(error) = file
+        .write_all(manifest.as_bytes())
+        .and_then(|()| file.sync_all())
+    {
+        let _ = std::fs::remove_file(&destination);
+        return Err(error);
+    }
+    println!("imported Ghostty colors to {}", destination.display());
+    if !imported.ignored_keys.is_empty() {
+        println!(
+            "ignored non-color Ghostty settings: {}",
+            imported.ignored_keys.join(", ")
+        );
+    }
+    println!("set [theme] name = \"{name}\" and reload config to apply it");
+    Ok(0)
 }
 
 fn config_reset_keys(args: &[String]) -> std::io::Result<i32> {
@@ -1156,6 +1266,7 @@ fn print_config_help() {
     eprintln!("nagi config commands:");
     eprintln!("  nagi config check  validate config.toml and print diagnostics");
     eprintln!("  nagi config reset-keys  back up config.toml and remove custom keybindings");
+    eprintln!("  nagi config import-ghostty-theme <path> --name <name>  import colors only");
 }
 
 fn print_terminal_help() {
@@ -1191,6 +1302,41 @@ fn _print_json<T: Serialize>(value: &T) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn ghostty_import_writes_a_safe_new_theme_without_overwriting() {
+        let _guard = crate::config::test_config_env_lock().lock().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let config_path = directory.path().join("config.toml");
+        let ghostty_path = directory.path().join("ghostty-theme");
+        std::fs::write(
+            &ghostty_path,
+            "background = #101820\nforeground = #f5f0e8\npalette = 4=#7ca8d8\ncommand = untrusted\n",
+        )
+        .unwrap();
+        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &config_path);
+        let args = vec![
+            ghostty_path.display().to_string(),
+            "--name".to_string(),
+            "forest-calm".to_string(),
+        ];
+
+        assert_eq!(super::config_import_ghostty_theme(&args).unwrap(), 0);
+        let destination = directory.path().join("themes/forest-calm.toml");
+        let first = std::fs::read_to_string(&destination).unwrap();
+        assert!(!first.contains("untrusted"));
+        assert_eq!(
+            crate::theme::loader::load_named_from("forest-calm", &directory.path().join("themes"))
+                .unwrap()
+                .name,
+            "forest-calm"
+        );
+
+        assert_eq!(super::config_import_ghostty_theme(&args).unwrap(), 1);
+        assert_eq!(std::fs::read_to_string(destination).unwrap(), first);
+
+        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
+    }
+
     #[test]
     fn parses_channel_set_argument() {
         assert_eq!(

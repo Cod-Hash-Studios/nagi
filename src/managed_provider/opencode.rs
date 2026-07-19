@@ -19,7 +19,7 @@ use super::{
     ResponseToken, RpcId, SandboxAccess, StartOrResume, TransportFailure, TurnOutcome,
 };
 
-const TESTED_VERSION: &str = "1.18.3";
+pub(crate) const TESTED_VERSION: &str = "1.18.3";
 const REQUIRED_ROUTES: [(&str, &str); 10] = [
     ("/event", "get"),
     ("/session", "post"),
@@ -1629,6 +1629,7 @@ impl Actor {
             item_id: request_id.to_owned(),
             requested_action:
                 "Structured question is unsupported by the tested OpenCode server API".to_owned(),
+            questions: Vec::new(),
         })
     }
 
@@ -1713,6 +1714,7 @@ impl Actor {
                 .unwrap_or_else(|| "pending".to_owned()),
             item_id: item_id.to_owned(),
             requested_action,
+            questions: Vec::new(),
         }))
     }
 

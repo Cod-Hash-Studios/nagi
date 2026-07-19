@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
+#[cfg(test)]
+use std::sync::Mutex;
+
 pub use super::attention::{ResponseFailureCode, ResponseFailureDisposition};
 
 use super::{
@@ -36,6 +39,17 @@ const WRITER_LOCK_FILE: &str = "missions.writer.lock";
 const MAX_HEAD_BYTES: u64 = 64 * 1024;
 const MAX_SNAPSHOT_BYTES: u64 = 16 * 1024 * 1024;
 
+#[cfg(test)]
+static FAIL_NEXT_ATOMIC_WRITE_WITH_STORAGE_FULL: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+#[cfg(test)]
+fn fail_next_atomic_write_with_storage_full(destination: &Path) {
+    *FAIL_NEXT_ATOMIC_WRITE_WITH_STORAGE_FULL
+        .lock()
+        .expect("storage-full test fault lock should not be poisoned") =
+        Some(destination.to_path_buf());
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PersistableMissionEvent {
@@ -60,6 +74,23 @@ pub enum PersistableMissionEvent {
         mode: ProviderMode,
         worktree_path: String,
         base_revision: String,
+        #[serde(default)]
+        execute_declared_checks: bool,
+        #[serde(default)]
+        execute_project_recipe: bool,
+        at_millis: u64,
+    },
+    RunContinued {
+        mission_id: String,
+        source_run_id: String,
+        run_id: String,
+        provider: ProviderKind,
+        mode: ProviderMode,
+        worktree_path: String,
+        base_revision: String,
+        execute_declared_checks: bool,
+        execute_project_recipe: bool,
+        handoff_artifact_sha256: String,
         at_millis: u64,
     },
     ProviderSessionBound {
@@ -107,6 +138,13 @@ pub enum PersistableMissionEvent {
         workspace_hash: String,
         at_millis: u64,
     },
+    EvidencePackRecorded {
+        mission_id: String,
+        run_id: String,
+        pack_digest: String,
+        workspace_hash: String,
+        at_millis: u64,
+    },
     ResponseRequested {
         mission_id: String,
         key: ResponseAttemptKey,
@@ -145,6 +183,7 @@ impl PersistableMissionEvent {
             Self::MissionCreated { mission_id, .. }
             | Self::ClosureConfigured { mission_id, .. }
             | Self::RunStarted { mission_id, .. }
+            | Self::RunContinued { mission_id, .. }
             | Self::ProviderSessionBound { mission_id, .. }
             | Self::StatusChanged { mission_id, .. }
             | Self::MissionReady { mission_id, .. }
@@ -152,6 +191,7 @@ impl PersistableMissionEvent {
             | Self::WorktreeClaimed { mission_id, .. }
             | Self::AttentionChanged { mission_id, .. }
             | Self::EvidenceChanged { mission_id, .. }
+            | Self::EvidencePackRecorded { mission_id, .. }
             | Self::ResponseRequested { mission_id, .. }
             | Self::ResponseAcknowledged { mission_id, .. }
             | Self::ResponseFailed { mission_id, .. } => mission_id,
@@ -197,6 +237,23 @@ impl PersistableMissionEvent {
                 }
                 validate_revision(base_revision)
             }
+            Self::RunContinued {
+                source_run_id,
+                run_id,
+                worktree_path,
+                base_revision,
+                handoff_artifact_sha256,
+                ..
+            } => {
+                validate_id("source mission run id", source_run_id)?;
+                validate_id("mission run id", run_id)?;
+                validate_text("mission worktree path", worktree_path, 1, 4 * 1024)?;
+                if !Path::new(worktree_path).is_absolute() {
+                    return Err(MissionStoreError::WorktreePathNotAbsolute);
+                }
+                validate_revision(base_revision)?;
+                validate_hash("handoff artifact sha256", handoff_artifact_sha256)
+            }
             Self::ClosureConfigured { declarations, .. } => {
                 if declarations.is_empty() || declarations.len() > 32 {
                     return Err(MissionStoreError::InvalidClosurePlan);
@@ -226,6 +283,16 @@ impl PersistableMissionEvent {
                 ..
             } => {
                 validate_id("check id", check_id)?;
+                validate_hash("workspace hash", workspace_hash)
+            }
+            Self::EvidencePackRecorded {
+                run_id,
+                pack_digest,
+                workspace_hash,
+                ..
+            } => {
+                validate_id("mission run id", run_id)?;
+                validate_hash("evidence pack digest", pack_digest)?;
                 validate_hash("workspace hash", workspace_hash)
             }
             Self::StatusChanged { .. } => Ok(()),
@@ -300,6 +367,7 @@ impl PersistableMissionEvent {
         Ok(event)
     }
 
+    #[cfg(test)]
     pub(crate) fn run_started(
         mission_id: impl Into<String>,
         run_id: impl Into<String>,
@@ -309,6 +377,31 @@ impl PersistableMissionEvent {
         base_revision: impl Into<String>,
         at_millis: u64,
     ) -> Result<Self, MissionStoreError> {
+        Self::run_started_with_check_execution(
+            mission_id,
+            run_id,
+            provider,
+            mode,
+            worktree_path,
+            base_revision,
+            false,
+            false,
+            at_millis,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn run_started_with_check_execution(
+        mission_id: impl Into<String>,
+        run_id: impl Into<String>,
+        provider: ProviderKind,
+        mode: ProviderMode,
+        worktree_path: impl Into<String>,
+        base_revision: impl Into<String>,
+        execute_declared_checks: bool,
+        execute_project_recipe: bool,
+        at_millis: u64,
+    ) -> Result<Self, MissionStoreError> {
         let event = Self::RunStarted {
             mission_id: mission_id.into(),
             run_id: run_id.into(),
@@ -316,6 +409,39 @@ impl PersistableMissionEvent {
             mode,
             worktree_path: worktree_path.into(),
             base_revision: base_revision.into(),
+            execute_declared_checks,
+            execute_project_recipe,
+            at_millis,
+        };
+        event.validate()?;
+        Ok(event)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn run_continued(
+        mission_id: impl Into<String>,
+        source_run_id: impl Into<String>,
+        run_id: impl Into<String>,
+        provider: ProviderKind,
+        mode: ProviderMode,
+        worktree_path: impl Into<String>,
+        base_revision: impl Into<String>,
+        execute_declared_checks: bool,
+        execute_project_recipe: bool,
+        handoff_artifact_sha256: impl Into<String>,
+        at_millis: u64,
+    ) -> Result<Self, MissionStoreError> {
+        let event = Self::RunContinued {
+            mission_id: mission_id.into(),
+            source_run_id: source_run_id.into(),
+            run_id: run_id.into(),
+            provider,
+            mode,
+            worktree_path: worktree_path.into(),
+            base_revision: base_revision.into(),
+            execute_declared_checks,
+            execute_project_recipe,
+            handoff_artifact_sha256: handoff_artifact_sha256.into(),
             at_millis,
         };
         event.validate()?;
@@ -589,6 +715,14 @@ struct PersistedEvidence {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct PersistedEvidencePack {
+    run_id: String,
+    pack_digest: String,
+    workspace_hash: String,
+    recorded_at_millis: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct PersistedResponseAttempt {
     key: ResponseAttemptKey,
     route: PersistedResponseRoute,
@@ -625,9 +759,13 @@ struct PersistedMission {
     status: MissionStatus,
     #[serde(default)]
     run: Option<PersistedRun>,
+    #[serde(default)]
+    run_history: Vec<PersistedRun>,
     worktree_relative_path: Option<String>,
     attention: BTreeMap<String, PersistedAttention>,
     evidence: BTreeMap<String, PersistedEvidence>,
+    #[serde(default)]
+    latest_evidence_pack: Option<PersistedEvidencePack>,
     responses: BTreeMap<String, PersistedResponseAttempt>,
     ready_receipt: Option<ProofReceipt>,
     archive_receipt: Option<ProofReceipt>,
@@ -641,6 +779,14 @@ struct PersistedRun {
     mode: ProviderMode,
     worktree_path: String,
     base_revision: String,
+    #[serde(default)]
+    execute_declared_checks: bool,
+    #[serde(default)]
+    execute_project_recipe: bool,
+    #[serde(default)]
+    handoff_from_run_id: Option<String>,
+    #[serde(default)]
+    handoff_artifact_sha256: Option<String>,
     provider_session_id: Option<String>,
 }
 
@@ -675,9 +821,11 @@ impl MissionProjection {
                         check_declarations: Vec::new(),
                         status: MissionStatus::Draft,
                         run: None,
+                        run_history: Vec::new(),
                         worktree_relative_path: None,
                         attention: BTreeMap::new(),
                         evidence: BTreeMap::new(),
+                        latest_evidence_pack: None,
                         responses: BTreeMap::new(),
                         ready_receipt: None,
                         archive_receipt: None,
@@ -718,6 +866,8 @@ impl MissionProjection {
                 mode,
                 worktree_path,
                 base_revision,
+                execute_declared_checks,
+                execute_project_recipe,
                 at_millis,
             } => {
                 let mission = self.mission_mut_at(mission_id, *at_millis)?;
@@ -734,8 +884,93 @@ impl MissionProjection {
                     mode: *mode,
                     worktree_path: worktree_path.clone(),
                     base_revision: base_revision.clone(),
+                    execute_declared_checks: *execute_declared_checks,
+                    execute_project_recipe: *execute_project_recipe,
+                    handoff_from_run_id: None,
+                    handoff_artifact_sha256: None,
                     provider_session_id: None,
                 });
+                mission.status = MissionStatus::Preparing;
+                mission.updated_at_millis = logical_at_millis;
+            }
+            PersistableMissionEvent::RunContinued {
+                mission_id,
+                source_run_id,
+                run_id,
+                provider,
+                mode,
+                worktree_path,
+                base_revision,
+                execute_declared_checks,
+                execute_project_recipe,
+                handoff_artifact_sha256,
+                at_millis,
+            } => {
+                let mission = self.mission_mut_at(mission_id, *at_millis)?;
+                let logical_at_millis = (*at_millis).max(mission.updated_at_millis);
+                if !matches!(
+                    mission.status,
+                    MissionStatus::Blocked
+                        | MissionStatus::Failed
+                        | MissionStatus::ReviewRequired
+                        | MissionStatus::ReadyToClose
+                ) {
+                    return Err(MissionStoreError::InvalidStatusTransition {
+                        from: mission.status,
+                        to: MissionStatus::Preparing,
+                    });
+                }
+                if mission.attention.values().any(|attention| {
+                    matches!(
+                        attention.state,
+                        PersistedAttentionState::Open
+                            | PersistedAttentionState::PendingResponse
+                            | PersistedAttentionState::ReconciliationRequired
+                    )
+                }) {
+                    return Err(MissionStoreError::HandoffAttentionUnresolved);
+                }
+                let source = mission.run.as_ref().ok_or(MissionStoreError::RunMissing)?;
+                if source.run_id != *source_run_id
+                    || source.worktree_path != *worktree_path
+                    || source.base_revision != *base_revision
+                    || source.execute_declared_checks != *execute_declared_checks
+                    || source.execute_project_recipe != *execute_project_recipe
+                {
+                    return Err(MissionStoreError::RunMismatch);
+                }
+                if source.provider == *provider {
+                    return Err(MissionStoreError::HandoffSameProvider);
+                }
+                if source.run_id == *run_id
+                    || mission
+                        .run_history
+                        .iter()
+                        .any(|previous| previous.run_id == *run_id)
+                {
+                    return Err(MissionStoreError::RunAlreadyExists);
+                }
+                let source = mission.run.take().ok_or(MissionStoreError::RunMissing)?;
+                mission.run_history.push(source);
+                mission.run = Some(PersistedRun {
+                    run_id: run_id.clone(),
+                    provider: *provider,
+                    mode: *mode,
+                    worktree_path: worktree_path.clone(),
+                    base_revision: base_revision.clone(),
+                    execute_declared_checks: *execute_declared_checks,
+                    execute_project_recipe: *execute_project_recipe,
+                    handoff_from_run_id: Some(source_run_id.clone()),
+                    handoff_artifact_sha256: Some(handoff_artifact_sha256.clone()),
+                    provider_session_id: None,
+                });
+                for evidence in mission.evidence.values_mut() {
+                    evidence.status = EvidenceStatus::Stale;
+                    evidence.updated_at_millis = logical_at_millis;
+                }
+                mission.latest_evidence_pack = None;
+                mission.ready_receipt = None;
+                mission.archive_receipt = None;
                 mission.status = MissionStatus::Preparing;
                 mission.updated_at_millis = logical_at_millis;
             }
@@ -897,6 +1132,36 @@ impl MissionProjection {
                         updated_at_millis: logical_at_millis,
                     },
                 );
+                mission.updated_at_millis = logical_at_millis;
+            }
+            PersistableMissionEvent::EvidencePackRecorded {
+                mission_id,
+                run_id,
+                pack_digest,
+                workspace_hash,
+                at_millis,
+            } => {
+                let mission = self.mission_mut_at(mission_id, *at_millis)?;
+                let logical_at_millis = (*at_millis).max(mission.updated_at_millis);
+                let run = mission.run.as_ref().ok_or(MissionStoreError::RunMissing)?;
+                if run.run_id != *run_id {
+                    return Err(MissionStoreError::RunMismatch);
+                }
+                if !matches!(
+                    mission.status,
+                    MissionStatus::ReviewRequired | MissionStatus::ReadyToClose
+                ) {
+                    return Err(MissionStoreError::InvalidStatusTransition {
+                        from: mission.status,
+                        to: MissionStatus::ReviewRequired,
+                    });
+                }
+                mission.latest_evidence_pack = Some(PersistedEvidencePack {
+                    run_id: run_id.clone(),
+                    pack_digest: pack_digest.clone(),
+                    workspace_hash: workspace_hash.clone(),
+                    recorded_at_millis: logical_at_millis,
+                });
                 mission.updated_at_millis = logical_at_millis;
             }
             PersistableMissionEvent::ResponseRequested {
@@ -1138,6 +1403,69 @@ impl MissionProjection {
             .map(|(mission_id, mission)| MissionView::from_persisted(mission_id, mission))
             .collect()
     }
+
+    pub(crate) fn attention_views(&self) -> Vec<DurableAttentionView> {
+        let mut views = self
+            .missions
+            .iter()
+            .flat_map(|(mission_id, mission)| {
+                mission
+                    .attention
+                    .iter()
+                    .map(move |(attention_id, attention)| {
+                        let response = mission
+                            .responses
+                            .values()
+                            .filter(|response| response.key.attention_id == *attention_id)
+                            .max_by_key(|response| response.key.attempt)
+                            .map(|response| DurableResponseView {
+                                decision: response.decision,
+                                actor_id: response.actor_id.clone(),
+                                state: response.state.clone(),
+                                updated_at_millis: response.updated_at_millis,
+                                attempt: response.key.attempt,
+                            });
+                        DurableAttentionView {
+                            mission_id: mission_id.clone(),
+                            attention_id: attention_id.clone(),
+                            state: attention.state,
+                            risk: attention.risk,
+                            updated_at_millis: attention.updated_at_millis,
+                            response,
+                        }
+                    })
+            })
+            .collect::<Vec<_>>();
+        views.sort_by(|left, right| {
+            left.mission_id
+                .cmp(&right.mission_id)
+                .then_with(|| left.attention_id.cmp(&right.attention_id))
+        });
+        views
+    }
+
+    pub(crate) fn unresolved_attention_ids(
+        &self,
+        mission_id: &str,
+    ) -> Result<BTreeSet<String>, MissionStoreError> {
+        let mission = self
+            .missions
+            .get(mission_id)
+            .ok_or_else(|| MissionStoreError::MissionNotFound(mission_id.to_owned()))?;
+        Ok(mission
+            .attention
+            .iter()
+            .filter(|(_, attention)| {
+                matches!(
+                    attention.state,
+                    PersistedAttentionState::Open
+                        | PersistedAttentionState::PendingResponse
+                        | PersistedAttentionState::ReconciliationRequired
+                )
+            })
+            .map(|(attention_id, _)| attention_id.clone())
+            .collect())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1151,7 +1479,39 @@ pub(crate) struct MissionView {
     pub(crate) check_declarations: Vec<CheckDeclaration>,
     pub(crate) status: MissionStatus,
     pub(crate) run: Option<MissionRunView>,
+    pub(crate) run_history: Vec<MissionRunView>,
     pub(crate) unresolved_attention_count: usize,
+    pub(crate) latest_evidence_pack_digest: Option<String>,
+    pub(crate) ready_receipt: Option<ProofReceipt>,
+    pub(crate) archive_receipt: Option<ProofReceipt>,
+    pub(crate) evidence: Vec<MissionEvidenceView>,
+    pub(crate) updated_at_millis: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DurableAttentionView {
+    pub(crate) mission_id: String,
+    pub(crate) attention_id: String,
+    pub(crate) state: PersistedAttentionState,
+    pub(crate) risk: AttentionRisk,
+    pub(crate) updated_at_millis: u64,
+    pub(crate) response: Option<DurableResponseView>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DurableResponseView {
+    pub(crate) decision: AttentionDecision,
+    pub(crate) actor_id: String,
+    pub(crate) state: PersistedResponseState,
+    pub(crate) updated_at_millis: u64,
+    pub(crate) attempt: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MissionEvidenceView {
+    pub(crate) check_id: String,
+    pub(crate) status: EvidenceStatus,
+    pub(crate) workspace_hash: String,
     pub(crate) updated_at_millis: u64,
 }
 
@@ -1163,6 +1523,10 @@ pub(crate) struct MissionRunView {
     pub(crate) worktree_path: String,
     pub(crate) base_revision: String,
     pub(crate) provider_session_id: Option<String>,
+    pub(crate) execute_declared_checks: bool,
+    pub(crate) execute_project_recipe: bool,
+    pub(crate) handoff_from_run_id: Option<String>,
+    pub(crate) handoff_artifact_sha256: Option<String>,
 }
 
 impl MissionView {
@@ -1188,17 +1552,42 @@ impl MissionView {
             acceptance_criteria: mission.acceptance_criteria.clone(),
             check_declarations: mission.check_declarations.clone(),
             status: mission.status,
-            run: mission.run.as_ref().map(|run| MissionRunView {
-                run_id: run.run_id.clone(),
-                provider: run.provider,
-                mode: run.mode,
-                worktree_path: run.worktree_path.clone(),
-                base_revision: run.base_revision.clone(),
-                provider_session_id: run.provider_session_id.clone(),
-            }),
+            run: mission.run.as_ref().map(mission_run_view),
+            run_history: mission.run_history.iter().map(mission_run_view).collect(),
             unresolved_attention_count,
+            latest_evidence_pack_digest: mission
+                .latest_evidence_pack
+                .as_ref()
+                .map(|pack| pack.pack_digest.clone()),
+            ready_receipt: mission.ready_receipt.clone(),
+            archive_receipt: mission.archive_receipt.clone(),
+            evidence: mission
+                .evidence
+                .iter()
+                .map(|(check_id, evidence)| MissionEvidenceView {
+                    check_id: check_id.clone(),
+                    status: evidence.status,
+                    workspace_hash: evidence.workspace_hash.clone(),
+                    updated_at_millis: evidence.updated_at_millis,
+                })
+                .collect(),
             updated_at_millis: mission.updated_at_millis,
         }
+    }
+}
+
+fn mission_run_view(run: &PersistedRun) -> MissionRunView {
+    MissionRunView {
+        run_id: run.run_id.clone(),
+        provider: run.provider,
+        mode: run.mode,
+        worktree_path: run.worktree_path.clone(),
+        base_revision: run.base_revision.clone(),
+        provider_session_id: run.provider_session_id.clone(),
+        execute_declared_checks: run.execute_declared_checks,
+        execute_project_recipe: run.execute_project_recipe,
+        handoff_from_run_id: run.handoff_from_run_id.clone(),
+        handoff_artifact_sha256: run.handoff_artifact_sha256.clone(),
     }
 }
 
@@ -2200,6 +2589,23 @@ fn atomic_write_json_limited<T: Serialize>(
     limit: u64,
     kind: FileLimitKind,
 ) -> Result<(), MissionStoreError> {
+    #[cfg(test)]
+    if FAIL_NEXT_ATOMIC_WRITE_WITH_STORAGE_FULL
+        .lock()
+        .expect("storage-full test fault lock should not be poisoned")
+        .as_ref()
+        .is_some_and(|target| target == destination)
+    {
+        *FAIL_NEXT_ATOMIC_WRITE_WITH_STORAGE_FULL
+            .lock()
+            .expect("storage-full test fault lock should not be poisoned") = None;
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::StorageFull,
+            "simulated storage exhaustion",
+        )
+        .into());
+    }
+
     verify_existing_private_file_if_present(destination)?;
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2603,6 +3009,8 @@ pub enum MissionStoreError {
     MissionNotFound(String),
     #[error("mission run already started")]
     RunAlreadyStarted,
+    #[error("mission run id was already used by this mission")]
+    RunAlreadyExists,
     #[error("mission closure plan is invalid")]
     InvalidClosurePlan,
     #[error("mission closure plan is missing")]
@@ -2615,6 +3023,10 @@ pub enum MissionStoreError {
     RunMissing,
     #[error("mission run does not match the durable run")]
     RunMismatch,
+    #[error("handoff target must differ from the source provider")]
+    HandoffSameProvider,
+    #[error("handoff requires all source-run attention to be resolved")]
+    HandoffAttentionUnresolved,
     #[error("attention {0} does not exist")]
     AttentionNotFound(String),
     #[error("response attempt generation and attempt must be greater than zero")]
@@ -2719,6 +3131,40 @@ mod bounded_replay_tests {
             10,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn storage_full_after_journal_append_poisoned_writer_recovers_exactly_on_restart() {
+        let directory = tempfile::tempdir().unwrap();
+        let event = created("mission-disk-full", "Recover disk pressure");
+        let mut store = MissionStore::open(directory.path()).unwrap();
+
+        fail_next_atomic_write_with_storage_full(&store.head_path);
+        let error = store.commit("event-disk-full", event.clone()).unwrap_err();
+        assert!(matches!(
+            error,
+            MissionStoreError::Io(ref source)
+                if source.kind() == std::io::ErrorKind::StorageFull
+        ));
+        assert!(store
+            .projection()
+            .mission_view("mission-disk-full")
+            .is_none());
+        assert!(matches!(
+            store.commit("event-after-disk-full", created("mission-after", "Blocked")),
+            Err(MissionStoreError::WriterPoisoned)
+        ));
+        drop(store);
+
+        let mut recovered = MissionStore::open(directory.path()).unwrap();
+        assert_eq!(recovered.last_sequence(), 1);
+        assert!(recovered
+            .projection()
+            .mission_view("mission-disk-full")
+            .is_some());
+        let duplicate = recovered.commit("event-disk-full", event).unwrap();
+        assert!(duplicate.was_duplicate());
+        assert_eq!(duplicate.sequence(), 1);
     }
 
     #[test]

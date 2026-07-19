@@ -137,6 +137,15 @@ impl App {
                     crate::api::schema::PluginCommandStatus::Failed
                 };
             }
+            if let Some(log) = self
+                .state
+                .plugin_command_logs
+                .iter()
+                .find(|log| log.log_id == log_id)
+                .cloned()
+            {
+                self.finish_plugin_inspector_command(&log);
+            }
             return;
         }
 
@@ -1084,6 +1093,12 @@ impl App {
             }
             Method::PluginLink(params) => {
                 return self.handle_plugin_link(request.id, params);
+            }
+            Method::PluginCapabilityApprove(params) => {
+                return self.handle_plugin_capability_approve(request.id, params);
+            }
+            Method::PluginCapabilityRevoke(params) => {
+                return self.handle_plugin_capability_revoke(request.id, params);
             }
             Method::PluginList(params) => {
                 return self.handle_plugin_list(request.id, params);

@@ -26,10 +26,13 @@ pub(super) fn command() -> Command {
         .subcommand(completion_command())
         .subcommand(update_command())
         .subcommand(status_command())
+        .subcommand(doctor_command())
         .subcommand(config_command())
         .subcommand(channel_command())
         .subcommand(server_command())
         .subcommand(api_command())
+        .subcommand(mission_command())
+        .subcommand(project_command())
         .subcommand(workspace_command())
         .subcommand(worktree_command())
         .subcommand(tab_command())
@@ -85,10 +88,31 @@ fn status_command() -> Command {
         )
 }
 
+fn doctor_command() -> Command {
+    Command::new("doctor")
+        .about("Check repository, providers, terminal and configuration")
+        .arg(json_flag())
+}
+
 fn config_command() -> Command {
     Command::new("config")
         .about("Manage local configuration")
         .subcommand(Command::new("check").about("Validate config.toml and print diagnostics"))
+        .subcommand(
+            Command::new("import-ghostty-theme")
+                .about("Import only colors from a Ghostty theme")
+                .arg(
+                    Arg::new("path")
+                        .value_name("PATH")
+                        .required(true)
+                        .help("Ghostty theme file"),
+                )
+                .arg(
+                    option("name", "NAME")
+                        .required(true)
+                        .help("Safe name for the Nagi theme"),
+                ),
+        )
         .subcommand(Command::new("reset-keys").about("Reset custom keybindings"))
 }
 
@@ -137,6 +161,132 @@ fn api_command() -> Command {
                 .arg(json_flag())
                 .arg(path_option("output", "PATH")),
         )
+}
+
+fn mission_command() -> Command {
+    Command::new("mission")
+        .about("Inspect missions and their verified proof")
+        .subcommand(Command::new("list").about("List missions"))
+        .subcommand(id_command("get", "mission_id", "Show a mission"))
+        .subcommand(id_command(
+            "proof",
+            "mission_id",
+            "Print the portable proof receipt for a closed-ready mission",
+        ))
+        .subcommand(id_command(
+            "close",
+            "mission_id",
+            "Re-run fresh checks and archive a ready mission",
+        ))
+        .subcommand(
+            id_command(
+                "handoff",
+                "mission_id",
+                "Preview a redacted provider handoff artifact",
+            )
+            .arg(Arg::new("to").long("to").required(true).value_parser([
+                "codex",
+                "claude-code",
+                "opencode",
+            ]))
+            .arg(
+                Arg::new("preview")
+                    .long("preview")
+                    .required(true)
+                    .action(ArgAction::SetTrue),
+            ),
+        )
+}
+
+fn project_command() -> Command {
+    Command::new("project")
+        .about("Validate and run consent-gated project isolation recipes")
+        .subcommand(
+            Command::new("detect")
+                .about("Suggest a project recipe without writing files")
+                .arg(
+                    Arg::new("path")
+                        .value_name("PATH")
+                        .value_hint(ValueHint::DirPath),
+                )
+                .arg(json_flag()),
+        )
+        .subcommand(
+            Command::new("validate")
+                .about("Validate .nagi/project.toml without executing commands")
+                .arg(
+                    Arg::new("path")
+                        .value_name("PATH")
+                        .value_hint(ValueHint::DirPath),
+                )
+                .arg(json_flag()),
+        )
+        .subcommand(project_exec_command(
+            "setup",
+            "Run the declared setup command",
+        ))
+        .subcommand(
+            project_exec_command("check", "Run declared project checks")
+                .arg(option("id", "ID").help("Run only one declared check id")),
+        )
+        .subcommand(project_exec_command(
+            "cleanup",
+            "Run declared project cleanup commands",
+        ))
+        .subcommand(
+            Command::new("services")
+                .about("Start, inspect, or stop durable project services")
+                .subcommand(project_service_command("start").arg(flag("yes")))
+                .subcommand(project_service_command("status"))
+                .subcommand(project_service_command("stop").arg(flag("yes"))),
+        )
+        .subcommand(
+            Command::new("resources")
+                .about("Preview or clean orphaned project resources")
+                .subcommand(
+                    Command::new("preview")
+                        .about("Preview orphaned project resources")
+                        .arg(json_flag()),
+                )
+                .subcommand(
+                    Command::new("apply")
+                        .about("Clean a previously previewed orphan set")
+                        .arg(option("digest", "DIGEST").required(true))
+                        .arg(flag("yes"))
+                        .arg(json_flag()),
+                ),
+        )
+}
+
+fn project_exec_command(name: &'static str, about: &'static str) -> Command {
+    Command::new(name)
+        .about(about)
+        .arg(
+            Arg::new("path")
+                .value_name("PATH")
+                .value_hint(ValueHint::DirPath),
+        )
+        .arg(flag("yes"))
+        .arg(json_flag())
+}
+
+fn project_service_command(name: &'static str) -> Command {
+    let about = match name {
+        "start" => "Start declared project services",
+        "status" => "Show declared project service status",
+        "stop" => "Stop declared project services",
+        _ => "Manage declared project services",
+    };
+    Command::new(name)
+        .about(about)
+        .arg(
+            Arg::new("path")
+                .value_name("PATH")
+                .value_hint(ValueHint::DirPath),
+        )
+        .arg(option("mission", "ID").required(true))
+        .arg(option("run", "ID").required(true))
+        .arg(json_flag())
 }
 
 fn workspace_command() -> Command {
@@ -633,7 +783,8 @@ fn plugin_command() -> Command {
                         .short('y')
                         .long("yes")
                         .action(ArgAction::SetTrue),
-                ),
+                )
+                .arg(flag("trust-native")),
         )
         .subcommand(
             Command::new("uninstall")
@@ -645,7 +796,8 @@ fn plugin_command() -> Command {
                 .about("Link a local plugin")
                 .arg(path_arg("path", "PATH"))
                 .arg(flag("disabled"))
-                .arg(flag("enabled")),
+                .arg(flag("enabled"))
+                .arg(flag("trust-native")),
         )
         .subcommand(
             Command::new("unlink")
@@ -942,6 +1094,25 @@ mod tests {
         let cmd = super::command();
         let pane_read = command_path(&cmd, &["pane", "read"]);
         assert!(has_option(pane_read, "raw"));
+    }
+
+    #[test]
+    fn spec_exposes_portable_mission_proof() {
+        let cmd = super::command();
+        let proof = command_path(&cmd, &["mission", "proof"]);
+        assert!(proof
+            .get_arguments()
+            .any(|arg| arg.get_id() == "mission_id"));
+    }
+
+    #[test]
+    fn spec_exposes_project_detection_and_validation() {
+        let cmd = super::command();
+        let detect = command_path(&cmd, &["project", "detect"]);
+        assert!(detect.get_arguments().any(|arg| arg.get_id() == "path"));
+        assert!(has_option(detect, "json"));
+        let validate = command_path(&cmd, &["project", "validate"]);
+        assert!(has_option(validate, "json"));
     }
 
     #[test]

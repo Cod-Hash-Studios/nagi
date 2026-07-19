@@ -200,6 +200,7 @@ impl ProviderRequestKey {
             ProviderKind::Codex => 0,
             ProviderKind::ClaudeCode => 1,
             ProviderKind::OpenCode => 2,
+            ProviderKind::Acp => 3,
         });
         digest.string(&self.mission_id);
         digest.string(&self.mission_run_id);

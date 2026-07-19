@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
@@ -16,7 +16,7 @@ use super::{
     runtime::AuthoritySnapshot,
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProofIdentity {
     mission_id: String,
     run_id: String,
@@ -80,6 +80,14 @@ impl ClosurePlan {
     fn matches_declarations(&self, declarations: &[CheckDeclaration]) -> bool {
         self.checkset_digest == digest_checkset(declarations)
     }
+
+    pub(crate) fn criteria_digest(&self) -> &str {
+        &self.criteria_digest
+    }
+
+    pub(crate) fn checkset_digest(&self) -> &str {
+        &self.checkset_digest
+    }
 }
 
 impl ProofIdentity {
@@ -139,6 +147,14 @@ impl ProofIdentity {
 
     pub(crate) fn worktree_identity(&self) -> &str {
         &self.worktree_identity
+    }
+
+    pub(crate) fn repository_identity(&self) -> &str {
+        &self.repository_identity
+    }
+
+    pub(crate) fn base_revision(&self) -> &str {
+        &self.base_revision
     }
 }
 
@@ -249,28 +265,108 @@ impl VerifiedProof {
     }
 
     pub(crate) fn seal_digest(&self) -> String {
-        let mut digest = CanonicalDigest::new(b"mission-verified-proof-seal-v1");
-        digest.string(&self.identity_digest);
-        digest.string(&self.workspace_digest);
-        digest.string(&self.checkset_digest);
-        digest.string(&self.criteria_digest);
-        digest.string(&self.attention_digest);
-        digest.string(&self.evidence_digest);
-        digest.string(&self.authority_head_digest);
-        digest.string(&self.lease_digest);
-        digest.u64(self.authority_sequence);
-        digest.u64(self.verified_at_millis);
-        digest.finish()
+        seal_digest_from_parts(
+            &self.identity_digest,
+            &self.workspace_digest,
+            &self.checkset_digest,
+            &self.criteria_digest,
+            &self.attention_digest,
+            &self.evidence_digest,
+            &self.authority_head_digest,
+            &self.lease_digest,
+            self.authority_sequence,
+            self.verified_at_millis,
+        )
     }
 
     pub(crate) fn subject_digest(&self) -> String {
-        let mut digest = CanonicalDigest::new(b"mission-verified-proof-subject-v1");
-        digest.string(&self.identity_digest);
-        digest.string(&self.workspace_digest);
-        digest.string(&self.checkset_digest);
-        digest.string(&self.criteria_digest);
-        digest.finish()
+        subject_digest_from_parts(
+            &self.identity_digest,
+            &self.workspace_digest,
+            &self.checkset_digest,
+            &self.criteria_digest,
+        )
     }
+}
+
+pub(crate) fn proof_subject_digest(
+    identity: &ProofIdentity,
+    workspace: &WorkspaceSnapshot,
+    closure_plan: &ClosurePlan,
+) -> String {
+    subject_digest_from_parts(
+        &identity.digest(),
+        &workspace.digest(),
+        closure_plan.checkset_digest(),
+        closure_plan.criteria_digest(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn proof_seal_digest(
+    identity: &ProofIdentity,
+    workspace: &WorkspaceSnapshot,
+    closure_plan: &ClosurePlan,
+    attention_digest: &str,
+    evidence_digest: &str,
+    authority_head_digest: &str,
+    lease_digest: &str,
+    authority_sequence: u64,
+    verified_at_millis: u64,
+) -> String {
+    seal_digest_from_parts(
+        &identity.digest(),
+        &workspace.digest(),
+        closure_plan.checkset_digest(),
+        closure_plan.criteria_digest(),
+        attention_digest,
+        evidence_digest,
+        authority_head_digest,
+        lease_digest,
+        authority_sequence,
+        verified_at_millis,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn seal_digest_from_parts(
+    identity_digest: &str,
+    workspace_digest: &str,
+    checkset_digest: &str,
+    criteria_digest: &str,
+    attention_digest: &str,
+    evidence_digest: &str,
+    authority_head_digest: &str,
+    lease_digest: &str,
+    authority_sequence: u64,
+    verified_at_millis: u64,
+) -> String {
+    let mut digest = CanonicalDigest::new(b"mission-verified-proof-seal-v1");
+    digest.string(identity_digest);
+    digest.string(workspace_digest);
+    digest.string(checkset_digest);
+    digest.string(criteria_digest);
+    digest.string(attention_digest);
+    digest.string(evidence_digest);
+    digest.string(authority_head_digest);
+    digest.string(lease_digest);
+    digest.u64(authority_sequence);
+    digest.u64(verified_at_millis);
+    digest.finish()
+}
+
+fn subject_digest_from_parts(
+    identity_digest: &str,
+    workspace_digest: &str,
+    checkset_digest: &str,
+    criteria_digest: &str,
+) -> String {
+    let mut digest = CanonicalDigest::new(b"mission-verified-proof-subject-v1");
+    digest.string(identity_digest);
+    digest.string(workspace_digest);
+    digest.string(checkset_digest);
+    digest.string(criteria_digest);
+    digest.finish()
 }
 
 pub struct ProofEvaluator;
@@ -390,7 +486,7 @@ fn digest_criteria(criteria: &BTreeSet<String>) -> String {
     digest.finish()
 }
 
-pub(super) fn digest_attention(attention_ids: &BTreeSet<String>) -> String {
+pub(crate) fn digest_attention(attention_ids: &BTreeSet<String>) -> String {
     let mut digest = CanonicalDigest::new(b"mission-unresolved-attention-v1");
     digest.u64(attention_ids.len() as u64);
     for item_id in attention_ids {
@@ -399,7 +495,7 @@ pub(super) fn digest_attention(attention_ids: &BTreeSet<String>) -> String {
     digest.finish()
 }
 
-pub(super) fn digest_evidence(records: &BTreeMap<String, EvidenceRecord>) -> String {
+pub(crate) fn digest_evidence(records: &BTreeMap<String, EvidenceRecord>) -> String {
     let mut digest = CanonicalDigest::new(b"mission-evidence-set-v1");
     digest.u64(records.len() as u64);
     for (check_id, record) in records {

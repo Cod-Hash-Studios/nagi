@@ -4,9 +4,21 @@ use tokio::sync::mpsc;
 
 use crate::mission::model::ProviderKind;
 
+mod acp;
+mod adapter;
 mod claude;
 mod codex;
 mod opencode;
+mod registry;
+
+#[cfg(test)]
+mod conformance;
+
+pub(crate) use acp::AcpEndpoint;
+pub(crate) use adapter::{
+    AdapterContractVersion, ProviderAdapterDescriptor, ProviderCapabilities, ProviderRuntimeVersion,
+};
+pub(crate) use opencode::TESTED_VERSION as OPENCODE_TESTED_VERSION;
 
 const COMMAND_CHANNEL_CAPACITY: usize = 32;
 
@@ -102,6 +114,15 @@ impl ResponseToken {
             method: method.into(),
         }
     }
+
+    fn for_external(request_id: &serde_json::Value, method: impl Into<String>) -> Option<Self> {
+        let rpc_id = RpcId::from_json(request_id)?;
+        Some(Self {
+            request_id: rpc_id.audit_id(),
+            rpc_id,
+            method: method.into(),
+        })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -120,6 +141,24 @@ pub(crate) struct ProviderAttention {
     pub(crate) turn_id: String,
     pub(crate) item_id: String,
     pub(crate) requested_action: String,
+    pub(crate) questions: Vec<ProviderQuestion>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ProviderQuestion {
+    /// Exact key expected by the provider response protocol.
+    pub(crate) id: String,
+    pub(crate) header: String,
+    pub(crate) prompt: String,
+    pub(crate) options: Vec<ProviderQuestionOption>,
+    pub(crate) multiple: bool,
+    pub(crate) custom_allowed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ProviderQuestionOption {
+    pub(crate) label: String,
+    pub(crate) description: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -230,23 +269,67 @@ impl ManagedProviderHandle {
 pub(crate) struct ManagedProviderSupervisor;
 
 impl ManagedProviderSupervisor {
+    #[allow(
+        dead_code,
+        reason = "adapter descriptors are inspected by the external conformance harness"
+    )]
+    pub(crate) fn descriptor(
+        provider: ProviderKind,
+        contract_version: AdapterContractVersion,
+    ) -> Result<ProviderAdapterDescriptor, ManagedProviderError> {
+        registry::resolve(provider, contract_version).map(|adapter| adapter.descriptor())
+    }
+
     pub(crate) fn spawn(
         provider: ProviderKind,
         executable: Option<PathBuf>,
         events: mpsc::Sender<ProviderEvent>,
     ) -> Result<ManagedProviderHandle, ManagedProviderError> {
-        let (commands, command_rx) = mpsc::channel(COMMAND_CHANNEL_CAPACITY);
-        match provider {
-            ProviderKind::Codex => codex::spawn(executable, command_rx, events),
-            ProviderKind::ClaudeCode => claude::spawn(executable, command_rx, events),
-            ProviderKind::OpenCode => opencode::spawn(executable, command_rx, events),
+        if provider == ProviderKind::Acp {
+            return Err(ManagedProviderError::AcpEndpointUnavailable);
         }
+        Self::spawn_with_contract(
+            provider,
+            AdapterContractVersion::CURRENT,
+            executable,
+            events,
+        )
+    }
+
+    pub(crate) fn spawn_acp(
+        endpoint: AcpEndpoint,
+        events: mpsc::Sender<ProviderEvent>,
+    ) -> Result<ManagedProviderHandle, ManagedProviderError> {
+        let (commands, command_rx) = mpsc::channel(COMMAND_CHANNEL_CAPACITY);
+        acp::spawn(endpoint, command_rx, events);
+        Ok(ManagedProviderHandle { commands })
+    }
+
+    pub(crate) fn spawn_with_contract(
+        provider: ProviderKind,
+        contract_version: AdapterContractVersion,
+        executable: Option<PathBuf>,
+        events: mpsc::Sender<ProviderEvent>,
+    ) -> Result<ManagedProviderHandle, ManagedProviderError> {
+        let adapter = registry::resolve(provider, contract_version)?;
+        let (commands, command_rx) = mpsc::channel(COMMAND_CHANNEL_CAPACITY);
+        adapter.spawn(executable, command_rx, events);
         Ok(ManagedProviderHandle { commands })
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ManagedProviderError {
+    #[error(
+        "provider {provider:?} does not support adapter contract {requested}; supported contract is {supported}"
+    )]
+    UnsupportedAdapterContract {
+        provider: ProviderKind,
+        requested: AdapterContractVersion,
+        supported: AdapterContractVersion,
+    },
+    #[error("ACP provider is not configured; set providers.acp.command in config.toml")]
+    AcpEndpointUnavailable,
     #[error("managed provider command queue is full")]
     Busy,
     #[error("managed provider command channel is disconnected")]

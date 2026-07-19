@@ -13,8 +13,8 @@ use tokio::{
 };
 
 use super::{
-    AttentionClass, ProviderAttention, ProviderCommand, ProviderEvent, ProviderResponse, RpcId,
-    StartOrResume, TransportFailure, TurnOutcome,
+    AttentionClass, ProviderAttention, ProviderCommand, ProviderEvent, ProviderQuestion,
+    ProviderQuestionOption, ProviderResponse, RpcId, StartOrResume, TransportFailure, TurnOutcome,
 };
 
 const MAX_PROVIDER_FRAME_BYTES: usize = 1024 * 1024;
@@ -420,7 +420,15 @@ impl Actor {
         let thread_id = required_string(params, "/threadId")?;
         let turn_id = required_string(params, "/turnId")?;
         let item_id = required_string(params, "/itemId")?;
-        let requested_action = requested_action(class.clone(), params);
+        let questions = if class == AttentionClass::UserInput {
+            parse_questions(params)?
+        } else {
+            Vec::new()
+        };
+        let requested_action = questions
+            .first()
+            .map(|question| question.prompt.clone())
+            .unwrap_or_else(|| requested_action(class.clone(), params));
         let request_id = rpc_id.audit_id();
         let attention = ProviderAttention {
             token: super::ResponseToken {
@@ -433,6 +441,7 @@ impl Actor {
             turn_id,
             item_id,
             requested_action,
+            questions,
         };
         self.emit(ProviderEvent::AttentionRequested {
             run_id: self.run_id(),
@@ -626,6 +635,62 @@ fn requested_action(class: AttentionClass, params: &Value) -> String {
     bounded_text(raw)
 }
 
+fn parse_questions(params: &Value) -> Result<Vec<ProviderQuestion>, ()> {
+    let values = params
+        .get("questions")
+        .and_then(Value::as_array)
+        .ok_or(())?;
+    if !(1..=4).contains(&values.len()) {
+        return Err(());
+    }
+    values
+        .iter()
+        .map(|value| {
+            let id = required_string(value, "/id")?;
+            let prompt = required_string(value, "/question")?;
+            let header = value
+                .get("header")
+                .and_then(Value::as_str)
+                .map(bounded_text)
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "Question".to_owned());
+            let options = value
+                .get("options")
+                .and_then(Value::as_array)
+                .map(|options| {
+                    if options.len() > 8 {
+                        return Err(());
+                    }
+                    options
+                        .iter()
+                        .map(|option| {
+                            let label = required_string(option, "/label")?;
+                            let description = option
+                                .get("description")
+                                .and_then(Value::as_str)
+                                .map(bounded_text)
+                                .unwrap_or_default();
+                            Ok(ProviderQuestionOption { label, description })
+                        })
+                        .collect::<Result<Vec<_>, ()>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            Ok(ProviderQuestion {
+                id,
+                header,
+                prompt,
+                options,
+                multiple: value
+                    .get("multiSelect")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                custom_allowed: true,
+            })
+        })
+        .collect()
+}
+
 fn bounded_text(value: &str) -> String {
     if value.len() <= MAX_VISIBLE_TEXT_BYTES {
         return value.to_owned();
@@ -674,6 +739,39 @@ mod tests {
         assert_eq!(attention.class, AttentionClass::CommandApproval);
         assert_eq!(attention.token.request_id(), "string:approval-rpc-1");
         assert_eq!(attention.requested_action, "cargo test");
+        assert!(attention.questions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn user_input_request_preserves_exact_question_ids_and_choices() {
+        let (mut actor, mut events) = actor();
+        actor
+            .handle_server_request(json!({
+                "id": "question-rpc-1",
+                "method": "item/tool/requestUserInput",
+                "params": {
+                    "threadId": "thread-1",
+                    "turnId": "turn-1",
+                    "itemId": "item-1",
+                    "questions": [{
+                        "id": "database-id",
+                        "header": "Database",
+                        "question": "Which database?",
+                        "options": [{"label": "Postgres", "description": "Relational"}]
+                    }]
+                }
+            }))
+            .await
+            .unwrap();
+
+        let ProviderEvent::AttentionRequested { attention, .. } = events.recv().await.unwrap()
+        else {
+            panic!("expected question attention");
+        };
+        assert_eq!(attention.requested_action, "Which database?");
+        assert_eq!(attention.questions.len(), 1);
+        assert_eq!(attention.questions[0].id, "database-id");
+        assert_eq!(attention.questions[0].options[0].label, "Postgres");
     }
 
     #[tokio::test]

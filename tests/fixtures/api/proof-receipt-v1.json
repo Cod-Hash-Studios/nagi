@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "mission_id": "mission-1",
+    "run_id": "run-1",
+    "repository_identity": "/repo",
+    "worktree_identity": "/repo",
+    "base_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "head_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "workspace_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "criteria_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "checkset_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+  "attention_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+  "evidence_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+  "subject_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+  "seal_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+  "authority_head_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+  "lease_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+  "authority_sequence": 42,
+  "verified_at_millis": 120,
+  "decision": "ready_to_close",
+  "fresh_evidence": [
+    {
+      "check_id": "tests",
+      "declaration_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "evidence_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "required": true,
+      "covered_criterion_ids": [
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "source": {
+        "kind": "command",
+        "program": "cargo",
+        "args": [
+          "test"
+        ],
+        "cwd": ".",
+        "exit_code": 0,
+        "started_at_millis": 100,
+        "finished_at_millis": 110
+      },
+      "artifacts": [
+        {
+          "path": "target/report.json",
+          "content_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "media_type": "application/json"
+        }
+      ]
+    }
+  ]
+}

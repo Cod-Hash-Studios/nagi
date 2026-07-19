@@ -64,6 +64,7 @@ mod cli;
 mod client;
 mod config;
 mod detect;
+mod doctor;
 mod events;
 mod ghostty;
 mod handoff_runtime;
@@ -79,16 +80,19 @@ mod mission;
 mod pane;
 mod persist;
 mod platform;
+mod plugin_capabilities;
 mod plugin_command;
 mod plugin_paths;
 mod popup_size;
 mod product_announcements;
+mod project_recipe;
 mod protocol;
 mod pty;
 mod raw_input;
 mod release_notes;
 mod remote;
 mod render_prof;
+mod resources;
 mod selection;
 mod server;
 mod session;
@@ -97,6 +101,7 @@ mod terminal;
 mod terminal_modes;
 mod terminal_notify;
 mod terminal_theme;
+mod theme;
 mod ui;
 mod update;
 mod workspace;
@@ -114,16 +119,17 @@ const DEFAULT_CONFIG: &str = r##"# nagi configuration
 # onboarding = true
 
 [theme]
-# Built-in themes: catppuccin, terminal, tokyo-night, dracula, nord,
+# Built-in themes: nagi-night, nagi-dawn, catppuccin, terminal, tokyo-night, dracula, nord,
 #                  gruvbox, one-dark, solarized, kanagawa, rose-pine,
 #                  vesper
-# name = "catppuccin"
+# Custom named themes load from ~/.config/nagi/themes/<name>.toml.
+# name = "nagi-night"
 
 # Follow host terminal light/dark appearance and switch Nagi UI themes.
 # Existing manual behavior is unchanged unless this is true.
 # auto_switch = false
-# dark_name = "catppuccin"
-# light_name = "catppuccin-latte"
+# dark_name = "nagi-night"
+# light_name = "nagi-dawn"
 
 # Override individual color tokens on top of the base theme.
 # Accepts: hex (#rrggbb), named colors, rgb(r,g,b), or panel_bg = "reset"
@@ -262,6 +268,9 @@ const DEFAULT_CONFIG: &str = r##"# nagi configuration
 # Terminal width at or below which Nagi uses the mobile single-column layout.
 # Increase this for foldables, tablets, or wide phone terminals.
 # mobile_width_threshold = 64
+
+# Essential icons can use Unicode or strict ASCII. Neither requires a Nerd Font.
+# icon_style = "unicode"
 
 # Capture mouse input for Nagi's mouse UI.
 # Set false to let the terminal handle normal clicks, such as Cmd-clicking URLs.

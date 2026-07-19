@@ -23,8 +23,8 @@ use super::{
         Confidence, ObservationSource, SessionObservation, SessionSnapshot, SessionStatus,
     },
     runtime::{
-        AuthoritySnapshot, ConfigureMission, CreateMission, MissionRuntime, MissionRuntimeError,
-        StartRun,
+        AuthoritySnapshot, ConfigureMission, ContinueRun, CreateMission, MissionRuntime,
+        MissionRuntimeError, StartRun,
     },
     store::{
         MissionStore, MissionStoreReader, PersistableMissionEvent, PersistedAttentionState,
@@ -57,6 +57,39 @@ fn disabled_mission_runtime_returns_typed_feature_unavailable() {
     .unwrap();
     let response: serde_json::Value = serde_json::from_str(&outcome.response).unwrap();
     assert_eq!(response["error"]["code"], "feature_unavailable");
+    assert!(!outcome.changed);
+}
+
+#[test]
+fn portable_proof_is_rejected_until_the_mission_is_verified() {
+    let directory = tempfile::tempdir().unwrap();
+    let claims = directory.path().join("claims");
+    let repository = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .canonicalize()
+        .unwrap();
+    let mut runtime = MissionRuntime::open_owned(directory.path(), &claims).unwrap();
+    runtime
+        .create_mission(CreateMission {
+            mission_id: "mission-unverified".into(),
+            title: "Do not invent proof".into(),
+            repository_path: repository.to_string_lossy().into_owned(),
+            objective: "Reject a proof request before verification".into(),
+            acceptance_criteria: vec!["A fresh check passes".into()],
+            at_millis: 1,
+        })
+        .unwrap();
+
+    let outcome = crate::server::mission_bridge::handle(
+        &mut runtime,
+        "proof-too-early",
+        &crate::api::schema::Method::MissionProofGet(crate::api::schema::MissionTarget {
+            mission_id: "mission-unverified".into(),
+        }),
+    )
+    .unwrap();
+    let response: crate::api::schema::ErrorResponse =
+        serde_json::from_str(&outcome.response).unwrap();
+    assert_eq!(response.error.code, "proof_not_ready");
     assert!(!outcome.changed);
 }
 
@@ -321,6 +354,8 @@ fn closure_configuration_is_idempotent_durable_and_required_before_start() {
         mode: ProviderMode::Managed,
         worktree_path: repository.to_string_lossy().into_owned(),
         request_id: ClaimRequestId::new("missing-closure").unwrap(),
+        execute_declared_checks: false,
+        execute_project_recipe: false,
         at_millis: 15,
     });
     assert!(matches!(
@@ -390,10 +425,392 @@ fn closure_configuration_is_idempotent_durable_and_required_before_start() {
             mode: ProviderMode::Managed,
             worktree_path: repository.to_string_lossy().into_owned(),
             request_id: ClaimRequestId::new("run-after-restart").unwrap(),
+            execute_declared_checks: false,
+            execute_project_recipe: true,
             at_millis: 50,
         })
         .unwrap();
+    assert!(started
+        .mission
+        .run
+        .as_ref()
+        .is_some_and(|run| run.execute_project_recipe));
     restored.release_worktree(&started.lease).unwrap();
+}
+
+#[test]
+fn provider_handoff_continues_the_same_mission_with_a_new_durable_run() {
+    let directory = tempfile::tempdir().unwrap();
+    let claim_directory = directory.path().join("claims");
+    let repository = std::fs::canonicalize(env!("CARGO_MANIFEST_DIR")).unwrap();
+    let mut runtime = MissionRuntime::open_owned(directory.path(), &claim_directory).unwrap();
+    runtime
+        .create_mission(CreateMission {
+            mission_id: "mission-continue".into(),
+            title: "Continue with another provider".into(),
+            repository_path: repository.to_string_lossy().into_owned(),
+            objective: "Keep the mission and its audit trail intact".into(),
+            acceptance_criteria: vec!["The new provider uses the existing worktree".into()],
+            at_millis: 1,
+        })
+        .unwrap();
+    runtime
+        .configure_mission(ConfigureMission {
+            mission_id: "mission-continue".into(),
+            declarations: vec![command_check().covers(MissionDefinition::criterion_ids(&[
+                "The new provider uses the existing worktree".into(),
+            ]))],
+            at_millis: 2,
+        })
+        .unwrap();
+    let source = runtime
+        .start_run(StartRun {
+            mission_id: "mission-continue".into(),
+            run_id: "run-codex".into(),
+            provider: ProviderKind::Codex,
+            mode: ProviderMode::Managed,
+            worktree_path: repository.to_string_lossy().into_owned(),
+            request_id: ClaimRequestId::new("claim-codex").unwrap(),
+            execute_declared_checks: true,
+            execute_project_recipe: true,
+            at_millis: 3,
+        })
+        .unwrap();
+    runtime
+        .bind_provider_session("mission-continue", "run-codex", "session-codex", 4)
+        .unwrap();
+    runtime
+        .commit(
+            "source-evidence",
+            PersistableMissionEvent::EvidenceChanged {
+                mission_id: "mission-continue".into(),
+                check_id: "quality".into(),
+                status: EvidenceStatus::Passed,
+                workspace_hash: "a".repeat(64),
+                at_millis: 5,
+            },
+        )
+        .unwrap();
+    runtime
+        .transition_run("mission-continue", MissionStatus::Blocked, 6)
+        .unwrap();
+    runtime.release_worktree(&source.lease).unwrap();
+
+    let continued = runtime
+        .continue_run(ContinueRun {
+            mission_id: "mission-continue".into(),
+            source_run_id: "run-codex".into(),
+            run_id: "run-claude".into(),
+            provider: ProviderKind::ClaudeCode,
+            mode: ProviderMode::Managed,
+            request_id: ClaimRequestId::new("claim-claude").unwrap(),
+            handoff_artifact_sha256: "b".repeat(64),
+            at_millis: 7,
+        })
+        .unwrap();
+
+    assert_eq!(continued.mission.status, MissionStatus::Preparing);
+    let run = continued.mission.run.as_ref().unwrap();
+    assert_eq!(run.run_id, "run-claude");
+    assert_eq!(run.provider, ProviderKind::ClaudeCode);
+    assert_eq!(run.worktree_path, repository.to_string_lossy());
+    assert_eq!(run.handoff_from_run_id.as_deref(), Some("run-codex"));
+    let expected_artifact_digest = "b".repeat(64);
+    assert_eq!(
+        run.handoff_artifact_sha256.as_deref(),
+        Some(expected_artifact_digest.as_str())
+    );
+    assert!(run.execute_declared_checks);
+    assert!(run.execute_project_recipe);
+    assert_eq!(continued.mission.run_history.len(), 1);
+    assert_eq!(continued.mission.run_history[0].run_id, "run-codex");
+    assert!(continued
+        .mission
+        .evidence
+        .iter()
+        .all(|evidence| evidence.status == EvidenceStatus::Stale));
+    runtime.release_worktree(&continued.lease).unwrap();
+    drop(runtime);
+
+    let restored = MissionRuntime::open_owned(directory.path(), &claim_directory).unwrap();
+    let mission = restored.mission("mission-continue").unwrap();
+    assert_eq!(mission.run.as_ref().unwrap().run_id, "run-claude");
+    assert_eq!(mission.run_history[0].run_id, "run-codex");
+}
+
+#[test]
+fn provider_handoff_rejects_same_provider_and_unresolved_attention() {
+    let directory = tempfile::tempdir().unwrap();
+    let claim_directory = directory.path().join("claims");
+    let repository = std::fs::canonicalize(env!("CARGO_MANIFEST_DIR")).unwrap();
+    let mut runtime = MissionRuntime::open_owned(directory.path(), &claim_directory).unwrap();
+    runtime
+        .create_mission(CreateMission {
+            mission_id: "mission-guarded-handoff".into(),
+            title: "Guard handoff".into(),
+            repository_path: repository.to_string_lossy().into_owned(),
+            objective: "Do not bypass unresolved authority".into(),
+            acceptance_criteria: vec!["Unsafe handoffs are rejected".into()],
+            at_millis: 1,
+        })
+        .unwrap();
+    runtime
+        .configure_mission(ConfigureMission {
+            mission_id: "mission-guarded-handoff".into(),
+            declarations: vec![command_check().covers(MissionDefinition::criterion_ids(&[
+                "Unsafe handoffs are rejected".into(),
+            ]))],
+            at_millis: 2,
+        })
+        .unwrap();
+    let source = runtime
+        .start_run(StartRun {
+            mission_id: "mission-guarded-handoff".into(),
+            run_id: "run-source".into(),
+            provider: ProviderKind::Codex,
+            mode: ProviderMode::Managed,
+            worktree_path: repository.to_string_lossy().into_owned(),
+            request_id: ClaimRequestId::new("claim-source").unwrap(),
+            execute_declared_checks: false,
+            execute_project_recipe: false,
+            at_millis: 3,
+        })
+        .unwrap();
+    runtime
+        .bind_provider_session("mission-guarded-handoff", "run-source", "session-source", 4)
+        .unwrap();
+    runtime
+        .transition_run("mission-guarded-handoff", MissionStatus::Blocked, 5)
+        .unwrap();
+    runtime.release_worktree(&source.lease).unwrap();
+
+    let same_provider = runtime.continue_run(ContinueRun {
+        mission_id: "mission-guarded-handoff".into(),
+        source_run_id: "run-source".into(),
+        run_id: "run-next".into(),
+        provider: ProviderKind::Codex,
+        mode: ProviderMode::Managed,
+        request_id: ClaimRequestId::new("claim-same-provider").unwrap(),
+        handoff_artifact_sha256: "c".repeat(64),
+        at_millis: 6,
+    });
+    assert!(matches!(
+        same_provider,
+        Err(MissionRuntimeError::Handoff(
+            super::handoff::MissionHandoffError::SameProvider
+        ))
+    ));
+
+    runtime
+        .commit(
+            "handoff-attention",
+            PersistableMissionEvent::AttentionChanged {
+                mission_id: "mission-guarded-handoff".into(),
+                attention_id: "attention-open".into(),
+                state: PersistedAttentionState::Open,
+                risk: AttentionRisk::Critical,
+                at_millis: 7,
+            },
+        )
+        .unwrap();
+    let unresolved = runtime.continue_run(ContinueRun {
+        mission_id: "mission-guarded-handoff".into(),
+        source_run_id: "run-source".into(),
+        run_id: "run-claude".into(),
+        provider: ProviderKind::ClaudeCode,
+        mode: ProviderMode::Managed,
+        request_id: ClaimRequestId::new("claim-unresolved").unwrap(),
+        handoff_artifact_sha256: "d".repeat(64),
+        at_millis: 8,
+    });
+    assert!(matches!(
+        unresolved,
+        Err(MissionRuntimeError::Handoff(
+            super::handoff::MissionHandoffError::UnresolvedAttention
+        ))
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn declared_checks_finalize_a_durable_ready_proof_pack() {
+    use std::{os::unix::fs::PermissionsExt as _, process::Command, time::Duration};
+
+    use super::executor::{execute_closure, ClosureExecutionRequest};
+
+    fn git(repository: &std::path::Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repository)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git command failed: {args:?}");
+        String::from_utf8_lossy(&output.stdout).trim().to_owned()
+    }
+
+    let session = tempfile::tempdir().unwrap();
+    let repository = tempfile::tempdir().unwrap();
+    git(repository.path(), &["init", "-q"]);
+    git(repository.path(), &["config", "user.name", "Nagi Test"]);
+    git(
+        repository.path(),
+        &["config", "user.email", "nagi@example.invalid"],
+    );
+    let script = repository.path().join("verify");
+    std::fs::write(&script, "#!/bin/sh\nprintf 'proof-ready'\n").unwrap();
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+    git(repository.path(), &["add", "verify"]);
+    git(repository.path(), &["commit", "-qm", "fixture"]);
+    let repository = repository.path().canonicalize().unwrap();
+
+    let claims = session.path().join("claims");
+    let mut runtime = MissionRuntime::open_owned(session.path(), &claims).unwrap();
+    runtime
+        .create_mission(CreateMission {
+            mission_id: "mission-proof".into(),
+            title: "Prove closure".into(),
+            repository_path: repository.to_string_lossy().into_owned(),
+            objective: "Close only after the declared check passes".into(),
+            acceptance_criteria: vec!["The verifier exits successfully".into()],
+            at_millis: 1,
+        })
+        .unwrap();
+    let criterion_ids =
+        MissionDefinition::criterion_ids(&["The verifier exits successfully".to_owned()]);
+    runtime
+        .configure_mission(ConfigureMission {
+            mission_id: "mission-proof".into(),
+            declarations: vec![CheckDeclaration::command(
+                "verify",
+                CommandSpec::new("./verify", [] as [&str; 0], "."),
+                vec![PathRule::All],
+                vec![],
+            )
+            .covers(criterion_ids)],
+            at_millis: 2,
+        })
+        .unwrap();
+    let started = runtime
+        .start_run(StartRun {
+            mission_id: "mission-proof".into(),
+            run_id: "run-proof".into(),
+            provider: ProviderKind::Codex,
+            mode: ProviderMode::Managed,
+            worktree_path: repository.to_string_lossy().into_owned(),
+            request_id: ClaimRequestId::new("run-proof").unwrap(),
+            execute_declared_checks: true,
+            execute_project_recipe: false,
+            at_millis: 3,
+        })
+        .unwrap();
+    runtime
+        .bind_provider_session("mission-proof", "run-proof", "session-proof", 4)
+        .unwrap();
+    runtime
+        .transition_run("mission-proof", MissionStatus::ReviewRequired, 5)
+        .unwrap();
+    let mission = runtime.mission("mission-proof").unwrap();
+    let run = mission.run.as_ref().unwrap();
+    let pack = execute_closure(ClosureExecutionRequest {
+        mission_id: mission.mission_id.clone(),
+        run_id: run.run_id.clone(),
+        repository_path: mission.repository_path.clone(),
+        worktree_path: run.worktree_path.clone(),
+        base_revision: run.base_revision.clone(),
+        declarations: mission.check_declarations.clone(),
+    })
+    .unwrap();
+    let finalized_at = pack.created_at_millis().saturating_add(1);
+    let outcome = runtime
+        .finalize_evidence_pack(pack, &started.lease, finalized_at)
+        .unwrap();
+
+    assert!(outcome.verified);
+    assert_eq!(outcome.mission.status, MissionStatus::ReadyToClose);
+    assert_eq!(
+        outcome.mission.latest_evidence_pack_digest.as_deref(),
+        Some(outcome.pack_digest.as_str())
+    );
+    let ready_pack_digest = outcome.pack_digest;
+
+    let proof_outcome = crate::server::mission_bridge::handle(
+        &mut runtime,
+        "proof-request",
+        &crate::api::schema::Method::MissionProofGet(crate::api::schema::MissionTarget {
+            mission_id: "mission-proof".into(),
+        }),
+    )
+    .unwrap();
+    assert!(!proof_outcome.changed);
+    let proof_response: crate::api::schema::SuccessResponse =
+        serde_json::from_str(&proof_outcome.response).unwrap();
+    let crate::api::schema::ResponseResult::MissionProof { receipt } = proof_response.result else {
+        panic!("expected a portable mission proof")
+    };
+    assert_eq!(receipt.identity.mission_id, "mission-proof");
+    assert_eq!(receipt.identity.run_id, "run-proof");
+    assert_eq!(receipt.seal_digest.len(), 64);
+    assert_eq!(receipt.fresh_evidence.len(), 1);
+    assert_eq!(receipt.fresh_evidence[0].check_id, "verify");
+    assert_eq!(
+        receipt.decision,
+        crate::api::schema::ProofClosureDecisionV1::ReadyToClose
+    );
+
+    std::thread::sleep(Duration::from_millis(2));
+    let mission = runtime.mission("mission-proof").unwrap();
+    let run = mission.run.as_ref().unwrap();
+    let archive_pack = execute_closure(ClosureExecutionRequest {
+        mission_id: mission.mission_id.clone(),
+        run_id: run.run_id.clone(),
+        repository_path: mission.repository_path.clone(),
+        worktree_path: run.worktree_path.clone(),
+        base_revision: run.base_revision.clone(),
+        declarations: mission.check_declarations.clone(),
+    })
+    .unwrap();
+    let archive_at = archive_pack
+        .created_at_millis()
+        .saturating_add(1)
+        .max(finalized_at.saturating_add(1));
+    let archive_outcome = runtime
+        .finalize_evidence_pack(archive_pack, &started.lease, archive_at)
+        .unwrap();
+    assert!(archive_outcome.verified);
+    assert_eq!(archive_outcome.mission.status, MissionStatus::Archived);
+    assert_ne!(archive_outcome.pack_digest, ready_pack_digest);
+    let archive_pack_digest = archive_outcome.pack_digest;
+
+    let archived_proof = crate::server::mission_bridge::handle(
+        &mut runtime,
+        "archived-proof-request",
+        &crate::api::schema::Method::MissionProofGet(crate::api::schema::MissionTarget {
+            mission_id: "mission-proof".into(),
+        }),
+    )
+    .unwrap();
+    let archived_response: crate::api::schema::SuccessResponse =
+        serde_json::from_str(&archived_proof.response).unwrap();
+    let crate::api::schema::ResponseResult::MissionProof { receipt } = archived_response.result
+    else {
+        panic!("expected an archived portable mission proof")
+    };
+    assert_eq!(
+        receipt.decision,
+        crate::api::schema::ProofClosureDecisionV1::Archived
+    );
+
+    runtime.release_worktree(&started.lease).unwrap();
+    drop(runtime);
+
+    let restored = MissionRuntime::open_owned(session.path(), &claims).unwrap();
+    assert_eq!(
+        restored.mission("mission-proof").unwrap().status,
+        MissionStatus::Archived
+    );
+    let restored_pack = restored.load_evidence_pack(&archive_pack_digest).unwrap();
+    assert_eq!(restored_pack.mission_id(), "mission-proof");
+    assert_eq!(restored_pack.run_id(), "run-proof");
 }
 
 #[test]
@@ -482,6 +899,8 @@ fn persisted_active_managed_run_reacquires_a_fresh_lease_after_restart() {
             mode: ProviderMode::Managed,
             worktree_path: repository.to_string_lossy().into_owned(),
             request_id: ClaimRequestId::new("initial-recovery-claim").unwrap(),
+            execute_declared_checks: false,
+            execute_project_recipe: false,
             at_millis: 20,
         })
         .unwrap();

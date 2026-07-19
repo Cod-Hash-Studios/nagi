@@ -17,6 +17,8 @@
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -139,7 +141,7 @@ fn encode_mission_run_started(
     serde_json::to_string(&crate::api::schema::SuccessResponse {
         id: request_id.to_owned(),
         result: crate::api::schema::ResponseResult::MissionRunStarted {
-            mission: crate::server::mission_bridge::mission_info(mission),
+            mission: crate::server::mission_bridge::mission_view(mission),
         },
     })
     .unwrap_or_else(|_| {
@@ -160,6 +162,47 @@ fn mission_prompt(mission: &crate::mission::store::MissionView) -> String {
     prompt
 }
 
+fn mission_handoff_prompt(artifact: &crate::api::schema::MissionHandoffArtifactV1) -> String {
+    use std::fmt::Write as _;
+
+    let mut prompt = format!(
+        "Continue this existing Nagi mission from run `{}`.\n\nObjective:\n{}\n\nAcceptance criteria:\n",
+        artifact.source_run_id, artifact.objective
+    );
+    for (index, criterion) in artifact.acceptance_criteria.iter().enumerate() {
+        let _ = writeln!(prompt, "{}. {}", index + 1, criterion);
+    }
+    let _ = write!(
+        prompt,
+        "\nWorkspace handoff:\n- base: {}\n- head: {}\n- dirty: {}\n- digest: {}\n- changed paths:\n",
+        artifact.base_revision,
+        artifact.head_revision,
+        artifact.diff.dirty,
+        artifact.diff.workspace_digest,
+    );
+    if artifact.diff.changed_paths.is_empty() {
+        prompt.push_str("  - none\n");
+    } else {
+        for path in &artifact.diff.changed_paths {
+            let _ = writeln!(prompt, "  - {path}");
+        }
+    }
+    if !artifact.decisions.is_empty() {
+        prompt.push_str("\nAcknowledged decisions:\n");
+        for decision in &artifact.decisions {
+            let _ = writeln!(
+                prompt,
+                "- {}: {:?} ({:?})",
+                decision.attention_id, decision.decision, decision.state
+            );
+        }
+    }
+    prompt.push_str(
+        "\nRe-read the current workspace before editing. Hidden reasoning and provider session state were not transferred. Re-run required checks before declaring the mission complete.\n",
+    );
+    prompt
+}
+
 fn stable_runtime_id(domain: &str, values: &[&str]) -> String {
     use sha2::{Digest as _, Sha256};
     let mut hasher = Sha256::new();
@@ -177,20 +220,193 @@ fn stable_runtime_id(domain: &str, values: &[&str]) -> String {
     format!("{domain}:{encoded}")
 }
 
-#[allow(
-    dead_code,
-    reason = "answer validation stays private until provider replies are public"
-)]
+fn project_resource_allocator() -> Result<crate::resources::ports::PortAllocator, String> {
+    crate::resources::ports::PortAllocator::open(
+        &crate::config::state_dir().join("project-resources"),
+    )
+    .map_err(|error| error.to_string())
+}
+
+fn configured_acp_endpoint(
+    config: &crate::config::Config,
+) -> Result<Option<crate::managed_provider::AcpEndpoint>, String> {
+    let Some(config) = config.providers.acp.as_ref() else {
+        return Ok(None);
+    };
+    let (executable, args) = config.endpoint()?;
+    crate::managed_provider::AcpEndpoint::stdio(executable, args)
+        .map(Some)
+        .map_err(|error| error.to_string())
+}
+
+fn provision_project_recipe(
+    worktree: &Path,
+    mission_id: &str,
+    run_id: &str,
+    execute_setup: bool,
+) -> Result<(), String> {
+    let Some(contract) =
+        crate::project_recipe::load_contract(worktree).map_err(|error| error.to_string())?
+    else {
+        return Ok(());
+    };
+    if execute_setup {
+        if let Some(setup) = &contract.setup {
+            let result = crate::project_recipe::run_setup(worktree, setup)
+                .map_err(|error| error.to_string())?;
+            if !result.succeeded() {
+                return Err(project_command_failure(&result));
+            }
+        }
+    }
+    let services = crate::resources::services::ServiceSet::start(
+        project_resource_allocator()?,
+        &contract,
+        worktree,
+        mission_id,
+        run_id,
+        crate::server::mission_bridge::now_millis(),
+    )
+    .map_err(|error| error.to_string())?;
+    services.detach();
+    Ok(())
+}
+
+fn project_command_failure(result: &crate::project_recipe::ProjectCommandResult) -> String {
+    let details = if result.stderr.trim().is_empty() {
+        result.stdout.trim()
+    } else {
+        result.stderr.trim()
+    };
+    let details = details.chars().take(2_048).collect::<String>();
+    format!(
+        "project {} failed with exit code {}{}",
+        result.id,
+        result
+            .exit_code
+            .map_or_else(|| "unknown".to_owned(), |code| code.to_string()),
+        if details.is_empty() {
+            String::new()
+        } else {
+            format!(": {details}")
+        }
+    )
+}
+
+fn stop_project_services(mission_id: &str, run_id: &str) -> Result<(), String> {
+    crate::resources::services::ServiceSet::stop_owner(
+        &project_resource_allocator()?,
+        mission_id,
+        run_id,
+    )
+    .map(|_| ())
+    .map_err(|error| error.to_string())
+}
+
+fn run_project_cleanup(worktree: PathBuf) {
+    let contract = match crate::project_recipe::load_contract(&worktree) {
+        Ok(Some(contract)) => contract,
+        Ok(None) => return,
+        Err(error) => {
+            warn!(path = %worktree.display(), err = %error, "project cleanup contract is unavailable");
+            return;
+        }
+    };
+    for (index, cleanup) in contract.cleanup.iter().enumerate() {
+        match crate::project_recipe::run_cleanup(&worktree, index, cleanup) {
+            Ok(result) if result.succeeded() => {}
+            Ok(result) => {
+                warn!(path = %worktree.display(), error = %project_command_failure(&result), "project cleanup command failed");
+            }
+            Err(error) => {
+                warn!(path = %worktree.display(), err = %error, "project cleanup command could not run");
+            }
+        }
+    }
+}
+
+fn wire_attention_decision(
+    decision: crate::mission::attention::AttentionDecision,
+) -> crate::api::schema::AttentionDecisionV1 {
+    match decision {
+        crate::mission::attention::AttentionDecision::ApproveOnce => {
+            crate::api::schema::AttentionDecisionV1::ApproveOnce
+        }
+        crate::mission::attention::AttentionDecision::ApproveForSession => {
+            crate::api::schema::AttentionDecisionV1::ApproveForSession
+        }
+        crate::mission::attention::AttentionDecision::AllowForMission => {
+            crate::api::schema::AttentionDecisionV1::AllowForMission
+        }
+        crate::mission::attention::AttentionDecision::Deny => {
+            crate::api::schema::AttentionDecisionV1::Deny
+        }
+        crate::mission::attention::AttentionDecision::Answer => {
+            crate::api::schema::AttentionDecisionV1::Answer
+        }
+    }
+}
+
+fn wire_attention_failure(
+    code: crate::mission::attention::ResponseFailureCode,
+) -> crate::api::schema::AttentionFailureCodeV1 {
+    match code {
+        crate::mission::attention::ResponseFailureCode::Rejected => {
+            crate::api::schema::AttentionFailureCodeV1::Rejected
+        }
+        crate::mission::attention::ResponseFailureCode::DisconnectedBeforeWrite => {
+            crate::api::schema::AttentionFailureCodeV1::DisconnectedBeforeWrite
+        }
+        crate::mission::attention::ResponseFailureCode::Timeout => {
+            crate::api::schema::AttentionFailureCodeV1::Timeout
+        }
+        crate::mission::attention::ResponseFailureCode::TransportClosed => {
+            crate::api::schema::AttentionFailureCodeV1::TransportClosed
+        }
+    }
+}
+
+fn wire_attention_risk(
+    risk: crate::mission::attention::AttentionRisk,
+) -> crate::api::schema::AttentionRiskV1 {
+    match risk {
+        crate::mission::attention::AttentionRisk::Low => crate::api::schema::AttentionRiskV1::Low,
+        crate::mission::attention::AttentionRisk::Medium => {
+            crate::api::schema::AttentionRiskV1::Medium
+        }
+        crate::mission::attention::AttentionRisk::High => crate::api::schema::AttentionRiskV1::High,
+        crate::mission::attention::AttentionRisk::Critical => {
+            crate::api::schema::AttentionRiskV1::Critical
+        }
+    }
+}
+
+fn wire_mission_provider(
+    provider: crate::mission::model::ProviderKind,
+) -> crate::api::schema::MissionProvider {
+    match provider {
+        crate::mission::model::ProviderKind::Codex => crate::api::schema::MissionProvider::Codex,
+        crate::mission::model::ProviderKind::ClaudeCode => {
+            crate::api::schema::MissionProvider::ClaudeCode
+        }
+        crate::mission::model::ProviderKind::OpenCode => {
+            crate::api::schema::MissionProvider::OpenCode
+        }
+        crate::mission::model::ProviderKind::Acp => crate::api::schema::MissionProvider::Acp,
+    }
+}
+
 fn validate_managed_answers(
     answers: &std::collections::BTreeMap<String, Vec<String>>,
+    questions: &[crate::managed_provider::ProviderQuestion],
 ) -> Result<(), ()> {
-    const MAX_QUESTIONS: usize = 32;
-    const MAX_ANSWERS_PER_QUESTION: usize = 16;
-    const MAX_KEY_BYTES: usize = 128;
+    const MAX_QUESTIONS: usize = 4;
+    const MAX_ANSWERS_PER_QUESTION: usize = 8;
+    const MAX_KEY_BYTES: usize = 1024;
     const MAX_ANSWER_BYTES: usize = 4 * 1024;
     const MAX_TOTAL_BYTES: usize = 32 * 1024;
 
-    if answers.is_empty() || answers.len() > MAX_QUESTIONS {
+    if questions.is_empty() || questions.len() > MAX_QUESTIONS || answers.len() != questions.len() {
         return Err(());
     }
     let mut total_bytes = 0_usize;
@@ -211,6 +427,22 @@ fn validate_managed_answers(
             total_bytes = total_bytes.checked_add(value.len()).ok_or(())?;
         }
     }
+    for question in questions {
+        let values = answers.get(&question.id).ok_or(())?;
+        if !question.multiple && values.len() != 1 {
+            return Err(());
+        }
+        if !question.custom_allowed
+            && values.iter().any(|answer| {
+                !question
+                    .options
+                    .iter()
+                    .any(|option| option.label == answer.as_str())
+            })
+        {
+            return Err(());
+        }
+    }
     (total_bytes <= MAX_TOTAL_BYTES).then_some(()).ok_or(())
 }
 
@@ -225,6 +457,7 @@ enum LoopEvent {
     Api(Box<api::ApiRequestMessage>),
     ServerEvent(ServerEvent),
     Provider(crate::managed_provider::ProviderEvent),
+    Proof(ProofWorkerEvent),
     RenderRequested,
 }
 
@@ -342,8 +575,14 @@ pub struct HeadlessServer {
     mission_runtime: crate::mission::runtime::MissionRuntime,
     managed_runs: HashMap<String, ManagedRun>,
     managed_provider_executable: Option<PathBuf>,
+    acp_endpoint: Option<crate::managed_provider::AcpEndpoint>,
     provider_event_rx: mpsc::Receiver<crate::managed_provider::ProviderEvent>,
     provider_event_tx: mpsc::Sender<crate::managed_provider::ProviderEvent>,
+    proof_event_rx: mpsc::Receiver<ProofWorkerEvent>,
+    proof_event_tx: mpsc::Sender<ProofWorkerEvent>,
+    pending_proofs: HashMap<String, PendingProofRun>,
+    pending_mission_launches: HashMap<String, PendingMissionLaunch>,
+    pending_project_launches: HashMap<String, PendingProjectLaunch>,
     #[cfg(unix)]
     api_tx: Option<api::ApiRequestSender>,
     // Kept on every platform so dropping HeadlessServer owns API server shutdown.
@@ -390,10 +629,34 @@ struct ManagedRun {
     mission_id: String,
     provider: crate::mission::model::ProviderKind,
     recovered: bool,
+    execute_declared_checks: bool,
+    execute_project_recipe: bool,
     handle: crate::managed_provider::ManagedProviderHandle,
     lease: crate::mission::claims::WorktreeLease,
     responses: HashMap<String, AvailableManagedResponse>,
     inflight_responses: HashMap<String, PendingManagedResponse>,
+}
+
+struct PendingProofRun {
+    mission_id: String,
+    lease: crate::mission::claims::WorktreeLease,
+    cancelled: Arc<AtomicBool>,
+}
+
+struct ProofWorkerEvent {
+    run_id: String,
+    result: Result<crate::mission::evidence_pack::EvidencePack, String>,
+}
+
+struct PendingMissionLaunch {
+    request: crate::app::state::NewMissionLaunchRequest,
+    worktree_response: std::sync::mpsc::Receiver<String>,
+}
+
+struct PendingProjectLaunch {
+    request: crate::app::state::NewMissionLaunchRequest,
+    worktree_path: String,
+    recipe_response: std::sync::mpsc::Receiver<Result<(), String>>,
 }
 
 #[derive(Clone)]
@@ -405,6 +668,9 @@ struct AvailableManagedResponse {
     token: crate::managed_provider::ResponseToken,
     class: crate::managed_provider::AttentionClass,
     session_id: String,
+    requested_action: String,
+    questions: Vec<crate::managed_provider::ProviderQuestion>,
+    created_at_millis: u64,
 }
 
 #[derive(Clone)]
@@ -552,7 +818,19 @@ impl HeadlessServer {
         .map_err(io::Error::other)?;
         #[cfg(not(unix))]
         let mission_runtime = crate::mission::runtime::MissionRuntime::disabled();
-        Self::new_with_mission_runtime(app, config_diagnostics, api_tx, api_server, mission_runtime)
+        let mut server = Self::new_with_mission_runtime(
+            app,
+            config_diagnostics,
+            api_tx,
+            api_server,
+            mission_runtime,
+        )?;
+        server.acp_endpoint = configured_acp_endpoint(&crate::config::Config::load().config)
+            .unwrap_or_else(|error| {
+                warn!(err = %error, "ACP provider configuration is invalid");
+                None
+            });
+        Ok(server)
     }
 
     fn new_with_mission_runtime(
@@ -579,6 +857,7 @@ impl HeadlessServer {
         // Channel for server events from client threads.
         let (server_event_tx, server_event_rx) = mpsc::channel(64);
         let (provider_event_tx, provider_event_rx) = mpsc::channel(64);
+        let (proof_event_tx, proof_event_rx) = mpsc::channel(8);
         #[cfg(windows)]
         spawn_windows_client_accept_thread(listener, should_quit.clone(), server_event_tx.clone());
 
@@ -587,13 +866,19 @@ impl HeadlessServer {
             server_config_diagnostic_summaries(config_diagnostics);
         #[cfg(not(unix))]
         let _ = api_tx;
-        Ok(Self {
+        let mut server = Self {
             app,
             mission_runtime,
             managed_runs: HashMap::new(),
             managed_provider_executable: None,
+            acp_endpoint: None,
             provider_event_rx,
             provider_event_tx,
+            proof_event_rx,
+            proof_event_tx,
+            pending_proofs: HashMap::new(),
+            pending_mission_launches: HashMap::new(),
+            pending_project_launches: HashMap::new(),
             #[cfg(unix)]
             api_tx,
             api_server,
@@ -618,7 +903,9 @@ impl HeadlessServer {
             should_quit,
             server_event_rx,
             server_event_tx,
-        })
+        };
+        server.sync_mission_projection();
+        Ok(server)
     }
 
     /// Runs the headless server event loop until shutdown.
@@ -634,6 +921,7 @@ impl HeadlessServer {
     pub async fn run(&mut self) -> io::Result<()> {
         crate::logging::startup("server");
         self.recover_managed_runs();
+        self.sync_mission_projection();
 
         // Register SIGINT handler for graceful shutdown.
         let should_quit = self.should_quit.clone();
@@ -839,6 +1127,10 @@ impl HeadlessServer {
                         Some(ev) => LoopEvent::Provider(ev),
                         None => LoopEvent::Timer,
                     },
+                    maybe_proof_ev = self.proof_event_rx.recv() => match maybe_proof_ev {
+                        Some(ev) => LoopEvent::Proof(ev),
+                        None => LoopEvent::Timer,
+                    },
                     _ = sleep_until_or_pending(next_deadline) => LoopEvent::Timer,
                     _ = self.app.render_notify.notified() => LoopEvent::RenderRequested,
                 }
@@ -901,6 +1193,12 @@ impl HeadlessServer {
                         needs_full_render = true;
                     }
                 }
+                LoopEvent::Proof(event) => {
+                    if self.handle_proof_event(event) {
+                        needs_render = true;
+                        needs_full_render = true;
+                    }
+                }
                 LoopEvent::RenderRequested => {
                     if self.app.render_dirty.load(Ordering::Acquire) {
                         needs_render = true;
@@ -923,7 +1221,7 @@ impl HeadlessServer {
 
         if self.app.state.request_complete_onboarding {
             self.app.state.request_complete_onboarding = false;
-            self.app.open_settings_from_onboarding();
+            self.app.complete_onboarding_to_mission();
             needs_render = true;
             crate::render_prof::event("full_render_cause.deferred_onboarding");
         }
@@ -1021,7 +1319,289 @@ impl HeadlessServer {
             crate::render_prof::event("full_render_cause.config_reload");
         }
 
+        if let Some(params) = self.app.state.request_attention_response.take() {
+            let response = self.handle_mission_respond_authorized("tui.mission.respond", &params);
+            self.app.state.attention_error =
+                serde_json::from_str::<api::schema::ErrorResponse>(&response)
+                    .ok()
+                    .map(|response| response.error.message);
+            self.sync_mission_projection();
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.attention_response");
+        }
+
+        if let Some(target) = self.app.state.request_mission_close.take() {
+            let response = self.handle_mission_close_api("tui.mission.close", &target);
+            self.app.state.mission_action_error =
+                serde_json::from_str::<api::schema::ErrorResponse>(&response)
+                    .ok()
+                    .map(|response| response.error.message);
+            self.sync_mission_projection();
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.mission_close");
+        }
+
+        if let Some(params) = self.app.state.request_mission_handoff_preview.take() {
+            let method = api::schema::Method::MissionHandoffPreview(params.clone());
+            let response = crate::server::mission_bridge::handle(
+                &mut self.mission_runtime,
+                "tui.mission.handoff.preview",
+                &method,
+            )
+            .map(|outcome| outcome.response)
+            .unwrap_or_else(|| {
+                encode_mission_error(
+                    "tui.mission.handoff.preview",
+                    "feature_unavailable",
+                    "mission handoff preview is unavailable",
+                )
+            });
+            if let Some(draft) = self.app.state.mission_handoff.as_mut().filter(|draft| {
+                draft.mission_id == params.mission_id && draft.target_provider == params.to
+            }) {
+                match serde_json::from_str::<api::schema::SuccessResponse>(&response) {
+                    Ok(api::schema::SuccessResponse {
+                        result: api::schema::ResponseResult::MissionHandoffPreview { artifact },
+                        ..
+                    }) => {
+                        draft.artifact = Some(artifact);
+                        draft.error = None;
+                    }
+                    _ => {
+                        draft.artifact = None;
+                        draft.error = serde_json::from_str::<api::schema::ErrorResponse>(&response)
+                            .ok()
+                            .map(|response| response.error.message)
+                            .or_else(|| Some("Handoff preview failed".into()));
+                    }
+                }
+                draft.loading = false;
+            }
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.mission_handoff_preview");
+        }
+
+        if let Some(request) = self.app.state.request_mission_handoff_start.take() {
+            let response = self.handle_mission_handoff_start(
+                "tui.mission.handoff.start",
+                &request.params,
+                request.workspace_write_confirmed,
+            );
+            if let Ok(success) = serde_json::from_str::<api::schema::SuccessResponse>(&response) {
+                if matches!(
+                    success.result,
+                    api::schema::ResponseResult::MissionRunStarted { .. }
+                ) {
+                    self.app.state.mission_handoff = None;
+                    self.app.state.mode = app::Mode::MissionInspector;
+                    self.app.state.mission_action_error = None;
+                }
+            } else if let Some(draft) = self.app.state.mission_handoff.as_mut() {
+                draft.loading = false;
+                draft.error = serde_json::from_str::<api::schema::ErrorResponse>(&response)
+                    .ok()
+                    .map(|response| response.error.message)
+                    .or_else(|| Some("Handoff start failed".into()));
+            }
+            self.sync_mission_projection();
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.mission_handoff_start");
+        }
+
+        if let Some(request) = self.app.state.request_new_mission.take() {
+            self.begin_new_mission_launch(request);
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.mission_provision");
+        }
+
+        if self.finish_pending_mission_launches() {
+            needs_render = true;
+            crate::render_prof::event("full_render_cause.mission_launch");
+        }
+
         needs_render
+    }
+
+    fn begin_new_mission_launch(&mut self, request: crate::app::state::NewMissionLaunchRequest) {
+        use crate::api::schema::{Method, Request, WorktreeCreateParams};
+
+        let mission_id = request.create.mission_id.clone();
+        if self.pending_mission_launches.contains_key(&mission_id)
+            || self.pending_project_launches.contains_key(&mission_id)
+        {
+            self.app.state.mission_action_error =
+                Some("This mission is already being provisioned".into());
+            return;
+        }
+        for method in [
+            Method::MissionCreate(request.create.clone()),
+            Method::MissionConfigure(request.configure.clone()),
+        ] {
+            let Some(outcome) = crate::server::mission_bridge::handle(
+                &mut self.mission_runtime,
+                "tui.mission.provision",
+                &method,
+            ) else {
+                self.app.state.mission_action_error =
+                    Some("Mission provisioning method is unavailable".into());
+                return;
+            };
+            if let Ok(error) = serde_json::from_str::<api::schema::ErrorResponse>(&outcome.response)
+            {
+                self.app.state.mission_action_error = Some(error.error.message);
+                self.sync_mission_projection();
+                return;
+            }
+        }
+        self.sync_mission_projection();
+
+        let (respond_to, worktree_response) = std::sync::mpsc::channel();
+        let worktree_request = Request {
+            id: format!("tui.mission.worktree.{mission_id}"),
+            method: Method::WorktreeCreate(WorktreeCreateParams {
+                workspace_id: None,
+                cwd: Some(request.create.repository_path.clone()),
+                branch: Some(request.branch.clone()),
+                base: Some("HEAD".into()),
+                path: None,
+                label: Some(request.create.title.clone()),
+                focus: false,
+            }),
+        };
+        if !self
+            .app
+            .handle_deferred_worktree_api_request(worktree_request, respond_to)
+        {
+            self.app.state.mission_action_error =
+                Some("Worktree provisioning is unavailable".into());
+            return;
+        }
+        self.pending_mission_launches.insert(
+            mission_id,
+            PendingMissionLaunch {
+                request,
+                worktree_response,
+            },
+        );
+    }
+
+    fn finish_pending_mission_launches(&mut self) -> bool {
+        let worktrees = self
+            .pending_mission_launches
+            .iter()
+            .filter_map(|(mission_id, pending)| match pending.worktree_response.try_recv() {
+                Ok(response) => Some((mission_id.clone(), response)),
+                Err(std::sync::mpsc::TryRecvError::Empty) => None,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => Some((
+                    mission_id.clone(),
+                    r#"{"id":"","error":{"code":"worktree_create_failed","message":"worktree provisioning channel closed"}}"#.to_owned(),
+                )),
+            })
+            .collect::<Vec<_>>();
+        let recipes = self
+            .pending_project_launches
+            .iter()
+            .filter_map(
+                |(mission_id, pending)| match pending.recipe_response.try_recv() {
+                    Ok(result) => Some((mission_id.clone(), result)),
+                    Err(std::sync::mpsc::TryRecvError::Empty) => None,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => Some((
+                        mission_id.clone(),
+                        Err("project recipe worker channel closed".to_owned()),
+                    )),
+                },
+            )
+            .collect::<Vec<_>>();
+        if worktrees.is_empty() && recipes.is_empty() {
+            return false;
+        }
+
+        for (mission_id, response) in worktrees {
+            let Some(pending) = self.pending_mission_launches.remove(&mission_id) else {
+                continue;
+            };
+            let worktree_path = serde_json::from_str::<api::schema::SuccessResponse>(&response)
+                .ok()
+                .and_then(|response| match response.result {
+                    api::schema::ResponseResult::WorktreeCreated { worktree, .. } => {
+                        Some(worktree.path)
+                    }
+                    _ => None,
+                });
+            let Some(worktree_path) = worktree_path else {
+                self.app.state.mission_action_error = serde_json::from_str::<
+                    api::schema::ErrorResponse,
+                >(&response)
+                .ok()
+                .map(|response| response.error.message)
+                .or_else(|| Some("Worktree provisioning returned an invalid response".into()));
+                continue;
+            };
+            if pending.request.start.execute_project_recipe {
+                let (sender, recipe_response) = std::sync::mpsc::channel();
+                let recipe_path = worktree_path.clone();
+                let mission_id_for_worker = pending.request.start.mission_id.clone();
+                let run_id = pending.request.start.run_id.clone();
+                std::thread::spawn(move || {
+                    let result = provision_project_recipe(
+                        Path::new(&recipe_path),
+                        &mission_id_for_worker,
+                        &run_id,
+                        true,
+                    );
+                    let _ = sender.send(result);
+                });
+                self.pending_project_launches.insert(
+                    mission_id,
+                    PendingProjectLaunch {
+                        request: pending.request,
+                        worktree_path,
+                        recipe_response,
+                    },
+                );
+            } else {
+                self.complete_pending_mission_launch(mission_id, pending.request, worktree_path);
+            }
+        }
+        for (mission_id, result) in recipes {
+            let Some(pending) = self.pending_project_launches.remove(&mission_id) else {
+                continue;
+            };
+            match result {
+                Ok(()) => self.complete_pending_mission_launch(
+                    mission_id,
+                    pending.request,
+                    pending.worktree_path,
+                ),
+                Err(error) => self.app.state.mission_action_error = Some(error),
+            }
+        }
+        self.sync_mission_projection();
+        true
+    }
+
+    fn complete_pending_mission_launch(
+        &mut self,
+        mission_id: String,
+        mut request: crate::app::state::NewMissionLaunchRequest,
+        worktree_path: String,
+    ) {
+        request.start.worktree_path = Some(worktree_path);
+        let response = self.handle_mission_start(
+            "tui.mission.start",
+            &request.start,
+            request.workspace_write_confirmed,
+        );
+        if let Ok(error) = serde_json::from_str::<api::schema::ErrorResponse>(&response) {
+            if request.start.execute_project_recipe {
+                let _ = stop_project_services(&request.start.mission_id, &request.start.run_id);
+            }
+            self.app.state.mission_action_error = Some(error.error.message);
+        } else {
+            self.app.state.mission_action_error = None;
+            self.app.state.selected_mission_id = Some(mission_id);
+            self.app.state.mode = app::Mode::MissionInspector;
+        }
     }
 
     fn headless_workspace_create(
@@ -1211,9 +1791,13 @@ impl HeadlessServer {
         &mut self,
         params: crate::api::schema::ServerLiveHandoffParams,
     ) -> io::Result<()> {
-        if !self.managed_runs.is_empty() {
+        if !self.managed_runs.is_empty()
+            || !self.pending_proofs.is_empty()
+            || !self.pending_mission_launches.is_empty()
+            || !self.pending_project_launches.is_empty()
+        {
             return Err(io::Error::other(
-                "live handoff requires managed provider runs to stop first",
+                "live handoff requires managed provider runs and proof checks to stop first",
             ));
         }
         info!("starting live handoff");
@@ -1570,7 +2154,37 @@ impl HeadlessServer {
         self.server_config_diagnostic_without_keybindings =
             server_config_diagnostic_without_keybindings;
         self.sync_foreground_client_state();
+        self.acp_endpoint = configured_acp_endpoint(&crate::config::Config::load().config)
+            .unwrap_or_else(|error| {
+                warn!(err = %error, "ACP provider configuration is invalid");
+                None
+            });
         report
+    }
+
+    fn spawn_managed_provider(
+        &self,
+        provider: crate::mission::model::ProviderKind,
+    ) -> Result<
+        crate::managed_provider::ManagedProviderHandle,
+        crate::managed_provider::ManagedProviderError,
+    > {
+        if provider == crate::mission::model::ProviderKind::Acp {
+            let endpoint = self
+                .acp_endpoint
+                .clone()
+                .ok_or(crate::managed_provider::ManagedProviderError::AcpEndpointUnavailable)?;
+            crate::managed_provider::ManagedProviderSupervisor::spawn_acp(
+                endpoint,
+                self.provider_event_tx.clone(),
+            )
+        } else {
+            crate::managed_provider::ManagedProviderSupervisor::spawn(
+                provider,
+                self.managed_provider_executable.clone(),
+                self.provider_event_tx.clone(),
+            )
+        }
     }
 
     fn foreground_client_outer_focus(&self) -> Option<bool> {
@@ -2093,9 +2707,7 @@ impl HeadlessServer {
 
     fn recover_managed_runs(&mut self) {
         use crate::{
-            managed_provider::{
-                ManagedProviderSupervisor, ProviderCommand, SandboxAccess, StartOrResume,
-            },
+            managed_provider::{ProviderCommand, SandboxAccess, StartOrResume},
             mission::{
                 claims::ClaimRequestId,
                 model::{MissionStatus, ProviderMode},
@@ -2156,11 +2768,24 @@ impl HeadlessServer {
                     continue;
                 }
             };
-            let handle = match ManagedProviderSupervisor::spawn(
-                run.provider,
-                self.managed_provider_executable.clone(),
-                self.provider_event_tx.clone(),
-            ) {
+            if run.execute_project_recipe {
+                if let Err(error) = provision_project_recipe(
+                    Path::new(&run.worktree_path),
+                    &mission.mission_id,
+                    &run.run_id,
+                    false,
+                ) {
+                    warn!(mission_id = %mission.mission_id, err = %error, "project services could not be adopted during recovery");
+                    let _ = self.mission_runtime.release_worktree(&outcome.lease);
+                    let _ = self.mission_runtime.transition_run(
+                        &mission.mission_id,
+                        MissionStatus::Blocked,
+                        at_millis,
+                    );
+                    continue;
+                }
+            }
+            let handle = match self.spawn_managed_provider(run.provider) {
                 Ok(handle) => handle,
                 Err(error) => {
                     warn!(mission_id = %mission.mission_id, err = %error, "managed provider recovery is unavailable");
@@ -2196,6 +2821,8 @@ impl HeadlessServer {
                     mission_id: mission.mission_id,
                     provider: run.provider,
                     recovered: true,
+                    execute_declared_checks: run.execute_declared_checks,
+                    execute_project_recipe: run.execute_project_recipe,
                     handle,
                     lease: outcome.lease,
                     responses: HashMap::new(),
@@ -2210,6 +2837,15 @@ impl HeadlessServer {
         request_id: &str,
         params: &crate::api::schema::MissionStartParams,
     ) -> String {
+        self.handle_mission_start(request_id, params, false)
+    }
+
+    fn handle_mission_start(
+        &mut self,
+        request_id: &str,
+        params: &crate::api::schema::MissionStartParams,
+        workspace_write_confirmed: bool,
+    ) -> String {
         if !self.mission_runtime.is_available() {
             return encode_mission_error(
                 request_id,
@@ -2217,11 +2853,16 @@ impl HeadlessServer {
                 "mission features are unavailable on this platform",
             );
         }
+        if params.execute_project_recipe && !workspace_write_confirmed {
+            return encode_mission_error(
+                request_id,
+                "interactive_consent_required",
+                "project setup and services require confirmation in the local mission cockpit",
+            );
+        }
         use crate::{
             api::schema::{MissionProvider, MissionProviderMode},
-            managed_provider::{
-                ManagedProviderSupervisor, ProviderCommand, SandboxAccess, StartOrResume,
-            },
+            managed_provider::{ProviderCommand, SandboxAccess, StartOrResume},
             mission::{
                 claims::ClaimRequestId,
                 model::{ProviderKind, ProviderMode},
@@ -2232,14 +2873,16 @@ impl HeadlessServer {
         let provider = match params.provider {
             MissionProvider::Codex => ProviderKind::Codex,
             MissionProvider::ClaudeCode => ProviderKind::ClaudeCode,
-            MissionProvider::OpenCode => {
-                return encode_mission_error(
-                    request_id,
-                    "provider_unavailable",
-                    "this managed provider is not available in the current build",
-                );
-            }
+            MissionProvider::OpenCode => ProviderKind::OpenCode,
+            MissionProvider::Acp => ProviderKind::Acp,
         };
+        if provider == ProviderKind::Acp && !workspace_write_confirmed {
+            return encode_mission_error(
+                request_id,
+                "interactive_consent_required",
+                "ACP agents require explicit write-scope confirmation in the local mission cockpit",
+            );
+        }
         if params.mode != MissionProviderMode::Managed {
             return encode_mission_error(
                 request_id,
@@ -2260,6 +2903,8 @@ impl HeadlessServer {
                 run.run_id == params.run_id
                     && run.provider == provider
                     && run.mode == ProviderMode::Managed
+                    && run.execute_declared_checks == params.execute_declared_checks
+                    && run.execute_project_recipe == params.execute_project_recipe
                     && requested_worktree.as_deref() == Some(Path::new(&run.worktree_path))
             });
             if active.mission_id == params.mission_id
@@ -2287,6 +2932,8 @@ impl HeadlessServer {
                     return encode_mission_error(request_id, "invalid_run", &error.to_string())
                 }
             },
+            execute_declared_checks: params.execute_declared_checks,
+            execute_project_recipe: params.execute_project_recipe,
             at_millis,
         });
         let outcome = match start {
@@ -2299,11 +2946,7 @@ impl HeadlessServer {
                 )
             }
         };
-        let handle = match ManagedProviderSupervisor::spawn(
-            provider,
-            self.managed_provider_executable.clone(),
-            self.provider_event_tx.clone(),
-        ) {
+        let handle = match self.spawn_managed_provider(provider) {
             Ok(handle) => handle,
             Err(error) => {
                 let _ = self.mission_runtime.transition_run(
@@ -2329,7 +2972,11 @@ impl HeadlessServer {
                 .as_ref()
                 .and_then(|run| run.provider_session_id.clone()),
             initial_input: prompt,
-            sandbox: SandboxAccess::ReadOnly,
+            sandbox: if workspace_write_confirmed {
+                SandboxAccess::WorkspaceWriteConfirmed
+            } else {
+                SandboxAccess::ReadOnly
+            },
         });
         if let Err(error) = handle.try_send(command) {
             let _ = self.mission_runtime.transition_run(
@@ -2346,6 +2993,222 @@ impl HeadlessServer {
                 mission_id: params.mission_id.clone(),
                 provider,
                 recovered: false,
+                execute_declared_checks: params.execute_declared_checks,
+                execute_project_recipe: params.execute_project_recipe,
+                handle,
+                lease: outcome.lease,
+                responses: HashMap::new(),
+                inflight_responses: HashMap::new(),
+            },
+        );
+
+        encode_mission_run_started(request_id, outcome.mission)
+    }
+
+    fn handle_mission_handoff_start_api(
+        &mut self,
+        request_id: &str,
+        params: &crate::api::schema::MissionHandoffStartParams,
+    ) -> String {
+        self.handle_mission_handoff_start(request_id, params, false)
+    }
+
+    fn handle_mission_handoff_start(
+        &mut self,
+        request_id: &str,
+        params: &crate::api::schema::MissionHandoffStartParams,
+        workspace_write_confirmed: bool,
+    ) -> String {
+        use crate::{
+            api::schema::MissionProvider,
+            managed_provider::{ProviderCommand, SandboxAccess, StartOrResume},
+            mission::{
+                claims::ClaimRequestId,
+                handoff::build_preview,
+                model::{MissionStatus, ProviderKind, ProviderMode},
+                runtime::ContinueRun,
+            },
+        };
+
+        if !self.mission_runtime.is_available() {
+            return encode_mission_error(
+                request_id,
+                "feature_unavailable",
+                "mission features are unavailable on this platform",
+            );
+        }
+        let provider = match params.to {
+            MissionProvider::Codex => ProviderKind::Codex,
+            MissionProvider::ClaudeCode => ProviderKind::ClaudeCode,
+            MissionProvider::OpenCode => ProviderKind::OpenCode,
+            MissionProvider::Acp => ProviderKind::Acp,
+        };
+        if provider == ProviderKind::Acp && !workspace_write_confirmed {
+            return encode_mission_error(
+                request_id,
+                "interactive_consent_required",
+                "ACP agents require explicit write-scope confirmation in the local mission cockpit",
+            );
+        }
+        let Some(mission) = self.mission_runtime.mission(&params.mission_id) else {
+            return encode_mission_error(request_id, "mission_not_found", "mission does not exist");
+        };
+        if mission.run.as_ref().is_some_and(|run| {
+            run.provider == provider
+                && run.mode == ProviderMode::Managed
+                && run.handoff_artifact_sha256.as_deref() == Some(params.artifact_sha256.as_str())
+                && self.managed_runs.contains_key(&run.run_id)
+        }) {
+            return encode_mission_run_started(request_id, mission);
+        }
+        let Some(source_run) = mission.run.as_ref() else {
+            return encode_mission_error(
+                request_id,
+                "invalid_handoff_state",
+                "mission has no source run to hand off",
+            );
+        };
+        if source_run.execute_project_recipe && !workspace_write_confirmed {
+            return encode_mission_error(
+                request_id,
+                "interactive_consent_required",
+                "continuing this mission restarts project services and requires confirmation in the local mission cockpit",
+            );
+        }
+        let checks = crate::server::mission_bridge::mission_view(mission.clone()).checks;
+        let artifact = match build_preview(
+            &mission,
+            &self.mission_runtime.attention_items(),
+            checks,
+            params.to,
+            params.generated_at_millis,
+        ) {
+            Ok(artifact) => artifact,
+            Err(error) => {
+                let error = crate::mission::runtime::MissionRuntimeError::from(error);
+                return encode_mission_error(
+                    request_id,
+                    crate::server::mission_bridge::error_code(&error),
+                    &error.to_string(),
+                );
+            }
+        };
+        if artifact.artifact_sha256 != params.artifact_sha256 {
+            return encode_mission_error(
+                request_id,
+                "handoff_artifact_changed",
+                "mission or workspace changed after the handoff preview; inspect a fresh preview",
+            );
+        }
+
+        let source_run_id = source_run.run_id.clone();
+        let execute_declared_checks = source_run.execute_declared_checks;
+        let execute_project_recipe = source_run.execute_project_recipe;
+        self.release_managed_run(&source_run_id);
+        if execute_project_recipe {
+            if let Err(error) = stop_project_services(&params.mission_id, &source_run_id) {
+                return encode_mission_error(request_id, "project_recipe_failed", &error);
+            }
+        }
+
+        let at_millis = crate::server::mission_bridge::now_millis();
+        let outcome = match self.mission_runtime.continue_run(ContinueRun {
+            mission_id: params.mission_id.clone(),
+            source_run_id,
+            run_id: artifact.suggested_run_id.clone(),
+            provider,
+            mode: ProviderMode::Managed,
+            request_id: match ClaimRequestId::new(&artifact.suggested_run_id) {
+                Ok(request_id) => request_id,
+                Err(error) => {
+                    return encode_mission_error(request_id, "invalid_run", &error.to_string());
+                }
+            },
+            handoff_artifact_sha256: artifact.artifact_sha256.clone(),
+            at_millis,
+        }) {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                return encode_mission_error(
+                    request_id,
+                    crate::server::mission_bridge::error_code(&error),
+                    &error.to_string(),
+                );
+            }
+        };
+        let worktree_path = outcome
+            .mission
+            .run
+            .as_ref()
+            .map(|run| run.worktree_path.clone())
+            .unwrap_or_else(|| artifact.worktree_path.clone());
+        if execute_project_recipe {
+            if let Err(error) = provision_project_recipe(
+                Path::new(&worktree_path),
+                &params.mission_id,
+                &artifact.suggested_run_id,
+                false,
+            ) {
+                let _ = self.mission_runtime.transition_run(
+                    &params.mission_id,
+                    MissionStatus::Failed,
+                    at_millis,
+                );
+                let _ = self.mission_runtime.release_worktree(&outcome.lease);
+                let _ = stop_project_services(&params.mission_id, &artifact.suggested_run_id);
+                return encode_mission_error(request_id, "project_recipe_failed", &error);
+            }
+        }
+        let handle = match self.spawn_managed_provider(provider) {
+            Ok(handle) => handle,
+            Err(error) => {
+                let _ = self.mission_runtime.transition_run(
+                    &params.mission_id,
+                    MissionStatus::Failed,
+                    at_millis,
+                );
+                let _ = self.mission_runtime.release_worktree(&outcome.lease);
+                if execute_project_recipe {
+                    let _ = stop_project_services(&params.mission_id, &artifact.suggested_run_id);
+                }
+                return encode_mission_error(
+                    request_id,
+                    "provider_start_failed",
+                    &error.to_string(),
+                );
+            }
+        };
+        let command = ProviderCommand::StartOrResume(StartOrResume {
+            run_id: artifact.suggested_run_id.clone(),
+            cwd: PathBuf::from(&worktree_path),
+            resume_session_id: None,
+            initial_input: mission_handoff_prompt(&artifact),
+            sandbox: if workspace_write_confirmed {
+                SandboxAccess::WorkspaceWriteConfirmed
+            } else {
+                SandboxAccess::ReadOnly
+            },
+        });
+        if let Err(error) = handle.try_send(command) {
+            let _ = self.mission_runtime.transition_run(
+                &params.mission_id,
+                MissionStatus::Failed,
+                at_millis,
+            );
+            let _ = self.mission_runtime.release_worktree(&outcome.lease);
+            if execute_project_recipe {
+                let _ = stop_project_services(&params.mission_id, &artifact.suggested_run_id);
+            }
+            return encode_mission_error(request_id, "provider_start_failed", &error.to_string());
+        }
+        self.managed_runs.insert(
+            artifact.suggested_run_id.clone(),
+            ManagedRun {
+                mission_id: params.mission_id.clone(),
+                provider,
+                recovered: false,
+                execute_declared_checks,
+                execute_project_recipe,
                 handle,
                 lease: outcome.lease,
                 responses: HashMap::new(),
@@ -2375,10 +3238,235 @@ impl HeadlessServer {
         )
     }
 
-    #[allow(
-        dead_code,
-        reason = "authorized replies stay unreachable until interactive consent is public"
-    )]
+    fn handle_mission_close_api(
+        &mut self,
+        request_id: &str,
+        target: &crate::api::schema::MissionTarget,
+    ) -> String {
+        use crate::{
+            api::schema::{ResponseResult, SuccessResponse},
+            mission::{
+                claims::{ClaimRequestId, LeaseOwner},
+                executor::ClosureExecutionRequest,
+                model::MissionStatus,
+            },
+        };
+
+        let Some(mission) = self.mission_runtime.mission(&target.mission_id) else {
+            return encode_mission_error(request_id, "mission_not_found", "mission does not exist");
+        };
+        if mission.status == MissionStatus::Archived {
+            return serde_json::to_string(&SuccessResponse {
+                id: request_id.to_owned(),
+                result: ResponseResult::MissionCloseAccepted {
+                    mission: crate::server::mission_bridge::mission_view(mission),
+                },
+            })
+            .unwrap_or_else(|_| {
+                encode_mission_error(
+                    request_id,
+                    "serialization_failed",
+                    "mission close response serialization failed",
+                )
+            });
+        }
+        if mission.status != MissionStatus::ReadyToClose {
+            return encode_mission_error(
+                request_id,
+                "mission_not_ready",
+                "mission must have a verified ready proof before close",
+            );
+        }
+        let Some(run) = mission.run.as_ref() else {
+            return encode_mission_error(
+                request_id,
+                "mission_runtime_error",
+                "mission has no durable run",
+            );
+        };
+        if self
+            .pending_proofs
+            .get(&run.run_id)
+            .is_some_and(|pending| pending.mission_id == mission.mission_id)
+        {
+            return serde_json::to_string(&SuccessResponse {
+                id: request_id.to_owned(),
+                result: ResponseResult::MissionCloseAccepted {
+                    mission: crate::server::mission_bridge::mission_view(mission),
+                },
+            })
+            .unwrap_or_else(|_| {
+                encode_mission_error(
+                    request_id,
+                    "serialization_failed",
+                    "mission close response serialization failed",
+                )
+            });
+        }
+        if self.pending_proofs.contains_key(&run.run_id)
+            || self.managed_runs.contains_key(&run.run_id)
+        {
+            return encode_mission_error(
+                request_id,
+                "mission_busy",
+                "mission run is already active",
+            );
+        }
+
+        let repository = match std::fs::canonicalize(&mission.repository_path) {
+            Ok(path) => path,
+            Err(error) => {
+                return encode_mission_error(request_id, "invalid_repository", &error.to_string())
+            }
+        };
+        let worktree = match std::fs::canonicalize(&run.worktree_path) {
+            Ok(path) => path,
+            Err(error) => {
+                return encode_mission_error(request_id, "invalid_repository", &error.to_string())
+            }
+        };
+        let claim_id = stable_runtime_id(
+            "mission-close-claim",
+            &[&mission.mission_id, &run.run_id, request_id],
+        );
+        let claim_id = match ClaimRequestId::new(claim_id) {
+            Ok(id) => id,
+            Err(error) => {
+                return encode_mission_error(request_id, "invalid_request", &error.to_string())
+            }
+        };
+        let lease = match self.mission_runtime.claim_worktree(
+            match LeaseOwner::new(&mission.mission_id, &run.run_id) {
+                Ok(owner) => owner,
+                Err(error) => {
+                    return encode_mission_error(
+                        request_id,
+                        "mission_runtime_error",
+                        &error.to_string(),
+                    )
+                }
+            },
+            &repository,
+            &worktree,
+            claim_id,
+        ) {
+            Ok(lease) => lease,
+            Err(error) => {
+                return encode_mission_error(
+                    request_id,
+                    crate::server::mission_bridge::error_code(&error),
+                    &error.to_string(),
+                )
+            }
+        };
+        let execution = ClosureExecutionRequest {
+            mission_id: mission.mission_id.clone(),
+            run_id: run.run_id.clone(),
+            repository_path: mission.repository_path.clone(),
+            worktree_path: run.worktree_path.clone(),
+            base_revision: run.base_revision.clone(),
+            declarations: mission.check_declarations.clone(),
+        };
+        if let Err(error) = self.spawn_proof_worker(
+            run.run_id.clone(),
+            mission.mission_id.clone(),
+            lease,
+            execution,
+        ) {
+            return encode_mission_error(request_id, "proof_worker_failed", &error);
+        }
+
+        serde_json::to_string(&SuccessResponse {
+            id: request_id.to_owned(),
+            result: ResponseResult::MissionCloseAccepted {
+                mission: crate::server::mission_bridge::mission_view(mission),
+            },
+        })
+        .unwrap_or_else(|_| {
+            encode_mission_error(
+                request_id,
+                "serialization_failed",
+                "mission close response serialization failed",
+            )
+        })
+    }
+
+    fn handle_attention_list_api(
+        &self,
+        request_id: &str,
+        params: &crate::api::schema::AttentionListParams,
+    ) -> String {
+        use crate::api::schema::{AttentionStateV1, ResponseResult, SuccessResponse};
+
+        let items = self
+            .app
+            .state
+            .attention_items
+            .iter()
+            .filter(|item| {
+                params
+                    .mission_id
+                    .as_ref()
+                    .is_none_or(|mission_id| item.mission_id == *mission_id)
+            })
+            .filter(|item| {
+                params.include_closed
+                    || matches!(
+                        item.state,
+                        AttentionStateV1::Open
+                            | AttentionStateV1::PendingResponse { .. }
+                            | AttentionStateV1::ReconciliationRequired { .. }
+                    )
+            })
+            .cloned()
+            .collect();
+        serde_json::to_string(&SuccessResponse {
+            id: request_id.to_owned(),
+            result: ResponseResult::AttentionList { items },
+        })
+        .unwrap_or_else(|_| {
+            encode_mission_error(
+                request_id,
+                "serialization_failed",
+                "attention response serialization failed",
+            )
+        })
+    }
+
+    fn handle_attention_get_api(
+        &self,
+        request_id: &str,
+        target: &crate::api::schema::AttentionTarget,
+    ) -> String {
+        use crate::api::schema::{ResponseResult, SuccessResponse};
+
+        let Some(item) = self
+            .app
+            .state
+            .attention_items
+            .iter()
+            .find(|item| item.attention_id == target.attention_id)
+            .cloned()
+        else {
+            return encode_mission_error(
+                request_id,
+                "attention_not_found",
+                "attention item not found",
+            );
+        };
+        serde_json::to_string(&SuccessResponse {
+            id: request_id.to_owned(),
+            result: ResponseResult::AttentionInfo { item },
+        })
+        .unwrap_or_else(|_| {
+            encode_mission_error(
+                request_id,
+                "serialization_failed",
+                "attention response serialization failed",
+            )
+        })
+    }
+
     fn handle_mission_respond_authorized(
         &mut self,
         request_id: &str,
@@ -2448,7 +3536,7 @@ impl HeadlessServer {
                 MissionResponseDecision::Deny,
             ) if params.answers.is_empty() => (AttentionDecision::Deny, ProviderResponse::Decline),
             (AttentionClass::UserInput, MissionResponseDecision::Answer)
-                if validate_managed_answers(&params.answers).is_ok() =>
+                if validate_managed_answers(&params.answers, &available.questions).is_ok() =>
             {
                 (
                     AttentionDecision::Answer,
@@ -2671,6 +3759,9 @@ impl HeadlessServer {
                             token: attention.token,
                             class: attention.class,
                             session_id: attention.thread_id,
+                            requested_action: attention.requested_action,
+                            questions: attention.questions,
+                            created_at_millis: at_millis,
                         },
                     );
                 }
@@ -2717,7 +3808,11 @@ impl HeadlessServer {
             ProviderEvent::TurnCompleted {
                 run_id, outcome, ..
             } => {
-                let Some(run) = self.managed_runs.get(&run_id) else {
+                let Some((mission_id, execute_declared_checks)) = self
+                    .managed_runs
+                    .get(&run_id)
+                    .map(|run| (run.mission_id.clone(), run.execute_declared_checks))
+                else {
                     return false;
                 };
                 let status = match outcome {
@@ -2727,7 +3822,7 @@ impl HeadlessServer {
                 };
                 let changed = self
                     .mission_runtime
-                    .transition_run(&run.mission_id, status, at_millis)
+                    .transition_run(&mission_id, status, at_millis)
                     .is_ok();
                 if outcome == TurnOutcome::Failed {
                     self.mark_inflight_delivery_unknown(
@@ -2736,7 +3831,13 @@ impl HeadlessServer {
                         at_millis,
                     );
                 }
-                self.release_managed_run(&run_id);
+                if outcome == TurnOutcome::Completed && changed && execute_declared_checks {
+                    if !self.start_closure_execution(&run_id) {
+                        self.release_managed_run(&run_id);
+                    }
+                } else {
+                    self.release_managed_run(&run_id);
+                }
                 changed
             }
             ProviderEvent::TransportFailed { run_id, .. } | ProviderEvent::Stopped { run_id } => {
@@ -2763,6 +3864,135 @@ impl HeadlessServer {
                 changed
             }
         }
+    }
+
+    fn start_closure_execution(&mut self, run_id: &str) -> bool {
+        use crate::mission::executor::ClosureExecutionRequest;
+
+        let Some(run) = self.managed_runs.remove(run_id) else {
+            return false;
+        };
+        let _ = run
+            .handle
+            .try_send(crate::managed_provider::ProviderCommand::Shutdown);
+        let Some(mission) = self.mission_runtime.mission(&run.mission_id) else {
+            let _ = self.mission_runtime.release_worktree(&run.lease);
+            return false;
+        };
+        let Some(durable_run) = mission.run.as_ref() else {
+            let _ = self.mission_runtime.release_worktree(&run.lease);
+            return false;
+        };
+        let request = ClosureExecutionRequest {
+            mission_id: mission.mission_id.clone(),
+            run_id: durable_run.run_id.clone(),
+            repository_path: mission.repository_path.clone(),
+            worktree_path: durable_run.worktree_path.clone(),
+            base_revision: durable_run.base_revision.clone(),
+            declarations: mission.check_declarations.clone(),
+        };
+        self.spawn_proof_worker(run_id.to_owned(), mission.mission_id, run.lease, request)
+            .is_ok()
+    }
+
+    fn spawn_proof_worker(
+        &mut self,
+        run_id: String,
+        mission_id: String,
+        lease: crate::mission::claims::WorktreeLease,
+        request: crate::mission::executor::ClosureExecutionRequest,
+    ) -> Result<(), String> {
+        use crate::mission::executor::execute_closure_cancellable;
+
+        if self.pending_proofs.contains_key(&run_id) {
+            let _ = self.mission_runtime.release_worktree(&lease);
+            return Err("a proof worker is already running for this mission run".into());
+        }
+        let cancelled = Arc::new(AtomicBool::new(false));
+        self.pending_proofs.insert(
+            run_id.clone(),
+            PendingProofRun {
+                mission_id,
+                lease,
+                cancelled: cancelled.clone(),
+            },
+        );
+        let sender = self.proof_event_tx.clone();
+        let worker_run_id = run_id.clone();
+        let spawn = std::thread::Builder::new()
+            .name(format!("nagi-proof-{run_id}"))
+            .spawn(move || {
+                let result = execute_closure_cancellable(request, &cancelled)
+                    .map_err(|error| error.to_string());
+                let _ = sender.blocking_send(ProofWorkerEvent {
+                    run_id: worker_run_id,
+                    result,
+                });
+            });
+        if let Err(error) = spawn {
+            warn!(run_id, err = %error, "mission proof worker could not start");
+            if let Some(pending) = self.pending_proofs.remove(&run_id) {
+                pending.cancelled.store(true, Ordering::Release);
+                let _ = self.mission_runtime.release_worktree(&pending.lease);
+            }
+            return Err(error.to_string());
+        }
+        Ok(())
+    }
+
+    fn handle_proof_event(&mut self, event: ProofWorkerEvent) -> bool {
+        let Some(pending) = self.pending_proofs.remove(&event.run_id) else {
+            return false;
+        };
+        let result = match event.result {
+            Ok(pack) => self.mission_runtime.finalize_evidence_pack(
+                pack,
+                &pending.lease,
+                crate::server::mission_bridge::now_millis(),
+            ),
+            Err(error) => {
+                warn!(
+                    mission_id = %pending.mission_id,
+                    run_id = %event.run_id,
+                    err = %error,
+                    "mission closure checks did not produce a proof pack"
+                );
+                let _ = self.mission_runtime.release_worktree(&pending.lease);
+                return true;
+            }
+        };
+        match result {
+            Ok(outcome) => {
+                info!(
+                    mission_id = %outcome.mission.mission_id,
+                    pack_digest = %outcome.pack_digest,
+                    verified = outcome.verified,
+                    "mission proof pack finalized"
+                );
+                if outcome.mission.status == crate::mission::model::MissionStatus::Archived {
+                    if let Some(run) = outcome
+                        .mission
+                        .run
+                        .as_ref()
+                        .filter(|run| run.execute_project_recipe)
+                    {
+                        let _ = stop_project_services(&outcome.mission.mission_id, &run.run_id);
+                        let worktree = PathBuf::from(&run.worktree_path);
+                        std::thread::spawn(move || run_project_cleanup(worktree));
+                    }
+                }
+            }
+            Err(error) => {
+                warn!(
+                    mission_id = %pending.mission_id,
+                    run_id = %event.run_id,
+                    err = %error,
+                    "mission proof pack could not be finalized"
+                );
+            }
+        }
+        let _ = self.mission_runtime.release_worktree(&pending.lease);
+        true
     }
 
     fn mark_inflight_delivery_unknown(
@@ -2806,6 +4036,16 @@ impl HeadlessServer {
                 .handle
                 .try_send(crate::managed_provider::ProviderCommand::Shutdown);
             let _ = self.mission_runtime.release_worktree(&run.lease);
+            if run.execute_project_recipe
+                && self
+                    .mission_runtime
+                    .mission(&run.mission_id)
+                    .is_some_and(|mission| {
+                        mission.status == crate::mission::model::MissionStatus::Failed
+                    })
+            {
+                let _ = stop_project_services(&run.mission_id, run_id);
+            }
         }
     }
 
@@ -3981,13 +5221,39 @@ impl HeadlessServer {
         if let api::schema::Method::MissionStart(params) = &msg.request.method {
             let response = self.handle_mission_start_api(&msg.request.id, params);
             let _ = msg.respond_to.send(response);
-            return false;
+            return self.sync_mission_projection();
+        }
+
+        if let api::schema::Method::MissionHandoffStart(params) = &msg.request.method {
+            let response = self.handle_mission_handoff_start_api(&msg.request.id, params);
+            let _ = msg.respond_to.send(response);
+            return self.sync_mission_projection();
         }
 
         if let api::schema::Method::MissionRespond(params) = &msg.request.method {
             let response = self.handle_mission_respond_api(&msg.request.id, params);
             let _ = msg.respond_to.send(response);
-            return false;
+            return self.sync_mission_projection();
+        }
+
+        if let api::schema::Method::MissionClose(target) = &msg.request.method {
+            let response = self.handle_mission_close_api(&msg.request.id, target);
+            let _ = msg.respond_to.send(response);
+            return self.sync_mission_projection();
+        }
+
+        if let api::schema::Method::AttentionList(params) = &msg.request.method {
+            let changed = self.sync_mission_projection();
+            let response = self.handle_attention_list_api(&msg.request.id, params);
+            let _ = msg.respond_to.send(response);
+            return changed;
+        }
+
+        if let api::schema::Method::AttentionGet(target) = &msg.request.method {
+            let changed = self.sync_mission_projection();
+            let response = self.handle_attention_get_api(&msg.request.id, target);
+            let _ = msg.respond_to.send(response);
+            return changed;
         }
 
         if let Some(outcome) = crate::server::mission_bridge::handle(
@@ -3996,7 +5262,7 @@ impl HeadlessServer {
             &msg.request.method,
         ) {
             let _ = msg.respond_to.send(outcome.response);
-            return outcome.changed;
+            return outcome.changed | self.sync_mission_projection();
         }
 
         match &msg.request.method {
@@ -4508,7 +5774,227 @@ impl HeadlessServer {
         }
     }
 
+    fn sync_mission_projection(&mut self) -> bool {
+        let durable_missions = self.mission_runtime.missions();
+        let missions = durable_missions
+            .iter()
+            .cloned()
+            .map(crate::server::mission_bridge::mission_view)
+            .collect::<Vec<_>>();
+        let attention_items = self
+            .mission_runtime
+            .attention_items()
+            .into_iter()
+            .filter_map(|attention| self.attention_item_projection(&attention, &durable_missions))
+            .collect::<Vec<_>>();
+        let changed = self.app.state.set_mission_views(missions)
+            | self.app.state.set_attention_items(attention_items);
+        if changed && self.app.state.mode == app::Mode::Navigator {
+            self.app
+                .state
+                .reconcile_navigator_selection_from(&self.app.terminal_runtimes);
+        }
+        changed
+    }
+
+    fn attention_item_projection(
+        &self,
+        attention: &crate::mission::store::DurableAttentionView,
+        missions: &[crate::mission::store::MissionView],
+    ) -> Option<crate::api::schema::AttentionItemV1> {
+        use crate::{
+            api::schema::{
+                AttentionDeliveryStateV1, AttentionFailureCodeV1, AttentionItemV1, AttentionKindV1,
+                AttentionPaneTargetV1, AttentionQuestionOptionV1, AttentionQuestionV1,
+                AttentionResponseCapabilityV1, AttentionSourceV1, AttentionStateV1,
+                ContractVersionV1,
+            },
+            mission::store::{PersistedAttentionState, PersistedResponseState},
+        };
+
+        let mission = missions
+            .iter()
+            .find(|mission| mission.mission_id == attention.mission_id)?;
+        let run = mission.run.as_ref()?;
+        let live = self.managed_runs.values().find_map(|managed| {
+            (managed.mission_id == attention.mission_id)
+                .then(|| managed.responses.get(&attention.attention_id))
+                .flatten()
+        });
+        let requested_action = live
+            .map(|response| response.requested_action.clone())
+            .unwrap_or_else(|| "Review the provider request in its originating session".into());
+        let created_at_millis = live
+            .map(|response| response.created_at_millis)
+            .unwrap_or(attention.updated_at_millis);
+        let state = match attention.state {
+            PersistedAttentionState::Open => AttentionStateV1::Open,
+            PersistedAttentionState::PendingResponse => attention
+                .response
+                .as_ref()
+                .map(|response| AttentionStateV1::PendingResponse {
+                    decision: wire_attention_decision(response.decision),
+                    actor: response.actor_id.clone(),
+                    requested_at_millis: response.updated_at_millis,
+                })
+                .unwrap_or(AttentionStateV1::Open),
+            PersistedAttentionState::ReconciliationRequired => attention
+                .response
+                .as_ref()
+                .map(|response| AttentionStateV1::ReconciliationRequired {
+                    decision: wire_attention_decision(response.decision),
+                    actor: response.actor_id.clone(),
+                    code: match response.state {
+                        PersistedResponseState::ReconciliationRequired { code }
+                        | PersistedResponseState::Failed { code } => wire_attention_failure(code),
+                        PersistedResponseState::Requested
+                        | PersistedResponseState::Acknowledged { .. } => {
+                            AttentionFailureCodeV1::TransportClosed
+                        }
+                    },
+                    at_millis: response.updated_at_millis,
+                })
+                .unwrap_or(AttentionStateV1::Open),
+            PersistedAttentionState::Resolved => attention
+                .response
+                .as_ref()
+                .map(|response| AttentionStateV1::Resolved {
+                    decision: wire_attention_decision(response.decision),
+                    actor: response.actor_id.clone(),
+                    at_millis: response.updated_at_millis,
+                })
+                .unwrap_or_else(|| AttentionStateV1::Dismissed {
+                    actor: "system".into(),
+                    reason: "Provider request resolved".into(),
+                    at_millis: attention.updated_at_millis,
+                }),
+            PersistedAttentionState::Dismissed => AttentionStateV1::Dismissed {
+                actor: "system".into(),
+                reason: "Request dismissed".into(),
+                at_millis: attention.updated_at_millis,
+            },
+            PersistedAttentionState::Expired => AttentionStateV1::Expired {
+                at_millis: attention.updated_at_millis,
+            },
+        };
+        let delivery = attention
+            .response
+            .as_ref()
+            .map(|response| match response.state {
+                PersistedResponseState::Requested => AttentionDeliveryStateV1::Pending {
+                    attempt: response.attempt,
+                    requested_at_millis: response.updated_at_millis,
+                },
+                PersistedResponseState::Acknowledged { .. } => {
+                    AttentionDeliveryStateV1::Acknowledged {
+                        attempt: response.attempt,
+                        at_millis: response.updated_at_millis,
+                    }
+                }
+                PersistedResponseState::Failed { code } => {
+                    AttentionDeliveryStateV1::DefinitelyNotApplied {
+                        attempt: response.attempt,
+                        code: wire_attention_failure(code),
+                        at_millis: response.updated_at_millis,
+                    }
+                }
+                PersistedResponseState::ReconciliationRequired { code } => {
+                    AttentionDeliveryStateV1::DeliveryUnknown {
+                        attempt: response.attempt,
+                        code: wire_attention_failure(code),
+                        at_millis: response.updated_at_millis,
+                    }
+                }
+            })
+            .unwrap_or_else(|| {
+                if matches!(
+                    attention.state,
+                    PersistedAttentionState::Dismissed | PersistedAttentionState::Expired
+                ) {
+                    AttentionDeliveryStateV1::NotApplicable
+                } else {
+                    AttentionDeliveryStateV1::NotRequested
+                }
+            });
+        Some(AttentionItemV1 {
+            schema_version: ContractVersionV1,
+            attention_id: attention.attention_id.clone(),
+            mission_id: attention.mission_id.clone(),
+            run_id: run.run_id.clone(),
+            session_id: live
+                .map(|response| response.session_id.clone())
+                .or_else(|| run.provider_session_id.clone())
+                .unwrap_or_else(|| run.run_id.clone()),
+            pane: AttentionPaneTargetV1 {
+                workspace_id: attention.mission_id.clone(),
+                pane_id: run.run_id.clone(),
+            },
+            kind: live.map_or(
+                AttentionKindV1::PermissionRequest,
+                |response| match response.class {
+                    crate::managed_provider::AttentionClass::UserInput => {
+                        AttentionKindV1::ProviderQuestion
+                    }
+                    crate::managed_provider::AttentionClass::CommandApproval
+                    | crate::managed_provider::AttentionClass::FileChangeApproval
+                    | crate::managed_provider::AttentionClass::PermissionApproval => {
+                        AttentionKindV1::PermissionRequest
+                    }
+                },
+            ),
+            requested_action: requested_action.clone(),
+            scope: requested_action,
+            risk: wire_attention_risk(attention.risk),
+            provider: wire_mission_provider(run.provider),
+            source: if live.is_some() {
+                AttentionSourceV1::ProviderApi
+            } else {
+                AttentionSourceV1::Process
+            },
+            response_capability: if live.is_some() {
+                AttentionResponseCapabilityV1::Reliable
+            } else {
+                AttentionResponseCapabilityV1::OpenPaneOnly
+            },
+            questions: live
+                .map(|response| {
+                    response
+                        .questions
+                        .iter()
+                        .map(|question| AttentionQuestionV1 {
+                            id: question.id.clone(),
+                            header: question.header.clone(),
+                            prompt: question.prompt.clone(),
+                            options: question
+                                .options
+                                .iter()
+                                .map(|option| AttentionQuestionOptionV1 {
+                                    label: option.label.clone(),
+                                    description: option.description.clone(),
+                                })
+                                .collect(),
+                            multiple: question.multiple,
+                            custom_allowed: question.custom_allowed,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            created_at_millis,
+            expires_at_millis: None,
+            occurrence_count: 1,
+            unread: matches!(
+                attention.state,
+                PersistedAttentionState::Open
+                    | PersistedAttentionState::PendingResponse
+                    | PersistedAttentionState::ReconciliationRequired
+            ),
+            state,
+            delivery,
+        })
+    }
+
     fn render_and_stream(&mut self) {
+        self.sync_mission_projection();
         let full_started = crate::render_prof::timer();
         let render_targets = render_targets(&self.clients, self.foreground_client_id);
 
@@ -5039,6 +6525,10 @@ impl Drop for HeadlessServer {
             );
             self.release_managed_run(&run_id);
         }
+        for (_, pending) in self.pending_proofs.drain() {
+            pending.cancelled.store(true, Ordering::Release);
+            let _ = self.mission_runtime.release_worktree(&pending.lease);
+        }
         let staged_files = self
             .clients
             .drain()
@@ -5321,6 +6811,11 @@ fn run_handoff_import_server(socket_path: &Path, token: &str) -> io::Result<()> 
             Some(api_server),
             mission_runtime,
         )?;
+        server.acp_endpoint =
+            configured_acp_endpoint(&loaded_config.config).unwrap_or_else(|error| {
+                warn!(err = %error, "ACP provider configuration is invalid");
+                None
+            });
         crate::server::handoff::report_ready(&mut received.stream)?;
         crate::server::handoff::wait_committed(&mut received.stream)?;
         server
@@ -5401,6 +6896,8 @@ mod tests {
     }
 
     fn test_headless_server_with_event_hub(event_hub: api::EventHub) -> HeadlessServer {
+        static TEST_SERVER_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
         let config = crate::config::Config::default();
         let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
         let mut app = crate::app::App::new(&config, true, None, api_rx, event_hub);
@@ -5409,12 +6906,13 @@ mod tests {
         app.local_input_source_switch = false;
 
         let dir = std::env::temp_dir().join(format!(
-            "hh-{}-{}",
+            "hh-{}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos())
-                .unwrap_or(0)
+                .unwrap_or(0),
+            TEST_SERVER_SEQUENCE.fetch_add(1, Ordering::Relaxed),
         ));
         let _ = fs::create_dir_all(&dir);
         let mission_runtime = crate::mission::runtime::MissionRuntime::open_owned(
@@ -5433,6 +6931,7 @@ mod tests {
             .expect("set listener nonblocking");
         let (server_event_tx, server_event_rx) = mpsc::channel(64);
         let (provider_event_tx, provider_event_rx) = mpsc::channel(64);
+        let (proof_event_tx, proof_event_rx) = mpsc::channel(8);
         #[cfg(windows)]
         let should_quit = Arc::new(AtomicBool::new(false));
         #[cfg(windows)]
@@ -5444,8 +6943,14 @@ mod tests {
             mission_runtime,
             managed_runs: HashMap::new(),
             managed_provider_executable: None,
+            acp_endpoint: None,
             provider_event_rx,
             provider_event_tx,
+            proof_event_rx,
+            proof_event_tx,
+            pending_proofs: HashMap::new(),
+            pending_mission_launches: HashMap::new(),
+            pending_project_launches: HashMap::new(),
             #[cfg(unix)]
             api_tx: None,
             api_server: None,
@@ -5505,6 +7010,7 @@ mod tests {
             .expect("set listener nonblocking");
         let (server_event_tx, server_event_rx) = mpsc::channel(64);
         let (provider_event_tx, provider_event_rx) = mpsc::channel(64);
+        let (proof_event_tx, proof_event_rx) = mpsc::channel(8);
         #[cfg(windows)]
         let should_quit = Arc::new(AtomicBool::new(false));
         #[cfg(windows)]
@@ -5516,8 +7022,14 @@ mod tests {
             mission_runtime,
             managed_runs: HashMap::new(),
             managed_provider_executable: None,
+            acp_endpoint: None,
             provider_event_rx,
             provider_event_tx,
+            proof_event_rx,
+            proof_event_tx,
+            pending_proofs: HashMap::new(),
+            pending_mission_launches: HashMap::new(),
+            pending_project_launches: HashMap::new(),
             #[cfg(unix)]
             api_tx: None,
             api_server: None,
@@ -8111,11 +9623,8 @@ next_tab = ""
             }],
         }));
 
-        assert_eq!(server.app.state.mode, crate::app::Mode::Settings);
-        assert_eq!(
-            server.app.state.settings.section,
-            crate::app::state::SettingsSection::Integrations
-        );
+        assert_eq!(server.app.state.mode, crate::app::Mode::NewMission);
+        assert!(server.app.state.new_mission.is_some());
     }
 
     #[test]
@@ -10494,6 +12003,8 @@ next_tab = ""
                 provider: MissionProvider::Codex,
                 mode: MissionProviderMode::Managed,
                 worktree_path: None,
+                execute_declared_checks: false,
+                execute_project_recipe: false,
             },
         );
         let respond = server.handle_mission_respond_api(
@@ -10511,6 +12022,443 @@ next_tab = ""
             let response: serde_json::Value = serde_json::from_str(&response).unwrap();
             assert_eq!(response["error"]["code"], "feature_unavailable");
         }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn managed_mission_start_wires_the_registered_opencode_adapter() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        use crate::{
+            api::schema::{MissionProvider, MissionProviderMode, MissionStartParams},
+            managed_provider::ProviderEvent,
+            mission::{model::MissionStatus, runtime::CreateMission},
+        };
+
+        fn git(repository: &std::path::Path, arguments: &[&str]) {
+            let status = std::process::Command::new("git")
+                .args(arguments)
+                .current_dir(repository)
+                .status()
+                .expect("run git fixture command");
+            assert!(
+                status.success(),
+                "git fixture command failed: {arguments:?}"
+            );
+        }
+
+        let repository = tempfile::tempdir().unwrap();
+        git(repository.path(), &["init", "-q"]);
+        git(repository.path(), &["config", "user.name", "Test User"]);
+        git(
+            repository.path(),
+            &["config", "user.email", "test@example.invalid"],
+        );
+        std::fs::write(repository.path().join("README.md"), "fixture\n").unwrap();
+        git(repository.path(), &["add", "README.md"]);
+        git(repository.path(), &["commit", "-qm", "fixture"]);
+
+        let provider_directory = tempfile::tempdir().unwrap();
+        let executable = provider_directory.path().join("opencode-conformance");
+        std::fs::write(
+            &executable,
+            include_str!("../../tests/fixtures/providers/opencode.py"),
+        )
+        .unwrap();
+        let mut permissions = std::fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&executable, permissions).unwrap();
+
+        let mut server = test_headless_server();
+        server
+            .mission_runtime
+            .create_mission(CreateMission {
+                mission_id: "mission-opencode".into(),
+                title: "Start OpenCode".into(),
+                repository_path: repository.path().to_string_lossy().into_owned(),
+                objective: "Run through the registered adapter".into(),
+                acceptance_criteria: vec!["The provider session is bound".into()],
+                at_millis: 1,
+            })
+            .unwrap();
+        configure_test_mission(&mut server.mission_runtime, "mission-opencode", 1);
+        server.managed_provider_executable = Some(executable);
+
+        let denied = server.handle_mission_start_api(
+            "start-opencode-project-recipe-without-local-consent",
+            &MissionStartParams {
+                mission_id: "mission-opencode".into(),
+                run_id: "run-opencode".into(),
+                provider: MissionProvider::OpenCode,
+                mode: MissionProviderMode::Managed,
+                worktree_path: None,
+                execute_declared_checks: false,
+                execute_project_recipe: true,
+            },
+        );
+        let denied: crate::api::schema::ErrorResponse = serde_json::from_str(&denied).unwrap();
+        assert_eq!(denied.error.code, "interactive_consent_required");
+
+        let response = server.handle_mission_start_api(
+            "start-opencode",
+            &MissionStartParams {
+                mission_id: "mission-opencode".into(),
+                run_id: "run-opencode".into(),
+                provider: MissionProvider::OpenCode,
+                mode: MissionProviderMode::Managed,
+                worktree_path: None,
+                execute_declared_checks: false,
+                execute_project_recipe: false,
+            },
+        );
+        let response: crate::api::schema::SuccessResponse = serde_json::from_str(&response)
+            .expect("OpenCode must return the typed mission start response");
+        assert!(matches!(
+            response.result,
+            crate::api::schema::ResponseResult::MissionRunStarted { .. }
+        ));
+        assert!(server.managed_runs.contains_key("run-opencode"));
+
+        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+            .await
+            .expect("OpenCode ready timeout")
+            .expect("OpenCode event channel closed");
+        assert!(matches!(
+            event,
+            ProviderEvent::Ready {
+                ref run_id,
+                ref session_id,
+            } if run_id == "run-opencode" && session_id == "session-live"
+        ));
+        assert!(server.handle_provider_event(event));
+        let mission = server.mission_runtime.mission("mission-opencode").unwrap();
+        assert_eq!(mission.status, MissionStatus::Active);
+        assert_eq!(
+            mission
+                .run
+                .as_ref()
+                .and_then(|run| run.provider_session_id.as_deref()),
+            Some("session-live")
+        );
+        server.release_managed_run("run-opencode");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn managed_handoff_starts_the_target_provider_from_the_inspected_artifact() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        use crate::{
+            api::schema::{MissionHandoffStartParams, MissionProvider},
+            managed_provider::ProviderEvent,
+            mission::{
+                claims::ClaimRequestId,
+                handoff::build_preview,
+                model::{MissionStatus, ProviderKind, ProviderMode},
+                runtime::{CreateMission, StartRun},
+            },
+        };
+
+        fn git(repository: &std::path::Path, arguments: &[&str]) {
+            assert!(std::process::Command::new("git")
+                .args(arguments)
+                .current_dir(repository)
+                .status()
+                .unwrap()
+                .success());
+        }
+
+        let repository = tempfile::tempdir().unwrap();
+        git(repository.path(), &["init", "-q"]);
+        git(repository.path(), &["config", "user.name", "Test User"]);
+        git(
+            repository.path(),
+            &["config", "user.email", "test@example.invalid"],
+        );
+        std::fs::write(repository.path().join("README.md"), "fixture\n").unwrap();
+        git(repository.path(), &["add", "README.md"]);
+        git(repository.path(), &["commit", "-qm", "fixture"]);
+
+        let provider_directory = tempfile::tempdir().unwrap();
+        let executable = provider_directory.path().join("opencode-handoff");
+        std::fs::write(
+            &executable,
+            include_str!("../../tests/fixtures/providers/opencode.py"),
+        )
+        .unwrap();
+        let mut permissions = std::fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&executable, permissions).unwrap();
+
+        let mut server = test_headless_server();
+        server
+            .mission_runtime
+            .create_mission(CreateMission {
+                mission_id: "mission-handoff-live".into(),
+                title: "Continue live".into(),
+                repository_path: repository.path().to_string_lossy().into_owned(),
+                objective: "Continue the same mission with OpenCode".into(),
+                acceptance_criteria: vec!["The target provider receives the handoff".into()],
+                at_millis: 1,
+            })
+            .unwrap();
+        configure_test_mission(&mut server.mission_runtime, "mission-handoff-live", 1);
+        let source = server
+            .mission_runtime
+            .start_run(StartRun {
+                mission_id: "mission-handoff-live".into(),
+                run_id: "run-source".into(),
+                provider: ProviderKind::Codex,
+                mode: ProviderMode::Managed,
+                worktree_path: repository.path().to_string_lossy().into_owned(),
+                request_id: ClaimRequestId::new("claim-source").unwrap(),
+                execute_declared_checks: false,
+                execute_project_recipe: false,
+                at_millis: 2,
+            })
+            .unwrap();
+        server
+            .mission_runtime
+            .transition_run("mission-handoff-live", MissionStatus::Blocked, 3)
+            .unwrap();
+        server
+            .mission_runtime
+            .release_worktree(&source.lease)
+            .unwrap();
+        server.managed_provider_executable = Some(executable);
+
+        let generated_at_millis = 4;
+        let mission = server
+            .mission_runtime
+            .mission("mission-handoff-live")
+            .unwrap();
+        let artifact = build_preview(
+            &mission,
+            &server.mission_runtime.attention_items(),
+            crate::server::mission_bridge::mission_view(mission.clone()).checks,
+            MissionProvider::OpenCode,
+            generated_at_millis,
+        )
+        .unwrap();
+        let stale = server.handle_mission_handoff_start_api(
+            "handoff-stale",
+            &MissionHandoffStartParams {
+                mission_id: "mission-handoff-live".into(),
+                to: MissionProvider::OpenCode,
+                generated_at_millis,
+                artifact_sha256: "0".repeat(64),
+            },
+        );
+        let stale: crate::api::schema::ErrorResponse = serde_json::from_str(&stale).unwrap();
+        assert_eq!(stale.error.code, "handoff_artifact_changed");
+        assert!(server.managed_runs.is_empty());
+        assert_eq!(
+            server
+                .mission_runtime
+                .mission("mission-handoff-live")
+                .unwrap()
+                .run
+                .as_ref()
+                .unwrap()
+                .run_id,
+            "run-source"
+        );
+        let response = server.handle_mission_handoff_start_api(
+            "handoff-live",
+            &MissionHandoffStartParams {
+                mission_id: "mission-handoff-live".into(),
+                to: MissionProvider::OpenCode,
+                generated_at_millis,
+                artifact_sha256: artifact.artifact_sha256.clone(),
+            },
+        );
+        let response: crate::api::schema::SuccessResponse =
+            serde_json::from_str(&response).expect("handoff must return a typed success response");
+        assert!(matches!(
+            response.result,
+            crate::api::schema::ResponseResult::MissionRunStarted { .. }
+        ));
+        assert!(server.managed_runs.contains_key(&artifact.suggested_run_id));
+
+        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+            .await
+            .expect("OpenCode handoff ready timeout")
+            .expect("OpenCode handoff event channel closed");
+        assert!(matches!(
+            event,
+            ProviderEvent::Ready { ref run_id, .. } if run_id == &artifact.suggested_run_id
+        ));
+        assert!(server.handle_provider_event(event));
+        let mission = server
+            .mission_runtime
+            .mission("mission-handoff-live")
+            .unwrap();
+        assert_eq!(mission.status, MissionStatus::Active);
+        assert_eq!(mission.run_history.len(), 1);
+        assert_eq!(
+            mission
+                .run
+                .as_ref()
+                .and_then(|run| run.handoff_from_run_id.as_deref()),
+            Some("run-source")
+        );
+        assert_eq!(
+            mission
+                .run
+                .as_ref()
+                .and_then(|run| run.handoff_artifact_sha256.as_deref()),
+            Some(artifact.artifact_sha256.as_str())
+        );
+        server.release_managed_run(&artifact.suggested_run_id);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn new_mission_launch_creates_an_isolated_worktree_before_provider_start() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        use crate::{
+            api::schema::{
+                MissionCheck, MissionConfigureParams, MissionCreateParams, MissionPathRule,
+                MissionProvider, MissionProviderMode, MissionStartParams,
+            },
+            app::state::NewMissionLaunchRequest,
+            managed_provider::ProviderEvent,
+            mission::model::MissionStatus,
+        };
+
+        fn git(repository: &std::path::Path, arguments: &[&str]) {
+            assert!(std::process::Command::new("git")
+                .args(arguments)
+                .current_dir(repository)
+                .status()
+                .unwrap()
+                .success());
+        }
+
+        let repository = tempfile::tempdir().unwrap();
+        git(repository.path(), &["init", "-q"]);
+        git(repository.path(), &["config", "user.name", "Test User"]);
+        git(
+            repository.path(),
+            &["config", "user.email", "test@example.invalid"],
+        );
+        std::fs::write(repository.path().join("README.md"), "fixture\n").unwrap();
+        std::fs::create_dir(repository.path().join(".nagi")).unwrap();
+        std::fs::write(
+            repository.path().join(".nagi/project.toml"),
+            "schema = 1\n[setup]\ncommand = [\"./project-setup\"]\ntimeout_seconds = 5\n",
+        )
+        .unwrap();
+        let setup = repository.path().join("project-setup");
+        std::fs::write(&setup, "#!/bin/sh\nprintf ready > recipe-ready\n").unwrap();
+        std::fs::set_permissions(&setup, std::fs::Permissions::from_mode(0o700)).unwrap();
+        git(repository.path(), &["add", "."]);
+        git(repository.path(), &["commit", "-qm", "fixture"]);
+        let repository = repository.path().canonicalize().unwrap();
+
+        let provider_directory = tempfile::tempdir().unwrap();
+        let executable = provider_directory.path().join("opencode-conformance");
+        std::fs::write(
+            &executable,
+            include_str!("../../tests/fixtures/providers/opencode.py"),
+        )
+        .unwrap();
+        let mut permissions = std::fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&executable, permissions).unwrap();
+
+        let worktrees = tempfile::tempdir().unwrap();
+        let mut server = test_headless_server();
+        server.app.state.worktree_directory = worktrees.path().to_path_buf();
+        server.managed_provider_executable = Some(executable);
+        server.begin_new_mission_launch(NewMissionLaunchRequest {
+            create: MissionCreateParams {
+                mission_id: "isolated-launch".into(),
+                title: "Isolated launch".into(),
+                repository_path: repository.to_string_lossy().into_owned(),
+                objective: "Start away from the source checkout".into(),
+                acceptance_criteria: vec!["The provider uses a linked worktree".into()],
+            },
+            configure: MissionConfigureParams {
+                mission_id: "isolated-launch".into(),
+                checks: vec![MissionCheck::Command {
+                    id: "git-proof".into(),
+                    program: "git".into(),
+                    args: vec!["diff".into(), "--check".into()],
+                    cwd: ".".into(),
+                    relevant_paths: vec![MissionPathRule::All],
+                    required_artifacts: Vec::new(),
+                    include_ignored: false,
+                    required: true,
+                    covers: vec![0],
+                }],
+            },
+            start: MissionStartParams {
+                mission_id: "isolated-launch".into(),
+                run_id: "run-isolated-launch".into(),
+                provider: MissionProvider::OpenCode,
+                mode: MissionProviderMode::Managed,
+                worktree_path: None,
+                execute_declared_checks: true,
+                execute_project_recipe: true,
+            },
+            workspace_write_confirmed: true,
+            branch: "mission/isolated-launch".into(),
+        });
+        assert!(server
+            .pending_mission_launches
+            .contains_key("isolated-launch"));
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while server
+                .pending_mission_launches
+                .contains_key("isolated-launch")
+                || server
+                    .pending_project_launches
+                    .contains_key("isolated-launch")
+            {
+                if let Ok(event) = server.app.event_rx.try_recv() {
+                    server.handle_internal_event_with_forwarding(event);
+                }
+                server.finish_pending_mission_launches();
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("worktree provisioning timed out");
+
+        let mission = server.mission_runtime.mission("isolated-launch").unwrap();
+        let run = mission.run.as_ref().unwrap();
+        assert_ne!(std::path::Path::new(&run.worktree_path), repository);
+        assert!(std::path::Path::new(&run.worktree_path)
+            .join(".git")
+            .exists());
+        assert_eq!(
+            std::fs::read_to_string(std::path::Path::new(&run.worktree_path).join("recipe-ready"))
+                .unwrap(),
+            "ready"
+        );
+        assert_eq!(mission.status, MissionStatus::Preparing);
+        assert!(server.managed_runs.contains_key("run-isolated-launch"));
+
+        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            event,
+            ProviderEvent::Ready { ref run_id, .. } if run_id == "run-isolated-launch"
+        ));
+        assert!(server.handle_provider_event(event));
+        assert_eq!(
+            server
+                .mission_runtime
+                .mission("isolated-launch")
+                .unwrap()
+                .status,
+            MissionStatus::Active
+        );
     }
 
     #[test]
@@ -10575,6 +12523,8 @@ next_tab = ""
                 mode: ProviderMode::Managed,
                 worktree_path: repository.path().to_string_lossy().into_owned(),
                 request_id: ClaimRequestId::new("request-respond").unwrap(),
+                execute_declared_checks: false,
+                execute_project_recipe: false,
                 at_millis: 2,
             })
             .unwrap();
@@ -10603,6 +12553,8 @@ next_tab = ""
                 mission_id: "mission-respond".into(),
                 provider: ProviderKind::Codex,
                 recovered: false,
+                execute_declared_checks: false,
+                execute_project_recipe: false,
                 handle,
                 lease: started.lease,
                 responses: [(
@@ -10611,6 +12563,9 @@ next_tab = ""
                         token: ResponseToken::for_test(41, "item/commandExecution/requestApproval"),
                         class: AttentionClass::CommandApproval,
                         session_id: "session-respond".into(),
+                        requested_action: "Run tests".into(),
+                        questions: Vec::new(),
+                        created_at_millis: 1,
                     },
                 )]
                 .into_iter()
@@ -10618,6 +12573,44 @@ next_tab = ""
                 inflight_responses: HashMap::new(),
             },
         );
+        assert!(server.sync_mission_projection());
+        let projected = server
+            .app
+            .state
+            .attention_items
+            .iter()
+            .find(|item| item.attention_id == "attention-respond")
+            .expect("durable attention must reach the cockpit projection");
+        assert_eq!(projected.requested_action, "Run tests");
+        assert_eq!(
+            projected.response_capability,
+            crate::api::schema::AttentionResponseCapabilityV1::Reliable
+        );
+        assert_eq!(projected.risk, crate::api::schema::AttentionRiskV1::High);
+        let listed: crate::api::schema::SuccessResponse =
+            serde_json::from_str(&server.handle_attention_list_api(
+                "attention-list",
+                &crate::api::schema::AttentionListParams::default(),
+            ))
+            .unwrap();
+        assert!(matches!(
+            listed.result,
+            crate::api::schema::ResponseResult::AttentionList { ref items }
+                if items.len() == 1 && items[0].attention_id == "attention-respond"
+        ));
+        let fetched: crate::api::schema::SuccessResponse =
+            serde_json::from_str(&server.handle_attention_get_api(
+                "attention-get",
+                &crate::api::schema::AttentionTarget {
+                    attention_id: "attention-respond".into(),
+                },
+            ))
+            .unwrap();
+        assert!(matches!(
+            fetched.result,
+            crate::api::schema::ResponseResult::AttentionInfo { ref item }
+                if item.requested_action == "Run tests"
+        ));
 
         let retry = server.handle_mission_start_api(
             "start-retry",
@@ -10627,6 +12620,8 @@ next_tab = ""
                 provider: MissionProvider::Codex,
                 mode: MissionProviderMode::Managed,
                 worktree_path: Some(repository.path().to_string_lossy().into_owned()),
+                execute_declared_checks: false,
+                execute_project_recipe: false,
             },
         );
         let retry: crate::api::schema::SuccessResponse = serde_json::from_str(&retry).unwrap();
@@ -10723,6 +12718,9 @@ next_tab = ""
                     token: ResponseToken::for_test(42, "item/commandExecution/requestApproval"),
                     class: AttentionClass::CommandApproval,
                     session_id: "session-respond".into(),
+                    requested_action: "Run checks".into(),
+                    questions: Vec::new(),
+                    created_at_millis: 2,
                 },
             );
         let encoded = server.handle_mission_respond_authorized(
@@ -10817,6 +12815,8 @@ next_tab = ""
                 mode: ProviderMode::Managed,
                 worktree_path: repository.path().to_string_lossy().into_owned(),
                 request_id: ClaimRequestId::new("request-completed").unwrap(),
+                execute_declared_checks: false,
+                execute_project_recipe: false,
                 at_millis: 2,
             })
             .unwrap();
@@ -10831,6 +12831,8 @@ next_tab = ""
                 mission_id: "mission-completed".into(),
                 provider: ProviderKind::Codex,
                 recovered: false,
+                execute_declared_checks: false,
+                execute_project_recipe: false,
                 handle,
                 lease: started.lease,
                 responses: HashMap::new(),
@@ -10875,6 +12877,8 @@ next_tab = ""
                 mode: ProviderMode::Managed,
                 worktree_path: repository.path().to_string_lossy().into_owned(),
                 request_id: ClaimRequestId::new("request-next").unwrap(),
+                execute_declared_checks: false,
+                execute_project_recipe: false,
                 at_millis: 6,
             })
             .expect("completed runs must release their checkout lease");
@@ -10882,6 +12886,161 @@ next_tab = ""
             .mission_runtime
             .release_worktree(&next.lease)
             .unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn consented_managed_turn_runs_checks_and_seals_ready_proof() {
+        use std::{os::unix::fs::PermissionsExt as _, process::Command};
+
+        use crate::{
+            managed_provider::{ManagedProviderHandle, ProviderEvent, TurnOutcome},
+            mission::{
+                claims::ClaimRequestId,
+                evidence::{CheckDeclaration, CommandSpec, PathRule},
+                model::{MissionDefinition, MissionStatus, ProviderKind, ProviderMode},
+                runtime::{ConfigureMission, CreateMission, StartRun},
+            },
+        };
+
+        fn git(repository: &Path, args: &[&str]) {
+            let status = Command::new("git")
+                .args(args)
+                .current_dir(repository)
+                .status()
+                .unwrap();
+            assert!(status.success(), "git command failed: {args:?}");
+        }
+
+        let repository = tempfile::tempdir().unwrap();
+        git(repository.path(), &["init", "-q"]);
+        git(repository.path(), &["config", "user.name", "Nagi Test"]);
+        git(
+            repository.path(),
+            &["config", "user.email", "nagi@example.invalid"],
+        );
+        let script = repository.path().join("verify");
+        std::fs::write(&script, "#!/bin/sh\nprintf 'sealed'\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        git(repository.path(), &["add", "verify"]);
+        git(repository.path(), &["commit", "-qm", "fixture"]);
+        let repository = repository.path().canonicalize().unwrap();
+        let mut server = test_headless_server();
+        server
+            .mission_runtime
+            .create_mission(CreateMission {
+                mission_id: "mission-proof-worker".into(),
+                title: "Seal the worker proof".into(),
+                repository_path: repository.to_string_lossy().into_owned(),
+                objective: "Run checks away from the server writer".into(),
+                acceptance_criteria: vec!["The declared verifier passes".into()],
+                at_millis: 1,
+            })
+            .unwrap();
+        let criterion_ids =
+            MissionDefinition::criterion_ids(&["The declared verifier passes".to_owned()]);
+        server
+            .mission_runtime
+            .configure_mission(ConfigureMission {
+                mission_id: "mission-proof-worker".into(),
+                declarations: vec![CheckDeclaration::command(
+                    "verify",
+                    CommandSpec::new("./verify", [] as [&str; 0], "."),
+                    vec![PathRule::All],
+                    vec![],
+                )
+                .covers(criterion_ids)],
+                at_millis: 2,
+            })
+            .unwrap();
+        let started = server
+            .mission_runtime
+            .start_run(StartRun {
+                mission_id: "mission-proof-worker".into(),
+                run_id: "run-proof-worker".into(),
+                provider: ProviderKind::Codex,
+                mode: ProviderMode::Managed,
+                worktree_path: repository.to_string_lossy().into_owned(),
+                request_id: ClaimRequestId::new("run-proof-worker").unwrap(),
+                execute_declared_checks: true,
+                execute_project_recipe: false,
+                at_millis: 3,
+            })
+            .unwrap();
+        server
+            .mission_runtime
+            .bind_provider_session(
+                "mission-proof-worker",
+                "run-proof-worker",
+                "session-proof-worker",
+                4,
+            )
+            .unwrap();
+        let (handle, _commands) = ManagedProviderHandle::for_test(1);
+        server.managed_runs.insert(
+            "run-proof-worker".into(),
+            ManagedRun {
+                mission_id: "mission-proof-worker".into(),
+                provider: ProviderKind::Codex,
+                recovered: false,
+                execute_declared_checks: true,
+                execute_project_recipe: false,
+                handle,
+                lease: started.lease,
+                responses: HashMap::new(),
+                inflight_responses: HashMap::new(),
+            },
+        );
+
+        assert!(server.handle_provider_event(ProviderEvent::TurnCompleted {
+            run_id: "run-proof-worker".into(),
+            turn_id: "turn-proof-worker".into(),
+            outcome: TurnOutcome::Completed,
+        }));
+        assert!(server.managed_runs.is_empty());
+        assert!(server.pending_proofs.contains_key("run-proof-worker"));
+        let event = tokio::time::timeout(Duration::from_secs(10), server.proof_event_rx.recv())
+            .await
+            .expect("proof worker timed out")
+            .expect("proof worker channel closed");
+        assert!(server.handle_proof_event(event));
+
+        let mission = server
+            .mission_runtime
+            .mission("mission-proof-worker")
+            .unwrap();
+        assert_eq!(mission.status, MissionStatus::ReadyToClose);
+        assert!(mission.latest_evidence_pack_digest.is_some());
+        assert!(server.pending_proofs.is_empty());
+
+        let close_response = server.handle_mission_close_api(
+            "close-proof-worker",
+            &crate::api::schema::MissionTarget {
+                mission_id: "mission-proof-worker".into(),
+            },
+        );
+        let close_response: crate::api::schema::SuccessResponse =
+            serde_json::from_str(&close_response).unwrap();
+        assert!(matches!(
+            close_response.result,
+            crate::api::schema::ResponseResult::MissionCloseAccepted { .. }
+        ));
+        assert!(server.pending_proofs.contains_key("run-proof-worker"));
+
+        let event = tokio::time::timeout(Duration::from_secs(10), server.proof_event_rx.recv())
+            .await
+            .expect("archive proof worker timed out")
+            .expect("archive proof worker channel closed");
+        assert!(server.handle_proof_event(event));
+        assert_eq!(
+            server
+                .mission_runtime
+                .mission("mission-proof-worker")
+                .unwrap()
+                .status,
+            MissionStatus::Archived
+        );
+        assert!(server.pending_proofs.is_empty());
     }
 
     #[cfg(unix)]
@@ -10918,6 +13077,8 @@ next_tab = ""
                 mode: ProviderMode::Managed,
                 worktree_path: repository.to_string_lossy().into_owned(),
                 request_id: ClaimRequestId::new("initial-server-recovery").unwrap(),
+                execute_declared_checks: false,
+                execute_project_recipe: false,
                 at_millis: 2,
             })
             .unwrap();
@@ -11028,6 +13189,8 @@ done
                     mode: ProviderMode::Managed,
                     worktree_path: repository.to_string_lossy().into_owned(),
                     request_id: ClaimRequestId::new(run_id).unwrap(),
+                    execute_declared_checks: false,
+                    execute_project_recipe: false,
                     at_millis: 2,
                 })
                 .unwrap();

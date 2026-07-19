@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "provider": "codex",
+  "mode": "managed",
+  "source": "adapter_declaration",
+  "adapter_contract_version": 1,
+  "runtime_requirement": {
+    "strategy": "not_pinned"
+  },
+  "provider_version": "1.2.3",
+  "resume": {
+    "status": "supported"
+  },
+  "turns": {
+    "status": "supported"
+  },
+  "permissions": {
+    "status": "partial",
+    "detail": "Command and file approvals only"
+  },
+  "questions": {
+    "status": "partial",
+    "detail": "Structured single-turn questions only"
+  },
+  "diffs": {
+    "status": "unsupported",
+    "detail": "No structured diff events"
+  },
+  "interruption": {
+    "status": "supported"
+  },
+  "usage": {
+    "status": "unknown",
+    "detail": "Provider did not report trustworthy usage"
+  },
+  "streaming": {
+    "status": "supported"
+  }
+}

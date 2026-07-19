@@ -1,21 +1,24 @@
 use serde::{Deserialize, Serialize};
 
 use super::agents::AgentInfo;
+use super::attention::AttentionItemV1;
 use super::common::{ClientWindowTitleReason, NotificationShowReason};
 use super::events::EventEnvelope;
 use super::integrations::{
     IntegrationInstallResult, IntegrationTarget, IntegrationUninstallResult,
 };
-use super::missions::{MissionInfo, MissionSummary};
+use super::missions::{MissionHandoffArtifactV1, MissionSummary, MissionViewV1};
 use super::panes::{
     LayoutDescription, PaneEdgesResult, PaneFocusDirectionResult, PaneInfo, PaneLayoutSnapshot,
     PaneMoveResult, PaneNeighborResult, PaneProcessInfo, PaneReadResult, PaneResizeResult,
     PaneSwapResult, PaneZoomResult,
 };
+use super::plugin_v2::PluginGrantV1;
 use super::plugins::{
     InstalledPluginInfo, PluginActionInfo, PluginCommandLogInfo, PluginInvocationContext,
     PluginPaneInfo,
 };
+use super::proof::ProofReceiptV1;
 use super::server::ServerCapabilities;
 use super::session::SessionSnapshot;
 use super::tabs::TabInfo;
@@ -53,18 +56,18 @@ pub enum ResponseResult {
         snapshot: Box<SessionSnapshot>,
     },
     MissionInfo {
-        mission: MissionInfo,
+        mission: MissionViewV1,
     },
     MissionCreated {
-        mission: MissionInfo,
+        mission: MissionViewV1,
         created: bool,
     },
     MissionConfigured {
-        mission: MissionInfo,
+        mission: MissionViewV1,
         configured: bool,
     },
     MissionRunStarted {
-        mission: MissionInfo,
+        mission: MissionViewV1,
     },
     MissionResponseQueued {
         mission_id: String,
@@ -72,6 +75,21 @@ pub enum ResponseResult {
     },
     MissionList {
         missions: Vec<MissionSummary>,
+    },
+    MissionProof {
+        receipt: ProofReceiptV1,
+    },
+    MissionHandoffPreview {
+        artifact: MissionHandoffArtifactV1,
+    },
+    MissionCloseAccepted {
+        mission: MissionViewV1,
+    },
+    AttentionList {
+        items: Vec<AttentionItemV1>,
+    },
+    AttentionInfo {
+        item: AttentionItemV1,
     },
     WorkspaceInfo {
         workspace: WorkspaceInfo,
@@ -232,6 +250,14 @@ pub enum ResponseResult {
     },
     PluginDisabled {
         plugin: InstalledPluginInfo,
+    },
+    PluginCapabilitiesApproved {
+        plugin: InstalledPluginInfo,
+        grant: PluginGrantV1,
+    },
+    PluginCapabilitiesRevoked {
+        plugin: InstalledPluginInfo,
+        revoked: bool,
     },
     PluginActionList {
         actions: Vec<PluginActionInfo>,
