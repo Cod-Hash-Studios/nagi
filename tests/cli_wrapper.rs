@@ -3603,6 +3603,23 @@ command = ["sh", "-c", "echo bootstrap"]
     )
     .unwrap();
 
+    let untrusted_install = run_named_cli_with_env(
+        &config_home,
+        &runtime_dir,
+        &[
+            "--session",
+            "plugins",
+            "plugin",
+            "install",
+            "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
+            "--yes",
+        ],
+        &[("GIT_CONFIG_GLOBAL", &git_config)],
+    );
+    assert_eq!(untrusted_install.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&untrusted_install.stderr)
+        .contains("non-interactive native plugin install requires --trust-native"));
+
     let install = run_named_cli_with_env(
         &config_home,
         &runtime_dir,
@@ -3613,6 +3630,7 @@ command = ["sh", "-c", "echo bootstrap"]
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
+            "--trust-native",
         ],
         &[
             ("GIT_CONFIG_GLOBAL", &git_config),
@@ -3743,6 +3761,7 @@ command = ["sh", "-c", "echo should-not-install"]
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/build-fail",
             "--yes",
+            "--trust-native",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
     );
@@ -3837,6 +3856,7 @@ command = ["sh", "-c", "echo should-not-install"]
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/missing-tool",
             "--yes",
+            "--trust-native",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
     );
@@ -3946,6 +3966,7 @@ EOF
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/manifest-mutator",
             "--yes",
+            "--trust-native",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
     );
@@ -4089,6 +4110,7 @@ command = ["sh", "-c", "echo new"]
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
+            "--trust-native",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
         Some(&socket_path),
@@ -4226,6 +4248,7 @@ command = ["sh", "-c", "echo install"]
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
+            "--trust-native",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
         Some(&socket_path),
@@ -4355,6 +4378,7 @@ command = ["sh", "-c", "echo install"]
             "install",
             "Cod-Hash-Studios/nagi-plugin-examples/worktree-bootstrap",
             "--yes",
+            "--trust-native",
         ],
         &[("GIT_CONFIG_GLOBAL", &git_config)],
         Some(&socket_path),
