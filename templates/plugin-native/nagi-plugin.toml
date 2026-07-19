@@ -11,4 +11,3 @@ id = "hello"
 title = "Hello from {PLUGIN_NAME}"
 contexts = ["global"]
 command = ["python3", "plugin.py"]
-

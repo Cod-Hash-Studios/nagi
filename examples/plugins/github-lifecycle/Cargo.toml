@@ -7,4 +7,3 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 nagi-plugin-sdk = { path = "../../../sdk/rust/nagi-plugin-sdk" }
 serde_json = "1"
-

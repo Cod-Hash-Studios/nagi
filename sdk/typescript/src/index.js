@@ -40,4 +40,3 @@ function bounded(value, min, max, label) {
     throw new Error(`${label} must contain ${min}..=${max} safe characters`);
   }
 }
-

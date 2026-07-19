@@ -21,4 +21,3 @@ test("serializes a bounded host-compatible document", () => {
 test("rejects control characters", () => {
   assert.throws(() => document([{ type: "notice", tone: "danger", body: "bad\u0007" }]));
 });
-

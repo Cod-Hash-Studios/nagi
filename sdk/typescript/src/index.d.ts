@@ -14,4 +14,3 @@ export declare function readInvocation(env?: Record<string, string | undefined>)
 export declare function document(blocks: UiBlock[], summary?: string | null): UiDocument;
 export declare function validateDocument(value: UiDocument): UiDocument;
 export declare function serializeDocument(value: UiDocument): string;
-

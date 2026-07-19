@@ -17,4 +17,3 @@ contexts = ["mission"]
 id = "overview"
 title = "{PLUGIN_NAME}"
 source = "inspect"
-

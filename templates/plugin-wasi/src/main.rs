@@ -12,4 +12,3 @@ fn main() {
         r#"{{"schema_version":1,"summary":"Plugin connected","blocks":[{{"type":"notice","tone":"success","title":"{PLUGIN_NAME}","body":"This structured panel is rendered by Nagi."}}]}}"#
     );
 }
-

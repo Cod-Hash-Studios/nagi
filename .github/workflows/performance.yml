@@ -20,4 +20,3 @@ jobs:
       - run: HOMEBREW_NO_AUTO_UPDATE=1 brew install zig@0.15
       - run: echo "$(brew --prefix zig@0.15)/bin" >> "$GITHUB_PATH"
       - run: just bench-smoke
-
