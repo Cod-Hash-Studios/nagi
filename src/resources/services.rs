@@ -555,14 +555,22 @@ mod tests {
             .unwrap();
 
         let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, lease.port())).unwrap();
-        let worker = thread::spawn(move || {
+        let worker = thread::spawn(move || loop {
             let (mut stream, _) = listener.accept().unwrap();
             let mut request = [0_u8; 256];
-            let _ = stream.read(&mut request).unwrap();
-            stream
+            let count = stream.read(&mut request).unwrap();
+            if count == 0 || !request[..count].starts_with(b"GET ") {
+                continue;
+            }
+            if stream
                 .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
-                .unwrap();
+                .is_ok()
+            {
+                break;
+            }
         });
+        let stray = TcpStream::connect((Ipv4Addr::LOCALHOST, lease.port())).unwrap();
+        drop(stray);
         let contract = ProjectContract {
             schema: 1,
             worktree: Default::default(),
