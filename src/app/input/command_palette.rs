@@ -28,6 +28,13 @@ impl App {
             CommandPaletteAction::OpenCockpit => {
                 self.state.open_navigator_from(&self.terminal_runtimes)
             }
+            CommandPaletteAction::NewMission { provider } => {
+                super::mission::open_new_mission_with_provider(
+                    &mut self.state,
+                    &self.terminal_runtimes,
+                    provider,
+                );
+            }
             CommandPaletteAction::NewWorkspace => self.execute_tui_navigate_action(
                 super::navigate::NavigateAction::NewWorkspace,
                 super::navigate::ActionContext::Direct,
@@ -170,6 +177,17 @@ pub(crate) fn select_command_palette_index(state: &mut AppState, index: usize) {
 mod tests {
     use super::*;
 
+    fn test_app() -> App {
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        App::new(
+            &crate::config::Config::default(),
+            true,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        )
+    }
+
     #[test]
     fn typing_filters_palette_and_keeps_selection_on_the_best_match() {
         let mut state = AppState::test_new();
@@ -225,5 +243,27 @@ mod tests {
         );
 
         assert_eq!(action, None);
+    }
+
+    #[test]
+    fn managed_provider_quick_actions_preselect_the_requested_runtime() {
+        for (provider, expected_index) in [
+            (crate::api::schema::MissionProvider::Codex, 0),
+            (crate::api::schema::MissionProvider::ClaudeCode, 1),
+        ] {
+            let mut app = test_app();
+
+            app.execute_command_palette_action(CommandPaletteAction::NewMission { provider });
+
+            assert_eq!(app.state.mode, crate::app::state::Mode::NewMission);
+            assert_eq!(
+                app.state
+                    .new_mission
+                    .as_ref()
+                    .expect("provider action must open the mission wizard")
+                    .provider_index,
+                expected_index
+            );
+        }
     }
 }

@@ -3,11 +3,11 @@
 # theme: nagi-night
 # size: 60x20
 # palette: Palette { accent: Rgb(121, 167, 216), panel_bg: Rgb(16, 22, 31), surface0: Rgb(25, 36, 52), surface1: Rgb(43, 58, 78), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(243, 235, 221), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(126, 185, 154), yellow: Rgb(212, 180, 106), red: Rgb(230, 101, 90), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
-# style-sha256: 70f938d820bbd54a48e80ef565a8db4b7076daea8b38e11f45934e6ad3add57c
+# style-sha256: 51771486a3cfd7e5e4a0d80718fc8daf7f3afea0739e92143ad7392970536311
 # ---
  · nagi-release-with-a-deliberately-long-…  tab 1 │
  n╭──────────────────────────────────────────────────────╮
-  │COMMANDS  7  core + providers + plugins               │
+  │COMMANDS  9  core + providers + plugins               │
   │› Type to search commands…                            │
   │──────────────────────────────────────────────────────│
   │▏ Open cockpit                                  core  │

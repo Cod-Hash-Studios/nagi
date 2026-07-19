@@ -3,14 +3,14 @@
 # theme: terminal-16
 # size: 120x32
 # palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
-# style-sha256: e20862660e42dd871c4d28f316d1a8be467cda175449546847f5949a23473540
+# style-sha256: af0643b0f9268315a400e3c099f0afedd386ab5f82af7ad4f8eb8abed52eaedd
 # ---
  spaces                  │ 1       +
                          │
  · nagi-release-with-a-…▕│
    main                 ▕│
  · mission-001+------------------------------------------------------------------------------------------+
-   main       |COMMANDS  7  core + providers + plugins                                                   |
+   main       |COMMANDS  9  core + providers + plugins                                                   |
  · mission-002|> Type to search commands…                                                                |
    main       |------------------------------------------------------------------------------------------|
  · mission-003|> Open cockpit                                                                      core  |
@@ -27,10 +27,10 @@
               |  Add a tab to the current workspace                                                      |
               |  New workspace                                                                     core  |
               |  Start another durable workspace                                                         |
-              |                                                                                          |
-              |                                                                                          |
-              |                                                                                          |
-              |                                                                                          |
+              |  New mission with Claude Code                                    provider · Claude Code  |
+              |  Start a durable, proof-bound mission                                                    |
+              |  New mission with Codex                                                provider · Codex  |
+              |  Start a durable, proof-bound mission                                                    |
               |enter run  ↑↓ select  esc close                                                           |
               +------------------------------------------------------------------------------------------+
                          │

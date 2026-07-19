@@ -56,6 +56,22 @@ pub(crate) fn open_new_mission(
     state.mode = Mode::NewMission;
 }
 
+pub(crate) fn open_new_mission_with_provider(
+    state: &mut AppState,
+    terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+    provider: crate::api::schema::MissionProvider,
+) {
+    open_new_mission(state, terminal_runtimes);
+    if let Some(draft) = state.new_mission.as_mut() {
+        draft.provider_index = match provider {
+            crate::api::schema::MissionProvider::Codex => 0,
+            crate::api::schema::MissionProvider::ClaudeCode => 1,
+            crate::api::schema::MissionProvider::OpenCode => 2,
+            crate::api::schema::MissionProvider::Acp => 3,
+        };
+    }
+}
+
 pub(crate) fn handle_new_mission_key(state: &mut AppState, key: KeyEvent) {
     let Some(step) = state.new_mission.as_ref().map(|draft| draft.step) else {
         state.mode = Mode::Navigator;

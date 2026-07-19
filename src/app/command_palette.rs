@@ -1,13 +1,18 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum CommandPaletteAction {
     OpenCockpit,
+    NewMission {
+        provider: crate::api::schema::MissionProvider,
+    },
     NewWorkspace,
     NewTab,
     Settings,
     Keybinds,
     ReloadConfig,
     Detach,
-    Plugin { qualified_id: String },
+    Plugin {
+        qualified_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,6 +142,20 @@ pub(crate) fn available_commands(
             None,
             CommandPaletteAction::Detach,
         ),
+        provider_command(
+            "provider.codex.mission.new",
+            "New mission with Codex",
+            "Start a durable, proof-bound mission",
+            "Codex",
+            crate::api::schema::MissionProvider::Codex,
+        ),
+        provider_command(
+            "provider.claude-code.mission.new",
+            "New mission with Claude Code",
+            "Start a durable, proof-bound mission",
+            "Claude Code",
+            crate::api::schema::MissionProvider::ClaudeCode,
+        ),
     ];
     for plugin in plugins.values() {
         for action in &plugin.actions {
@@ -183,6 +202,24 @@ fn core_command(
         enabled,
         disabled_reason,
         action,
+    }
+}
+
+fn provider_command(
+    id: &str,
+    title: &str,
+    description: &str,
+    label: &str,
+    provider: crate::api::schema::MissionProvider,
+) -> CommandPaletteCommand {
+    CommandPaletteCommand {
+        id: id.to_string(),
+        title: title.to_string(),
+        description: description.to_string(),
+        provenance: format!("provider · {label}"),
+        enabled: true,
+        disabled_reason: None,
+        action: CommandPaletteAction::NewMission { provider },
     }
 }
 
@@ -391,6 +428,27 @@ mod tests {
                 qualified_id: "example.review.review-current".into()
             }
         );
+    }
+
+    #[test]
+    fn managed_provider_quick_actions_expose_codex_and_claude() {
+        let commands = available_commands(&Default::default(), false);
+
+        let codex = commands
+            .iter()
+            .find(|command| command.id == "provider.codex.mission.new")
+            .expect("Codex mission action must be discoverable");
+        assert_eq!(codex.title, "New mission with Codex");
+        assert_eq!(codex.provenance, "provider · Codex");
+        assert!(codex.enabled);
+
+        let claude = commands
+            .iter()
+            .find(|command| command.id == "provider.claude-code.mission.new")
+            .expect("Claude Code mission action must be discoverable");
+        assert_eq!(claude.title, "New mission with Claude Code");
+        assert_eq!(claude.provenance, "provider · Claude Code");
+        assert!(claude.enabled);
     }
 
     #[test]

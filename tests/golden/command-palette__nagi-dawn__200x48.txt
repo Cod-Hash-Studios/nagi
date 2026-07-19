@@ -3,7 +3,7 @@
 # theme: nagi-dawn
 # size: 200x48
 # palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
-# style-sha256: 6bd47c4f3856659140691df651bee29e4d6b4ff1bd223db83dc36ae5c074e59f
+# style-sha256: f9d98801aad4877401b176597f1ba9c79e125f634338a642817b0275ee3d45ad
 # ---
  spaces                  │ 1       +
                          │
@@ -18,7 +18,7 @@
  · mission-004           │
    main                  │
  · mission-005           │                            ╭──────────────────────────────────────────────────────────────────────────────────────────╮
-   main                  │                            │COMMANDS  7  core + providers + plugins                                                   │
+   main                  │                            │COMMANDS  9  core + providers + plugins                                                   │
  · mission-006           │                            │› Type to search commands…                                                                │
    main                  │                            │──────────────────────────────────────────────────────────────────────────────────────────│
  · mission-007           │                            │▏ Open cockpit                                                                      core  │
@@ -35,10 +35,10 @@
                          │                            │  Add a tab to the current workspace                                                      │
                          │                            │  New workspace                                                                     core  │
                          │                            │  Start another durable workspace                                                         │
-                         │                            │                                                                                          │
-                         │                            │                                                                                          │
-                         │                            │                                                                                          │
-                         │                            │                                                                                          │
+                         │                            │  New mission with Claude Code                                    provider · Claude Code  │
+                         │                            │  Start a durable, proof-bound mission                                                    │
+                         │                            │  New mission with Codex                                                provider · Codex  │
+                         │                            │  Start a durable, proof-bound mission                                                    │
                          │                            │enter run  ↑↓ select  esc close                                                           │
                          │                            ╰──────────────────────────────────────────────────────────────────────────────────────────╯
                          │
