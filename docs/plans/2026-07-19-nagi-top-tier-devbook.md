@@ -1389,14 +1389,29 @@ Every item is mandatory. “Mostly works” is not a v1 result.
   provider/doctor suite passes locally, including lifecycle, attention, resume,
   interrupt and disconnect behavior. The release gate remains open until all
   three exact upstream binaries pass the same live conformance run.
+- Live provider canary: `nagi doctor --probe-providers` completed the real
+  initialize handshake against installed Codex `0.144.5` and Claude Code
+  `2.1.212`, without creating a Codex thread or sending either provider a user
+  turn. This proves current local protocol startup, not full upstream mission
+  conformance.
 - Rust suite: two consecutive complete Nextest runs passed 3,109 of 3,109 tests
   across all 14 binaries on Apple M2 Pro, macOS, with no skipped test, no retry,
   and process leaks configured as failures. The full serial suite and all 18
   macOS live-handoff tests also pass. The current local-only commits have not
   run in hosted Linux/macOS CI, so the supported-platform gate remains open.
 - Visual matrix: 11 real Ratatui surfaces, four themes, and 60/80/120/200-column
-  snapshots, including 1/8/50/500-session cockpit states. The same styled
-  buffers now export deterministic product media for the landing.
+  snapshots, including 1/8/50/500-session cockpit states. New Mission and
+  Handoff are now in the matrix, the Proof Review exposes compact human evidence
+  details, and the command palette opens Codex or Claude Code directly. The
+  same styled buffers now export deterministic product media for the landing.
+- Landing: the mission-to-proof hero fits one viewport at 1440x900, 390x844 and
+  320x568, keeps the complete 16:9 film in `contain`, and has no horizontal
+  overflow or browser console warning. Lint, production build, 8 rendered HTML
+  tests and 22 Chromium contracts pass locally.
+- Plugin trust: manifest v2 now fails closed on unsupported native capability
+  claims, binds approvals to source and package fingerprints, requires explicit
+  WASI integrity approval, and clears inherited environments for plugin actions,
+  builds and panes. The hostile-component isolation test remains green.
 - Runtime recovery: hard kill with torn journal tail, storage exhaustion between
   journal and head writes, provider disconnect, plugin fuel exhaustion, and
   timeout paths all pass without false completion.
