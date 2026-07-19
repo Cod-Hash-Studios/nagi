@@ -11,7 +11,6 @@ DISABLED_WORKFLOWS = (
     "label-next-release-issues.yml",
     "pr-gate.yml",
     "preview.yml",
-    "release.yml",
 )
 
 
@@ -32,6 +31,19 @@ class ForkSafetyTests(unittest.TestCase):
             "const FORK_REMOTE_RELEASE_CHANNEL_CONFIGURED: bool = false;",
             (ROOT / "src" / "remote" / "unix.rs").read_text(),
         )
+
+    def test_nagi_release_is_repository_scoped_and_requires_signed_payloads(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
+        self.assertEqual(
+            workflow.count("if: github.repository == 'Cod-Hash-Studios/nagi'"),
+            2,
+        )
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("cosign sign-blob --yes --bundle", workflow)
+        self.assertIn("--require-signatures", workflow)
+        self.assertIn("actions/attest@", workflow)
+        self.assertNotIn("ogulcancelik", workflow.lower())
+        self.assertNotIn("rm -rf", workflow)
 
     def test_fork_attribution_pins_the_exact_upstream_base(self) -> None:
         notice = (ROOT / "FORK.md").read_text()

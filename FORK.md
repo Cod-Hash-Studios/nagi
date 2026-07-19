@@ -30,8 +30,11 @@ upstream copyright holder and is not granted by this repository.
 The fork is now developed as **Nagi** by Cod'Hash Studios. It uses its own
 binary, package, config directory, sockets, logs, environment variables, and
 integration namespace. Upstream publishing workflows, update channels, and
-automatic remote binary downloads remain disabled until Nagi has its own
-security review and signed release-readiness artifact.
+automatic remote binary downloads remain disabled. Nagi's replacement release
+workflow is repository-scoped, tag-gated, keyless-signed with GitHub OIDC, and
+verifies checksums, SBOM, provenance, signature identity, and attestations
+before publishing. Client update channels remain disabled until a real signed
+Nagi release has passed clean-machine installation review.
 
 No public release is an MVP. The first public release is intended to include
 the complete mission-to-proof workflow described in the local product plan.

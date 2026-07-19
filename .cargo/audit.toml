@@ -1,0 +1,9 @@
+[advisories]
+ignore = [
+  # Direct wire-format dependency. There is no maintained, protocol-compatible
+  # replacement yet; migration requires a versioned protocol change.
+  "RUSTSEC-2025-0141",
+  # Present only in Ratatui's inactive termwiz backend. Nagi builds Ratatui
+  # with the crossterm backend, so the affected code is not compiled.
+  "RUSTSEC-2026-0097",
+]
