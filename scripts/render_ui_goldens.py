@@ -20,6 +20,12 @@ def main() -> int:
         action="store_true",
         help="replace committed goldens with the current intentional rendering",
     )
+    parser.add_argument(
+        "--export-media",
+        type=Path,
+        metavar="DIRECTORY",
+        help="export the styled Ratatui buffers as deterministic SVG product media",
+    )
     args = parser.parse_args()
 
     env = os.environ.copy()
@@ -27,6 +33,12 @@ def main() -> int:
         env["NAGI_UPDATE_GOLDENS"] = "1"
     else:
         env.pop("NAGI_UPDATE_GOLDENS", None)
+    if args.export_media:
+        export_directory = args.export_media.expanduser().resolve()
+        export_directory.mkdir(parents=True, exist_ok=True)
+        env["NAGI_EXPORT_GOLDEN_MEDIA_DIR"] = str(export_directory)
+    else:
+        env.pop("NAGI_EXPORT_GOLDEN_MEDIA_DIR", None)
     zig = Path("/opt/homebrew/opt/zig@0.15/bin/zig")
     if zig.exists():
         env.setdefault("ZIG", str(zig))
@@ -45,6 +57,8 @@ def main() -> int:
         return result.returncode
     if args.update:
         print("Updated UI goldens. Review tests/golden before committing.")
+    if args.export_media:
+        print(f"Exported styled UI media to {export_directory}")
     return 0
 
 

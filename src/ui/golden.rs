@@ -1,6 +1,12 @@
 use std::{env, fmt::Write as _, fs, path::PathBuf};
 
-use ratatui::{backend::TestBackend, layout::Rect, style::Color, Terminal};
+use ratatui::{
+    backend::TestBackend,
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Modifier},
+    Terminal,
+};
 use sha2::{Digest, Sha256};
 
 use super::{compute_view, render};
@@ -78,6 +84,17 @@ fn render_golden(surface: &str, theme: &str, width: u16, height: u16) -> String 
     terminal.draw(|frame| render(&app, frame)).unwrap();
     let buffer = terminal.backend().buffer();
 
+    if let Some(directory) = env::var_os("NAGI_EXPORT_GOLDEN_MEDIA_DIR") {
+        let directory = PathBuf::from(directory);
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join(format!("{surface}__{theme}__{width}x{height}.svg"));
+        fs::write(
+            path,
+            render_svg(buffer, surface, theme, width, height, &app.palette),
+        )
+        .unwrap();
+    }
+
     let mut style_hasher = Sha256::new();
     for cell in buffer.content() {
         style_hasher.update(cell.symbol().as_bytes());
@@ -102,6 +119,173 @@ fn render_golden(surface: &str, theme: &str, width: u16, height: u16) -> String 
         snapshot.push('\n');
     }
     snapshot
+}
+
+fn render_svg(
+    buffer: &Buffer,
+    surface: &str,
+    theme: &str,
+    width: u16,
+    height: u16,
+    palette: &Palette,
+) -> String {
+    const CELL_WIDTH: f32 = 9.6;
+    const CELL_HEIGHT: f32 = 20.0;
+    const FONT_SIZE: f32 = 16.0;
+    let pixel_width = f32::from(width) * CELL_WIDTH;
+    let pixel_height = f32::from(height) * CELL_HEIGHT;
+    let canvas = color_hex(Some(palette.panel_bg), "#171b24");
+    let default_text = color_hex(Some(palette.text), "#f4f0e8");
+    let mut svg = String::new();
+
+    writeln!(
+        svg,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 {pixel_width:.1} {pixel_height:.1}" width="{pixel_width:.1}" height="{pixel_height:.1}">"#
+    )
+    .unwrap();
+    writeln!(
+        svg,
+        "<title id=\"title\">Nagi {}</title>",
+        escape_xml(surface)
+    )
+    .unwrap();
+    writeln!(
+        svg,
+        "<desc id=\"desc\">Deterministic Nagi TUI render in the {} theme at {} by {} cells.</desc>",
+        escape_xml(theme),
+        width,
+        height
+    )
+    .unwrap();
+    writeln!(
+        svg,
+        r#"<rect width="100%" height="100%" rx="10" fill="{canvas}"/>"#
+    )
+    .unwrap();
+
+    for y in 0..height {
+        for x in 0..width {
+            let cell = &buffer[(x, y)];
+            let style = cell.style();
+            let reversed = style.add_modifier.contains(Modifier::REVERSED);
+            let foreground = if reversed { style.bg } else { style.fg };
+            let background = if reversed { style.fg } else { style.bg };
+            if background.is_some_and(|color| color != Color::Reset) {
+                let fill = color_hex(background, &canvas);
+                writeln!(
+                    svg,
+                    r#"<rect x="{:.1}" y="{:.1}" width="{CELL_WIDTH:.1}" height="{CELL_HEIGHT:.1}" fill="{fill}"/>"#,
+                    f32::from(x) * CELL_WIDTH,
+                    f32::from(y) * CELL_HEIGHT,
+                )
+                .unwrap();
+            }
+
+            let symbol = cell.symbol();
+            if symbol.trim().is_empty() {
+                continue;
+            }
+            let fill = color_hex(foreground, &default_text);
+            let weight = if style.add_modifier.contains(Modifier::BOLD) {
+                "700"
+            } else {
+                "450"
+            };
+            let font_style = if style.add_modifier.contains(Modifier::ITALIC) {
+                "italic"
+            } else {
+                "normal"
+            };
+            let decoration = if style.add_modifier.contains(Modifier::UNDERLINED) {
+                "underline"
+            } else {
+                "none"
+            };
+            let opacity = if style.add_modifier.contains(Modifier::DIM) {
+                "0.66"
+            } else {
+                "1"
+            };
+            writeln!(
+                svg,
+                r#"<text x="{:.1}" y="{:.1}" fill="{fill}" fill-opacity="{opacity}" font-family="'JetBrains Mono','SFMono-Regular','Cascadia Mono',monospace" font-size="{FONT_SIZE:.1}" font-style="{font_style}" font-weight="{weight}" text-decoration="{decoration}" xml:space="preserve">{}</text>"#,
+                f32::from(x) * CELL_WIDTH,
+                f32::from(y) * CELL_HEIGHT + FONT_SIZE,
+                escape_xml(symbol),
+            )
+            .unwrap();
+        }
+    }
+    svg.push_str("</svg>\n");
+    svg
+}
+
+fn color_hex(color: Option<Color>, fallback: &str) -> String {
+    let (red, green, blue) = match color {
+        None | Some(Color::Reset) => return fallback.to_owned(),
+        Some(Color::Black) => (0, 0, 0),
+        Some(Color::Red) => (205, 49, 49),
+        Some(Color::Green) => (13, 188, 121),
+        Some(Color::Yellow) => (229, 229, 16),
+        Some(Color::Blue) => (36, 114, 200),
+        Some(Color::Magenta) => (188, 63, 188),
+        Some(Color::Cyan) => (17, 168, 205),
+        Some(Color::Gray) => (204, 204, 204),
+        Some(Color::DarkGray) => (102, 102, 102),
+        Some(Color::LightRed) => (241, 76, 76),
+        Some(Color::LightGreen) => (35, 209, 139),
+        Some(Color::LightYellow) => (245, 245, 67),
+        Some(Color::LightBlue) => (59, 142, 234),
+        Some(Color::LightMagenta) => (214, 112, 214),
+        Some(Color::LightCyan) => (41, 184, 219),
+        Some(Color::White) => (242, 242, 242),
+        Some(Color::Indexed(index)) => indexed_rgb(index),
+        Some(Color::Rgb(red, green, blue)) => (red, green, blue),
+    };
+    format!("#{red:02x}{green:02x}{blue:02x}")
+}
+
+fn indexed_rgb(index: u8) -> (u8, u8, u8) {
+    const ANSI: [(u8, u8, u8); 16] = [
+        (0, 0, 0),
+        (128, 0, 0),
+        (0, 128, 0),
+        (128, 128, 0),
+        (0, 0, 128),
+        (128, 0, 128),
+        (0, 128, 128),
+        (192, 192, 192),
+        (128, 128, 128),
+        (255, 0, 0),
+        (0, 255, 0),
+        (255, 255, 0),
+        (0, 0, 255),
+        (255, 0, 255),
+        (0, 255, 255),
+        (255, 255, 255),
+    ];
+    if index < 16 {
+        return ANSI[usize::from(index)];
+    }
+    if index < 232 {
+        let value = index - 16;
+        let red = value / 36;
+        let green = (value % 36) / 6;
+        let blue = value % 6;
+        let component = |level: u8| if level == 0 { 0 } else { 55 + level * 40 };
+        return (component(red), component(green), component(blue));
+    }
+    let gray = 8 + (index - 232) * 10;
+    (gray, gray, gray)
+}
+
+fn escape_xml(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 fn fixture(surface: &str) -> AppState {
@@ -255,4 +439,12 @@ fn golden_path(surface: &str, theme: &str, width: u16, height: u16) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/golden")
         .join(format!("{surface}__{theme}__{width}x{height}.txt"))
+}
+
+#[test]
+fn svg_export_escapes_metadata_and_maps_terminal_colors() {
+    assert_eq!(escape_xml("proof & <done>"), "proof &amp; &lt;done&gt;");
+    assert_eq!(color_hex(Some(Color::Indexed(16)), "#ffffff"), "#000000");
+    assert_eq!(color_hex(Some(Color::Indexed(231)), "#000000"), "#ffffff");
+    assert_eq!(color_hex(None, "#123456"), "#123456");
 }
