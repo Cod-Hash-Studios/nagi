@@ -533,7 +533,7 @@ fn benign_read_reset_error(err: &io::Error) -> bool {
     {
         // macOS can return EINVAL while clearing SO_RCVTIMEO after the peer
         // closes. The completed EOF/read remains authoritative.
-        return err.kind() == io::ErrorKind::InvalidInput;
+        err.kind() == io::ErrorKind::InvalidInput
     }
     #[cfg(not(target_os = "macos"))]
     {
