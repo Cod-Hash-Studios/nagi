@@ -102,7 +102,7 @@ def write_fake_codex(directory: Path) -> None:
     executable.write_text(
         "#!/bin/sh\n"
         "if [ \"${1:-}\" = \"--version\" ]; then\n"
-        "  printf '%s\\n' 'codex-cli 1.0.0'\n"
+        "  printf '%s\\n' 'codex-cli 0.144.5'\n"
         "  exit 0\n"
         "fi\n"
         "printf '%s\\n' 'fixture provider running'\n"
