@@ -38,6 +38,7 @@ rustPlatform.buildRustPackage {
         ../assets
         ../docs/next/api/nagi-api.schema.json
         ../src
+        ../templates
         ../vendor/libghostty-vt
         ../vendor/libghostty-vt.vendor.json
         ../vendor/portable-pty
