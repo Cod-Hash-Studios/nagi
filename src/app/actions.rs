@@ -14,9 +14,9 @@ use crate::workspace::WorkspaceGitStatus;
 use unicode_width::UnicodeWidthChar;
 
 use super::state::{
-    text_matches_query, AgentNotificationDelivery, AppState, Mode, NavigatorRow,
-    NavigatorStateFilter, NavigatorTarget, PaneFocusTarget, PendingAgentNotification, ToastKind,
-    ToastNotification, ToastTarget, ViewLayout,
+    text_matches_query, AgentNotificationDelivery, AppState, CockpitScope, Mode, NavigatorRow,
+    NavigatorRowId, NavigatorStateFilter, NavigatorTarget, PaneFocusTarget,
+    PendingAgentNotification, ToastKind, ToastNotification, ToastTarget, ViewLayout,
 };
 
 fn is_background_completion_transition(prev_state: AgentState, new_state: AgentState) -> bool {
@@ -355,6 +355,18 @@ impl AppState {
         self.navigator.scroll = 0;
         self.navigator.expanded_workspaces.clear();
 
+        self.navigator.scope = if self.mission_views.is_empty() {
+            CockpitScope::Sessions
+        } else {
+            CockpitScope::Missions
+        };
+
+        for mission in &self.mission_views {
+            self.navigator
+                .expanded_workspaces
+                .insert(mission.repository_path.clone());
+        }
+
         for ws in &self.workspaces {
             self.navigator.expanded_workspaces.insert(ws.id.clone());
         }
@@ -363,7 +375,8 @@ impl AppState {
         self.navigator.selected = self
             .current_navigator_row_index_from(terminal_runtimes)
             .unwrap_or(0);
-        self.ensure_navigator_selection_visible_from(terminal_runtimes);
+        self.navigator.selected_id = None;
+        self.clamp_navigator_selection_from(terminal_runtimes);
     }
 
     #[cfg(test)]
@@ -376,6 +389,9 @@ impl AppState {
         &self,
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     ) -> Vec<NavigatorRow> {
+        if self.navigator.scope == CockpitScope::Missions {
+            return self.mission_navigator_rows();
+        }
         let query = self.navigator.query.trim().to_lowercase();
         let query_kind = navigator_query_kind(&query, self.navigator.state_filter);
         let mut rows = Vec::new();
@@ -402,6 +418,7 @@ impl AppState {
             let (state, seen) = ws.aggregate_state(&self.terminals);
             let pane_count = ws.tabs.iter().map(|tab| tab.panes.len()).sum::<usize>();
             rows.push(NavigatorRow {
+                id: NavigatorRowId::Workspace(ws.id.clone()),
                 target: NavigatorTarget::Workspace { ws_idx },
                 depth: 0,
                 label: format!("{workspace_label} ({pane_count})"),
@@ -419,6 +436,211 @@ impl AppState {
             }
         }
         rows
+    }
+
+    fn mission_navigator_rows(&self) -> Vec<NavigatorRow> {
+        use std::collections::BTreeMap;
+
+        let query = self.navigator.query.trim().to_lowercase();
+        let query_kind = navigator_query_kind(&query, self.navigator.state_filter);
+        let mut by_repository = BTreeMap::<&str, Vec<&crate::api::schema::MissionViewV1>>::new();
+        for mission in &self.mission_views {
+            by_repository
+                .entry(&mission.repository_path)
+                .or_default()
+                .push(mission);
+        }
+
+        let mut rows = Vec::new();
+        for (repository_path, mut missions) in by_repository {
+            missions.sort_by(|left, right| {
+                mission_status_priority(left.status)
+                    .cmp(&mission_status_priority(right.status))
+                    .then_with(|| right.updated_at_millis.cmp(&left.updated_at_millis))
+                    .then_with(|| left.mission_id.cmp(&right.mission_id))
+            });
+            let project_label = repository_display_name(repository_path);
+            let project_search = format!("{project_label} {repository_path}").to_lowercase();
+            let mut child_rows = missions
+                .iter()
+                .filter_map(|mission| {
+                    let (status, seen) = mission_agent_state(mission.status);
+                    let meta = mission_row_meta(mission);
+                    let search_text = format!(
+                        "{} {} {} {} {}",
+                        mission.title, mission.objective, mission.mission_id, repository_path, meta
+                    )
+                    .to_lowercase();
+                    let matches = match query_kind {
+                        NavigatorQueryKind::Empty => true,
+                        NavigatorQueryKind::State(filter) => {
+                            navigator_state_filter_matches(filter, status, seen)
+                        }
+                        NavigatorQueryKind::Text => navigator_matches(&query, &search_text),
+                    };
+                    matches.then(|| NavigatorRow {
+                        id: NavigatorRowId::Mission(mission.mission_id.clone()),
+                        target: NavigatorTarget::Mission {
+                            mission_id: mission.mission_id.clone(),
+                        },
+                        depth: 1,
+                        label: mission.title.clone(),
+                        meta,
+                        status,
+                        seen,
+                        is_current: self.selected_mission_id.as_deref()
+                            == Some(mission.mission_id.as_str()),
+                        is_workspace: false,
+                        is_tab: false,
+                        expanded: false,
+                        search_text,
+                    })
+                })
+                .collect::<Vec<_>>();
+            let project_matches = matches!(query_kind, NavigatorQueryKind::Empty)
+                || (matches!(query_kind, NavigatorQueryKind::Text)
+                    && navigator_matches(&query, &project_search));
+            if !project_matches && child_rows.is_empty() {
+                continue;
+            }
+            if project_matches && child_rows.is_empty() {
+                child_rows = missions
+                    .iter()
+                    .map(|mission| mission_navigator_row(self, mission))
+                    .collect();
+            }
+            let expanded = !matches!(query_kind, NavigatorQueryKind::Empty)
+                || self.navigator.expanded_workspaces.contains(repository_path);
+            let (status, seen) = missions
+                .iter()
+                .map(|mission| mission_agent_state(mission.status))
+                .min_by_key(|(status, seen)| agent_state_priority(*status, *seen))
+                .unwrap_or((AgentState::Unknown, true));
+            let need_you = missions
+                .iter()
+                .filter(|mission| mission_needs_attention(mission.status))
+                .count();
+            let working = missions
+                .iter()
+                .filter(|mission| mission_is_working(mission.status))
+                .count();
+            rows.push(NavigatorRow {
+                id: NavigatorRowId::MissionProject(repository_path.to_string()),
+                target: NavigatorTarget::MissionProject {
+                    repository_path: repository_path.to_string(),
+                },
+                depth: 0,
+                label: format!("{project_label} ({})", missions.len()),
+                meta: format!("{need_you} need you · {working} working"),
+                status,
+                seen,
+                is_current: false,
+                is_workspace: true,
+                is_tab: false,
+                expanded,
+                search_text: project_search,
+            });
+            if expanded {
+                rows.extend(child_rows);
+            }
+        }
+        rows
+    }
+
+    pub(crate) fn set_mission_views(
+        &mut self,
+        mut missions: Vec<crate::api::schema::MissionViewV1>,
+    ) -> bool {
+        missions.sort_by(|left, right| left.mission_id.cmp(&right.mission_id));
+        if self.mission_views == missions {
+            return false;
+        }
+        self.mission_views = missions;
+        if self.selected_mission_id.as_ref().is_some_and(|selected| {
+            !self
+                .mission_views
+                .iter()
+                .any(|mission| &mission.mission_id == selected)
+        }) {
+            self.selected_mission_id = None;
+        }
+        true
+    }
+
+    pub(crate) fn set_attention_items(
+        &mut self,
+        mut items: Vec<crate::api::schema::AttentionItemV1>,
+    ) -> bool {
+        items.sort_by(|left, right| {
+            attention_state_priority(&left.state)
+                .cmp(&attention_state_priority(&right.state))
+                .then_with(|| {
+                    attention_risk_priority(right.risk).cmp(&attention_risk_priority(left.risk))
+                })
+                .then_with(|| left.created_at_millis.cmp(&right.created_at_millis))
+                .then_with(|| left.attention_id.cmp(&right.attention_id))
+        });
+        if self.attention_items == items {
+            return false;
+        }
+        self.attention_items = items;
+        let selected = self.selected_attention_id.as_deref();
+        self.attention_selected = selected
+            .and_then(|selected| {
+                self.attention_items
+                    .iter()
+                    .position(|item| item.attention_id == selected)
+            })
+            .unwrap_or_else(|| {
+                self.attention_selected
+                    .min(self.attention_items.len().saturating_sub(1))
+            });
+        self.selected_attention_id = self
+            .attention_items
+            .get(self.attention_selected)
+            .map(|item| item.attention_id.clone());
+        true
+    }
+
+    pub(crate) fn open_attention_inbox(&mut self) {
+        self.attention_selected = self
+            .selected_attention_id
+            .as_ref()
+            .and_then(|selected| {
+                self.attention_items
+                    .iter()
+                    .position(|item| &item.attention_id == selected)
+            })
+            .or_else(|| {
+                self.selected_mission_id.as_ref().and_then(|mission_id| {
+                    self.attention_items
+                        .iter()
+                        .position(|item| &item.mission_id == mission_id)
+                })
+            })
+            .unwrap_or(0);
+        self.selected_attention_id = self
+            .attention_items
+            .get(self.attention_selected)
+            .map(|item| item.attention_id.clone());
+        self.attention_scroll = 0;
+        self.mode = Mode::AttentionInbox;
+    }
+
+    pub(crate) fn toggle_cockpit_scope_from(
+        &mut self,
+        terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+    ) {
+        self.navigator.scope = match self.navigator.scope {
+            CockpitScope::Missions => CockpitScope::Sessions,
+            CockpitScope::Sessions => CockpitScope::Missions,
+        };
+        self.navigator.query.clear();
+        self.navigator.state_filter = None;
+        self.navigator.selected = 0;
+        self.navigator.selected_id = None;
+        self.navigator.scroll = 0;
+        self.clamp_navigator_selection_from(terminal_runtimes);
     }
 
     fn navigator_child_rows(
@@ -481,6 +703,9 @@ impl AppState {
         };
         let search_text = format!("{label} {meta}").to_lowercase();
         NavigatorRow {
+            id: NavigatorRowId::Tab(crate::workspace::public_tab_id_for_number(
+                &ws.id, tab.number,
+            )),
             target: NavigatorTarget::Tab { ws_idx, tab_idx },
             depth: 1,
             label,
@@ -553,6 +778,7 @@ impl AppState {
             let is_current = self.is_active_pane(ws_idx, tab_idx, pane_id);
             let search_text = format!("{label} {meta}").to_lowercase();
             rows.push(NavigatorRow {
+                id: NavigatorRowId::Pane(pane_id),
                 target: NavigatorTarget::Pane {
                     ws_idx,
                     tab_idx,
@@ -578,15 +804,75 @@ impl AppState {
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     ) -> Option<usize> {
         let rows = self.navigator_rows_from(terminal_runtimes);
+        if self.navigator.scope == CockpitScope::Missions {
+            return self
+                .selected_mission_id
+                .as_ref()
+                .and_then(|mission_id| {
+                    rows.iter().position(|row| {
+                        matches!(&row.target, NavigatorTarget::Mission { mission_id: row_id } if row_id == mission_id)
+                    })
+                })
+                .or_else(|| rows.iter().position(|row| matches!(row.target, NavigatorTarget::Mission { .. })));
+        }
         rows.iter()
             .position(|row| matches!(row.target, NavigatorTarget::Pane { .. }) && row.is_current)
             .or_else(|| rows.iter().position(|row| row.is_current))
+    }
+
+    fn navigator_selected_index_in(&self, rows: &[NavigatorRow]) -> Option<usize> {
+        self.navigator
+            .selected_id
+            .as_ref()
+            .and_then(|selected_id| rows.iter().position(|row| &row.id == selected_id))
+            .or_else(|| (!rows.is_empty()).then(|| self.navigator.selected.min(rows.len() - 1)))
+    }
+
+    fn reconcile_navigator_selection_in(&mut self, rows: &[NavigatorRow]) {
+        let Some(selected) = self.navigator_selected_index_in(rows) else {
+            self.navigator.selected = 0;
+            self.navigator.selected_id = None;
+            self.navigator.scroll = 0;
+            return;
+        };
+        self.navigator.selected = selected;
+        self.navigator.selected_id = Some(rows[selected].id.clone());
+    }
+
+    pub(crate) fn select_navigator_index_from(
+        &mut self,
+        terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+        selected: usize,
+    ) {
+        let rows = self.navigator_rows_from(terminal_runtimes);
+        if rows.is_empty() {
+            self.navigator.selected = 0;
+            self.navigator.selected_id = None;
+            self.navigator.scroll = 0;
+            return;
+        }
+        self.navigator.selected = selected.min(rows.len() - 1);
+        self.navigator.selected_id = Some(rows[self.navigator.selected].id.clone());
+        self.ensure_navigator_selection_visible_from(terminal_runtimes);
+    }
+
+    pub(crate) fn reconcile_navigator_selection_from(
+        &mut self,
+        terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
+    ) {
+        let rows = self.navigator_rows_from(terminal_runtimes);
+        self.reconcile_navigator_selection_in(&rows);
+        self.ensure_navigator_selection_visible_from(terminal_runtimes);
     }
 
     pub(crate) fn ensure_navigator_selection_visible_from(
         &mut self,
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     ) {
+        let rows = self.navigator_rows_from(terminal_runtimes);
+        let selected = self
+            .navigator_selected_index_in(&rows)
+            .unwrap_or(self.navigator.selected);
         let body = self.navigator_body_rect();
         let viewport = body.height as usize;
         if viewport == 0 {
@@ -594,12 +880,12 @@ impl AppState {
             return;
         }
         let max_scroll = self.navigator_max_scroll_from(terminal_runtimes, viewport);
-        if self.navigator.selected < self.navigator.scroll {
-            self.navigator.scroll = self.navigator.selected;
-        } else if self.navigator.selected >= self.navigator.scroll.saturating_add(viewport) {
+        if selected < self.navigator.scroll {
+            self.navigator.scroll = selected;
+        } else if selected >= self.navigator.scroll.saturating_add(viewport) {
             self.navigator.scroll = self
-                .navigator
-                .selected
+                .navigator_selected_index_in(&rows)
+                .unwrap_or(selected)
                 .saturating_add(1)
                 .saturating_sub(viewport);
         }
@@ -624,14 +910,19 @@ impl AppState {
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
         delta: isize,
     ) {
-        let count = self.navigator_rows_from(terminal_runtimes).len();
+        let rows = self.navigator_rows_from(terminal_runtimes);
+        let count = rows.len();
         if count == 0 {
             self.navigator.selected = 0;
+            self.navigator.selected_id = None;
             self.navigator.scroll = 0;
             return;
         }
-        let current = self.navigator.selected.min(count - 1) as isize;
+        let current = self
+            .navigator_selected_index_in(&rows)
+            .unwrap_or(self.navigator.selected.min(count - 1)) as isize;
         self.navigator.selected = (current + delta).clamp(0, count as isize - 1) as usize;
+        self.navigator.selected_id = Some(rows[self.navigator.selected].id.clone());
         self.ensure_navigator_selection_visible_from(terminal_runtimes);
     }
 
@@ -639,27 +930,30 @@ impl AppState {
         &mut self,
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     ) {
-        let count = self.navigator_rows_from(terminal_runtimes).len();
-        self.navigator.selected = self.navigator.selected.min(count.saturating_sub(1));
-        self.ensure_navigator_selection_visible_from(terminal_runtimes);
+        self.reconcile_navigator_selection_from(terminal_runtimes);
     }
 
     pub(crate) fn toggle_selected_navigator_workspace_from(
         &mut self,
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     ) {
+        let rows = self.navigator_rows_from(terminal_runtimes);
         let Some(row) = self
-            .navigator_rows_from(terminal_runtimes)
-            .get(self.navigator.selected)
+            .navigator_selected_index_in(&rows)
+            .and_then(|selected| rows.get(selected))
             .cloned()
         else {
             return;
         };
-        let NavigatorTarget::Workspace { ws_idx } = row.target else {
-            return;
-        };
-        let Some(workspace_id) = self.workspaces.get(ws_idx).map(|ws| ws.id.clone()) else {
-            return;
+        let workspace_id = match row.target {
+            NavigatorTarget::MissionProject { repository_path } => repository_path,
+            NavigatorTarget::Workspace { ws_idx } => {
+                let Some(workspace_id) = self.workspaces.get(ws_idx).map(|ws| ws.id.clone()) else {
+                    return;
+                };
+                workspace_id
+            }
+            _ => return,
         };
         if self.navigator.expanded_workspaces.contains(&workspace_id) {
             self.navigator.expanded_workspaces.remove(&workspace_id);
@@ -679,18 +973,51 @@ impl AppState {
         &mut self,
         terminal_runtimes: &crate::terminal::TerminalRuntimeRegistry,
     ) -> bool {
+        let rows = self.navigator_rows_from(terminal_runtimes);
         let Some(row) = self
-            .navigator_rows_from(terminal_runtimes)
-            .get(self.navigator.selected)
+            .navigator_selected_index_in(&rows)
+            .and_then(|selected| rows.get(selected))
             .cloned()
         else {
             return false;
         };
+        self.navigator.selected_id = Some(row.id.clone());
         self.focus_navigator_target(row.target)
     }
 
     pub(crate) fn focus_navigator_target(&mut self, target: NavigatorTarget) -> bool {
         match target {
+            NavigatorTarget::MissionProject { repository_path } => {
+                if self
+                    .navigator
+                    .expanded_workspaces
+                    .contains(&repository_path)
+                {
+                    self.navigator.expanded_workspaces.remove(&repository_path);
+                } else {
+                    self.navigator.expanded_workspaces.insert(repository_path);
+                }
+                true
+            }
+            NavigatorTarget::Mission { mission_id } => {
+                if !self
+                    .mission_views
+                    .iter()
+                    .any(|mission| mission.mission_id == mission_id)
+                {
+                    return false;
+                }
+                self.selected_mission_id = Some(mission_id);
+                self.mission_inspector_scroll = 0;
+                self.mission_inspector_tab = 0;
+                self.request_plugin_inspector_refresh = None;
+                self.plugin_inspector_active_key = None;
+                self.plugin_inspector_log_id = None;
+                self.plugin_inspector_document = None;
+                self.plugin_inspector_error = None;
+                self.mode = Mode::MissionInspector;
+                true
+            }
             NavigatorTarget::Workspace { ws_idx } => {
                 if ws_idx >= self.workspaces.len() {
                     return false;
@@ -735,6 +1062,167 @@ impl AppState {
                 false
             }
         }
+    }
+}
+
+fn mission_navigator_row(
+    state: &AppState,
+    mission: &crate::api::schema::MissionViewV1,
+) -> NavigatorRow {
+    let (status, seen) = mission_agent_state(mission.status);
+    let meta = mission_row_meta(mission);
+    NavigatorRow {
+        id: NavigatorRowId::Mission(mission.mission_id.clone()),
+        target: NavigatorTarget::Mission {
+            mission_id: mission.mission_id.clone(),
+        },
+        depth: 1,
+        label: mission.title.clone(),
+        meta: meta.clone(),
+        status,
+        seen,
+        is_current: state.selected_mission_id.as_deref() == Some(mission.mission_id.as_str()),
+        is_workspace: false,
+        is_tab: false,
+        expanded: false,
+        search_text: format!(
+            "{} {} {} {} {}",
+            mission.title, mission.objective, mission.mission_id, mission.repository_path, meta
+        )
+        .to_lowercase(),
+    }
+}
+
+fn attention_state_priority(state: &crate::api::schema::AttentionStateV1) -> u8 {
+    match state {
+        crate::api::schema::AttentionStateV1::ReconciliationRequired { .. } => 0,
+        crate::api::schema::AttentionStateV1::Open => 1,
+        crate::api::schema::AttentionStateV1::PendingResponse { .. } => 2,
+        crate::api::schema::AttentionStateV1::Expired { .. } => 3,
+        crate::api::schema::AttentionStateV1::Resolved { .. }
+        | crate::api::schema::AttentionStateV1::Dismissed { .. } => 4,
+    }
+}
+
+fn attention_risk_priority(risk: crate::api::schema::AttentionRiskV1) -> u8 {
+    match risk {
+        crate::api::schema::AttentionRiskV1::Low => 0,
+        crate::api::schema::AttentionRiskV1::Medium => 1,
+        crate::api::schema::AttentionRiskV1::High => 2,
+        crate::api::schema::AttentionRiskV1::Critical => 3,
+    }
+}
+
+fn repository_display_name(repository_path: &str) -> String {
+    std::path::Path::new(repository_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or(repository_path)
+        .to_string()
+}
+
+fn mission_status_priority(status: crate::api::schema::MissionStatus) -> u8 {
+    use crate::api::schema::MissionStatus;
+    match status {
+        MissionStatus::ReviewRequired | MissionStatus::Blocked | MissionStatus::Failed => 0,
+        MissionStatus::Preparing | MissionStatus::Active => 1,
+        MissionStatus::ReadyToClose => 2,
+        MissionStatus::Draft => 3,
+        MissionStatus::Archived => 4,
+    }
+}
+
+fn mission_needs_attention(status: crate::api::schema::MissionStatus) -> bool {
+    matches!(
+        status,
+        crate::api::schema::MissionStatus::ReviewRequired
+            | crate::api::schema::MissionStatus::Blocked
+            | crate::api::schema::MissionStatus::Failed
+    )
+}
+
+fn mission_is_working(status: crate::api::schema::MissionStatus) -> bool {
+    matches!(
+        status,
+        crate::api::schema::MissionStatus::Preparing | crate::api::schema::MissionStatus::Active
+    )
+}
+
+fn mission_agent_state(status: crate::api::schema::MissionStatus) -> (AgentState, bool) {
+    use crate::api::schema::MissionStatus;
+    match status {
+        MissionStatus::ReviewRequired | MissionStatus::Blocked | MissionStatus::Failed => {
+            (AgentState::Blocked, true)
+        }
+        MissionStatus::Preparing | MissionStatus::Active => (AgentState::Working, true),
+        MissionStatus::ReadyToClose => (AgentState::Idle, false),
+        MissionStatus::Draft | MissionStatus::Archived => (AgentState::Idle, true),
+    }
+}
+
+fn agent_state_priority(status: AgentState, seen: bool) -> u8 {
+    match (status, seen) {
+        (AgentState::Blocked, _) => 0,
+        (AgentState::Working, _) => 1,
+        (AgentState::Idle, false) => 2,
+        (AgentState::Idle, true) => 3,
+        (AgentState::Unknown, _) => 4,
+    }
+}
+
+fn mission_status_label(status: crate::api::schema::MissionStatus) -> &'static str {
+    use crate::api::schema::MissionStatus;
+    match status {
+        MissionStatus::Draft => "draft",
+        MissionStatus::Preparing => "preparing",
+        MissionStatus::Active => "working",
+        MissionStatus::ReviewRequired => "review",
+        MissionStatus::ReadyToClose => "proven",
+        MissionStatus::Blocked => "blocked",
+        MissionStatus::Failed => "failed",
+        MissionStatus::Archived => "archived",
+    }
+}
+
+fn mission_provider_label(provider: crate::api::schema::MissionProvider) -> &'static str {
+    match provider {
+        crate::api::schema::MissionProvider::Codex => "Codex",
+        crate::api::schema::MissionProvider::ClaudeCode => "Claude Code",
+        crate::api::schema::MissionProvider::OpenCode => "OpenCode",
+        crate::api::schema::MissionProvider::Acp => "ACP agent",
+    }
+}
+
+fn mission_fresh_criteria(mission: &crate::api::schema::MissionViewV1) -> usize {
+    mission
+        .criteria
+        .iter()
+        .filter(|criterion| {
+            !criterion.required_check_ids.is_empty()
+                && criterion.required_check_ids.iter().all(|required_id| {
+                    mission.checks.iter().any(|check| {
+                        check.check_id == *required_id
+                            && check.status == crate::api::schema::MissionCheckStatusV1::Passed
+                    })
+                })
+        })
+        .count()
+}
+
+fn mission_row_meta(mission: &crate::api::schema::MissionViewV1) -> String {
+    let status = mission_status_label(mission.status);
+    let proof = format!(
+        "{} / {} fresh",
+        mission_fresh_criteria(mission),
+        mission.criteria.len()
+    );
+    match mission.run.as_ref() {
+        Some(run) => format!(
+            "{status} · {} · {proof}",
+            mission_provider_label(run.provider)
+        ),
+        None => format!("{status} · {proof}"),
     }
 }
 
@@ -3115,6 +3603,152 @@ mod tests {
         state
     }
 
+    fn mission_view(
+        mission_id: &str,
+        repository_path: &str,
+        status: crate::api::schema::MissionStatus,
+        updated_at_millis: u64,
+    ) -> crate::api::schema::MissionViewV1 {
+        crate::api::schema::MissionViewV1 {
+            schema_version: crate::api::schema::ContractVersionV1,
+            mission_id: mission_id.into(),
+            title: format!("Mission {mission_id}"),
+            repository_path: repository_path.into(),
+            objective: format!("Objective for {mission_id}"),
+            criteria: Vec::new(),
+            closure_configured: false,
+            declared_check_count: 0,
+            checks: Vec::new(),
+            evidence: Vec::new(),
+            evidence_pack_digest: None,
+            details_available: true,
+            status,
+            run: None,
+            run_history: Vec::new(),
+            unresolved_attention_count: 0,
+            updated_at_millis,
+        }
+    }
+
+    #[test]
+    fn mission_cockpit_groups_projects_and_orders_actionable_work_first() {
+        let mut state = AppState::test_new();
+        state.set_mission_views(vec![
+            mission_view(
+                "ready",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::ReadyToClose,
+                30,
+            ),
+            mission_view(
+                "active",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::Active,
+                20,
+            ),
+            mission_view(
+                "blocked",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::Blocked,
+                10,
+            ),
+        ]);
+        state.open_navigator();
+
+        let rows = state.navigator_rows();
+        assert!(matches!(
+            rows[0].target,
+            NavigatorTarget::MissionProject { .. }
+        ));
+        assert!(matches!(
+            &rows[1].target,
+            NavigatorTarget::Mission { mission_id } if mission_id == "blocked"
+        ));
+        assert!(matches!(
+            &rows[2].target,
+            NavigatorTarget::Mission { mission_id } if mission_id == "active"
+        ));
+        assert!(matches!(
+            &rows[3].target,
+            NavigatorTarget::Mission { mission_id } if mission_id == "ready"
+        ));
+    }
+
+    #[test]
+    fn mission_cockpit_preserves_selection_by_id_across_live_reordering() {
+        let mut state = AppState::test_new();
+        state.set_mission_views(vec![
+            mission_view(
+                "one",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::Active,
+                10,
+            ),
+            mission_view(
+                "two",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::Draft,
+                20,
+            ),
+        ]);
+        state.open_navigator();
+        state.select_navigator_index_from(&crate::terminal::TerminalRuntimeRegistry::new(), 2);
+        assert_eq!(
+            state.navigator.selected_id,
+            Some(NavigatorRowId::Mission("two".into()))
+        );
+
+        state.set_mission_views(vec![
+            mission_view(
+                "one",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::Archived,
+                10,
+            ),
+            mission_view(
+                "two",
+                "/repos/nagi",
+                crate::api::schema::MissionStatus::Blocked,
+                30,
+            ),
+        ]);
+        state.reconcile_navigator_selection_from(&crate::terminal::TerminalRuntimeRegistry::new());
+
+        assert_eq!(
+            state.navigator.selected_id,
+            Some(NavigatorRowId::Mission("two".into()))
+        );
+        assert!(matches!(
+            &state.navigator_rows()[state.navigator.selected].target,
+            NavigatorTarget::Mission { mission_id } if mission_id == "two"
+        ));
+    }
+
+    #[test]
+    fn cockpit_toggle_keeps_raw_sessions_available() {
+        let mut state = app_with_workspaces(&["shell"]);
+        state.set_mission_views(vec![mission_view(
+            "mission",
+            "/repos/nagi",
+            crate::api::schema::MissionStatus::Draft,
+            1,
+        )]);
+        state.open_navigator();
+        assert_eq!(state.navigator.scope, CockpitScope::Missions);
+        assert!(state
+            .navigator_rows()
+            .iter()
+            .any(|row| matches!(row.target, NavigatorTarget::Mission { .. })));
+
+        state.toggle_cockpit_scope_from(&crate::terminal::TerminalRuntimeRegistry::new());
+
+        assert_eq!(state.navigator.scope, CockpitScope::Sessions);
+        assert!(state
+            .navigator_rows()
+            .iter()
+            .any(|row| matches!(row.target, NavigatorTarget::Pane { .. })));
+    }
+
     fn insert_test_pane_graphics_layer(state: &mut AppState, pane_id: PaneId) {
         state.pane_graphics_layers.insert(
             pane_id,
@@ -3509,7 +4143,7 @@ mod tests {
             .navigator
             .expanded_workspaces
             .insert(state.workspaces[1].id.clone());
-        state.navigator.selected = state
+        let selected = state
             .navigator_rows()
             .iter()
             .position(|row| {
@@ -3519,12 +4153,156 @@ mod tests {
                 )
             })
             .unwrap();
+        state.select_navigator_index_from(
+            &crate::terminal::TerminalRuntimeRegistry::new(),
+            selected,
+        );
 
         assert!(state.accept_navigator_selection());
 
         assert_eq!(state.active, Some(1));
         assert_eq!(state.workspaces[1].focused_pane_id(), Some(target));
         assert_eq!(state.mode, Mode::Terminal);
+    }
+
+    #[test]
+    fn navigator_selection_survives_workspace_reordering_by_stable_identity() {
+        let mut state = app_with_workspaces(&["one", "two"]);
+        let target = state.workspaces[1].tabs[0].root_pane;
+        state.open_navigator();
+        let target_index = state
+            .navigator_rows()
+            .iter()
+            .position(|row| {
+                matches!(
+                    row.target,
+                    crate::app::state::NavigatorTarget::Pane { pane_id, .. } if pane_id == target
+                )
+            })
+            .unwrap();
+        let delta = target_index as isize - state.navigator.selected as isize;
+        let terminal_runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        state.move_navigator_selection_from(&terminal_runtimes, delta);
+
+        state.workspaces.swap(0, 1);
+        state.clamp_navigator_selection_from(&terminal_runtimes);
+
+        let selected = state.navigator_rows()[state.navigator.selected].clone();
+        assert!(matches!(
+            selected.target,
+            crate::app::state::NavigatorTarget::Pane { pane_id, .. } if pane_id == target
+        ));
+    }
+
+    #[test]
+    fn navigator_tab_selection_survives_tab_reordering_by_public_identity() {
+        let mut state = app_with_workspaces(&["one"]);
+        let second_tab = state.workspaces[0].test_add_tab(Some("logs"));
+        state.ensure_test_terminals();
+        state.open_navigator();
+        let rows = state.navigator_rows();
+        let target_index = rows
+            .iter()
+            .position(|row| {
+                matches!(
+                    row.target,
+                    crate::app::state::NavigatorTarget::Tab { tab_idx, .. }
+                        if tab_idx == second_tab
+                )
+            })
+            .unwrap();
+        let target_id = rows[target_index].id.clone();
+        let terminal_runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        state.select_navigator_index_from(&terminal_runtimes, target_index);
+
+        state.workspaces[0].tabs.swap(0, 1);
+        state.clamp_navigator_selection_from(&terminal_runtimes);
+
+        let selected = &state.navigator_rows()[state.navigator.selected];
+        assert_eq!(selected.id, target_id);
+        assert!(matches!(
+            selected.target,
+            crate::app::state::NavigatorTarget::Tab { tab_idx: 0, .. }
+        ));
+    }
+
+    #[test]
+    fn navigator_pane_selection_survives_tab_reordering() {
+        let mut state = app_with_workspaces(&["one"]);
+        let second_tab = state.workspaces[0].test_add_tab(Some("logs"));
+        let target = state.workspaces[0].tabs[second_tab].root_pane;
+        state.ensure_test_terminals();
+        state.open_navigator();
+        let target_index = state
+            .navigator_rows()
+            .iter()
+            .position(|row| {
+                matches!(
+                    row.target,
+                    crate::app::state::NavigatorTarget::Pane { pane_id, .. }
+                        if pane_id == target
+                )
+            })
+            .unwrap();
+        let terminal_runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        state.select_navigator_index_from(&terminal_runtimes, target_index);
+
+        state.workspaces[0].tabs.swap(0, 1);
+        state.clamp_navigator_selection_from(&terminal_runtimes);
+
+        let selected = &state.navigator_rows()[state.navigator.selected];
+        assert!(matches!(
+            selected.target,
+            crate::app::state::NavigatorTarget::Pane {
+                tab_idx: 0,
+                pane_id,
+                ..
+            } if pane_id == target
+        ));
+    }
+
+    #[test]
+    fn navigator_selection_falls_back_safely_when_selected_pane_disappears() {
+        let mut state = app_with_workspaces(&["one"]);
+        let target = state.workspaces[0].test_split(Direction::Horizontal);
+        state.ensure_test_terminals();
+        state.open_navigator();
+        let target_index = state
+            .navigator_rows()
+            .iter()
+            .position(|row| row.id == NavigatorRowId::Pane(target))
+            .unwrap();
+        let terminal_runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        state.select_navigator_index_from(&terminal_runtimes, target_index);
+
+        state.workspaces[0].remove_pane(target);
+        state.clamp_navigator_selection_from(&terminal_runtimes);
+
+        let rows = state.navigator_rows();
+        assert!(!rows.is_empty());
+        assert!(state.navigator.selected < rows.len());
+        assert_ne!(
+            state.navigator.selected_id,
+            Some(NavigatorRowId::Pane(target))
+        );
+        assert_eq!(
+            state.navigator.selected_id.as_ref(),
+            Some(&rows[state.navigator.selected].id)
+        );
+    }
+
+    #[test]
+    fn navigator_selection_clears_when_filter_has_no_rows() {
+        let mut state = app_with_workspaces(&["one"]);
+        state.open_navigator();
+        state.navigator.query = "this-will-never-match".into();
+
+        state.clamp_navigator_selection_from(&crate::terminal::TerminalRuntimeRegistry::new());
+
+        assert!(state.navigator_rows().is_empty());
+        assert_eq!(state.navigator.selected, 0);
+        assert_eq!(state.navigator.selected_id, None);
+        assert_eq!(state.navigator.scroll, 0);
     }
 
     #[test]

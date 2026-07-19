@@ -22,7 +22,7 @@ pub use self::{
         validated_sidebar_bounds, AgentPanelSortConfig, Config, ConfigReloadReport,
         ConfigReloadStatus, HostCursorModeConfig, NewTerminalCwdConfig, ShellModeConfig,
         SidebarCollapsedModeConfig, ToastClipboardPosition, ToastConfig, ToastDelivery,
-        ToastNagiPosition, UpdateChannelConfig, MAX_TOAST_DELAY_SECONDS,
+        ToastNagiPosition, UiIconStyleConfig, UpdateChannelConfig, MAX_TOAST_DELAY_SECONDS,
     },
     sidebar::{
         AgentSidebarToken, AgentsSidebarConfig, SidebarConfig, SpaceSidebarToken,
@@ -73,6 +73,12 @@ impl Config {
             .chain(self.remote_image_paste_key().err())
             .chain(self.ui.sound.diagnostics())
             .chain(self.invalid_sidebar_bounds_diagnostic())
+            .chain(
+                self.providers
+                    .acp
+                    .as_ref()
+                    .and_then(|acp| acp.endpoint().err()),
+            )
             .collect()
     }
 
@@ -153,6 +159,27 @@ command = "lazygit"
         assert!(!profile.contains("lazygit"));
         assert!(!profile.contains("command ="));
         assert!(!profile.contains("[[keys.command]]"));
+    }
+
+    #[test]
+    fn acp_provider_endpoint_is_literal_bounded_argv() {
+        let config: Config = toml::from_str(
+            r#"
+[providers.acp]
+command = ["agent", "--stdio"]
+"#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.providers.acp.unwrap().endpoint().unwrap(),
+            (std::path::PathBuf::from("agent"), vec!["--stdio".into()])
+        );
+
+        let config: Config = toml::from_str("[providers.acp]\ncommand = []\n").unwrap();
+        assert!(config
+            .collect_diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.contains("providers.acp.command")));
     }
 
     #[test]

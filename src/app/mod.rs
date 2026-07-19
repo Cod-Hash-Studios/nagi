@@ -9,6 +9,7 @@ mod agent_resume;
 mod agents;
 mod api;
 mod api_helpers;
+pub(crate) mod command_palette;
 mod config_io;
 mod creation;
 mod ids;
@@ -64,6 +65,36 @@ pub(crate) fn load_plugin_manifest(
     enabled: bool,
 ) -> Result<crate::api::schema::InstalledPluginInfo, (&'static str, String)> {
     api::plugins::load_plugin_manifest(path, enabled)
+}
+
+pub(crate) fn validate_plugin_component(path: &std::path::Path) -> Result<(), String> {
+    api::plugins::sandbox::validate_component(path)
+}
+
+pub(crate) fn validate_plugin_ui_document(stdout: &str) -> Result<(), String> {
+    api::plugins::parse_plugin_ui_document(stdout).map(|_| ())
+}
+
+pub(crate) fn test_plugin_component(
+    path: &std::path::Path,
+    plugin_id: &str,
+    action_id: Option<&str>,
+    context_json: &str,
+    stdin: &[u8],
+    workspace_path: Option<&std::path::Path>,
+    workspace_readable: bool,
+    workspace_writable: bool,
+) -> api::plugins::PluginComponentTestResult {
+    api::plugins::test_component_fixture(
+        path,
+        plugin_id,
+        action_id,
+        context_json,
+        stdin,
+        workspace_path,
+        workspace_readable,
+        workspace_writable,
+    )
 }
 
 /// Full application: AppState + runtime concerns (event channels, async I/O).
@@ -254,6 +285,9 @@ fn normalize_theme_name(name: &str) -> String {
 
 fn sibling_theme_names(name: &str) -> (String, String) {
     match normalize_theme_name(name).as_str() {
+        "nagi" | "nagi-night" | "night" | "nagi-dawn" => {
+            ("nagi-night".to_string(), "nagi-dawn".to_string())
+        }
         "catppuccin" | "catppuccin-mocha" | "catppuccin-latte" | "latte" | "light" => {
             ("catppuccin".to_string(), "catppuccin-latte".to_string())
         }
@@ -282,17 +316,71 @@ fn sibling_theme_names(name: &str) -> (String, String) {
 fn theme_runtime_config(
     config: &crate::config::Config,
     use_legacy_ui_accent: bool,
-) -> state::ThemeRuntimeConfig {
+) -> Result<state::ThemeRuntimeConfig, String> {
     let manual_name = config
         .theme
         .name
         .clone()
-        .unwrap_or_else(|| "catppuccin".to_string());
+        .unwrap_or_else(|| "nagi-night".to_string());
     let (default_dark, default_light) = sibling_theme_names(&manual_name);
-    state::ThemeRuntimeConfig {
+    let dark_name = config.theme.dark_name.clone().unwrap_or(default_dark);
+    let light_name = config.theme.light_name.clone().unwrap_or(default_light);
+    let mut file_palettes = std::collections::HashMap::new();
+    let names = if config.theme.auto_switch {
+        vec![
+            manual_name.as_str(),
+            dark_name.as_str(),
+            light_name.as_str(),
+        ]
+    } else {
+        vec![manual_name.as_str()]
+    };
+    for name in names {
+        let normalized = normalize_theme_name(name);
+        if state::Palette::from_name(name).is_some() || file_palettes.contains_key(&normalized) {
+            continue;
+        }
+        let loaded = crate::theme::loader::load_named(name).map_err(|error| error.to_string())?;
+        if normalize_theme_name(&loaded.name) != normalized {
+            return Err(format!(
+                "theme file '{name}' declares meta.name '{}'; expected the configured name",
+                loaded.name
+            ));
+        }
+        if config.theme.auto_switch
+            && config
+                .theme
+                .dark_name
+                .as_deref()
+                .is_some_and(|dark| normalize_theme_name(dark) == normalized)
+            && loaded.appearance != crate::theme::manifest::ThemeAppearance::Dark
+        {
+            return Err(format!(
+                "theme '{name}' is light but configured as dark_name"
+            ));
+        }
+        if config.theme.auto_switch
+            && config
+                .theme
+                .light_name
+                .as_deref()
+                .is_some_and(|light| normalize_theme_name(light) == normalized)
+            && loaded.appearance != crate::theme::manifest::ThemeAppearance::Light
+        {
+            return Err(format!(
+                "theme '{name}' is dark but configured as light_name"
+            ));
+        }
+        file_palettes.insert(normalized, loaded.palette);
+    }
+    let discovered = crate::theme::loader::discover();
+    for (name, theme) in discovered.themes {
+        file_palettes.entry(name).or_insert(theme.palette);
+    }
+    Ok(state::ThemeRuntimeConfig {
         manual_name,
-        dark_name: config.theme.dark_name.clone().unwrap_or(default_dark),
-        light_name: config.theme.light_name.clone().unwrap_or(default_light),
+        dark_name,
+        light_name,
         auto_switch: config.theme.auto_switch,
         custom: config.theme.custom.clone(),
         legacy_accent: (use_legacy_ui_accent
@@ -304,7 +392,9 @@ fn theme_runtime_config(
                 .and_then(|c| c.accent.as_ref())
                 .is_none())
         .then(|| config.ui.accent.clone()),
-    }
+        file_palettes,
+        theme_file_diagnostics: discovered.diagnostics,
+    })
 }
 
 fn resolve_palette_for_theme_name(
@@ -312,13 +402,21 @@ fn resolve_palette_for_theme_name(
     fallback_name: &str,
     runtime: &state::ThemeRuntimeConfig,
 ) -> state::Palette {
-    let mut palette = state::Palette::from_name(name).unwrap_or_else(|| {
+    let palette_for_name = |name: &str| {
+        state::Palette::from_name(name).or_else(|| {
+            runtime
+                .file_palettes
+                .get(&normalize_theme_name(name))
+                .cloned()
+        })
+    };
+    let mut palette = palette_for_name(name).unwrap_or_else(|| {
         tracing::warn!(
             theme = name,
             fallback = fallback_name,
             "unknown theme, falling back"
         );
-        state::Palette::from_name(fallback_name).unwrap_or_else(state::Palette::catppuccin)
+        palette_for_name(fallback_name).unwrap_or_else(state::Palette::nagi_night)
     });
 
     if let Some(custom) = &runtime.custom {
@@ -337,13 +435,11 @@ fn resolve_effective_theme(
 ) -> (state::Palette, String) {
     let (name, fallback) = if runtime.auto_switch {
         match appearance.unwrap_or(crate::terminal_theme::HostAppearance::Dark) {
-            crate::terminal_theme::HostAppearance::Dark => (&runtime.dark_name, "catppuccin"),
-            crate::terminal_theme::HostAppearance::Light => {
-                (&runtime.light_name, "catppuccin-latte")
-            }
+            crate::terminal_theme::HostAppearance::Dark => (&runtime.dark_name, "nagi-night"),
+            crate::terminal_theme::HostAppearance::Light => (&runtime.light_name, "nagi-dawn"),
         }
     } else {
-        (&runtime.manual_name, "catppuccin")
+        (&runtime.manual_name, "nagi-night")
     };
     (
         resolve_palette_for_theme_name(name, fallback, runtime),
@@ -504,8 +600,26 @@ impl App {
         // explicitly; unrelated App tests should not recompile every bundled regex.
         #[cfg(test)]
         let agent_manifest_summaries = Vec::new();
-        let theme_runtime = theme_runtime_config(config, true);
+        let (theme_runtime, theme_diagnostic) = match theme_runtime_config(config, true) {
+            Ok(runtime) => {
+                let diagnostic = (!runtime.theme_file_diagnostics.is_empty())
+                    .then(|| runtime.theme_file_diagnostics.join("; "));
+                (runtime, diagnostic)
+            }
+            Err(diagnostic) => {
+                tracing::warn!(diagnostic = %diagnostic, "invalid theme, using Nagi Night");
+                let runtime = theme_runtime_config(&crate::config::Config::default(), true)
+                    .expect("built-in default theme must resolve");
+                (runtime, Some(diagnostic))
+            }
+        };
         let (theme_palette, theme_name) = resolve_effective_theme(&theme_runtime, None);
+        let config_diagnostic = match (config_diagnostic, theme_diagnostic) {
+            (Some(existing), Some(theme)) => Some(format!("{existing}; {theme}")),
+            (Some(existing), None) => Some(existing),
+            (None, Some(theme)) => Some(theme),
+            (None, None) => None,
+        };
 
         let mut state = AppState {
             terminals: std::collections::HashMap::new(),
@@ -513,6 +627,10 @@ impl App {
             pane_id_aliases: std::collections::HashMap::new(),
             public_pane_id_aliases: std::collections::HashMap::new(),
             workspaces,
+            mission_views: Vec::new(),
+            attention_items: Vec::new(),
+            selected_mission_id: None,
+            selected_attention_id: None,
             active,
             previous_pane_focus: None,
             selected,
@@ -530,6 +648,11 @@ impl App {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
+            request_attention_response: None,
+            request_mission_close: None,
+            request_new_mission: None,
+            request_mission_handoff_preview: None,
+            request_mission_handoff_start: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
             creating_new_tab: false,
@@ -556,6 +679,23 @@ impl App {
             }),
             keybind_help: state::KeybindHelpState { scroll: 0 },
             navigator: state::NavigatorState::default(),
+            command_palette: command_palette::CommandPaletteState::default(),
+            mission_inspector_scroll: 0,
+            mission_inspector_tab: 0,
+            request_plugin_inspector_refresh: None,
+            plugin_inspector_active_key: None,
+            plugin_inspector_log_id: None,
+            plugin_inspector_document: None,
+            plugin_inspector_error: None,
+            proof_review_selected: 0,
+            proof_review_scroll: 0,
+            attention_selected: 0,
+            attention_scroll: 0,
+            attention_answer_input: None,
+            attention_error: None,
+            mission_action_error: None,
+            new_mission: None,
+            mission_handoff: None,
             copy_mode: None,
             workspace_scroll: 0,
             agent_panel_scroll: 0,
@@ -600,6 +740,7 @@ impl App {
             sidebar_min_width,
             sidebar_max_width,
             mobile_width_threshold: config.ui.mobile_width_threshold,
+            icon_style: config.ui.icon_style,
             sidebar_width_source,
             sidebar_width_auto: false,
             sidebar_collapsed: false,
@@ -923,7 +1064,7 @@ impl App {
 
             if self.state.request_complete_onboarding {
                 self.state.request_complete_onboarding = false;
-                self.open_settings_from_onboarding();
+                self.complete_onboarding_to_mission();
                 needs_render = true;
             }
 
@@ -1247,10 +1388,9 @@ impl App {
         }
     }
 
-    pub(crate) fn open_settings_from_onboarding(&mut self) {
+    pub(crate) fn complete_onboarding_to_mission(&mut self) {
         self.mark_onboarding_complete();
-        self.refresh_integration_recommendations();
-        crate::app::input::open_settings_at(&mut self.state, state::SettingsSection::Integrations);
+        crate::app::input::open_new_mission(&mut self.state, &self.terminal_runtimes);
     }
 
     pub(crate) fn refresh_integration_recommendations(&mut self) {
@@ -1383,6 +1523,7 @@ impl App {
                 self.state.sidebar_max_width = config.ui.sidebar_max_width;
                 self.state.sidebar_collapsed_mode = config.ui.sidebar_collapsed_mode;
                 self.state.mobile_width_threshold = config.ui.mobile_width_threshold;
+                self.state.icon_style = config.ui.icon_style;
                 // Re-clamp the live width to the new bounds. No source guard — bounds
                 // always apply, including to widths owned by Persisted or Manual.
                 self.state.sidebar_width = self
@@ -1506,8 +1647,16 @@ impl App {
         }
 
         if !invalid_section("theme") {
-            self.state.theme_runtime = theme_runtime_config(config, !invalid_section("ui"));
-            self.refresh_effective_app_theme();
+            match theme_runtime_config(config, !invalid_section("ui")) {
+                Ok(runtime) => {
+                    diagnostics.extend(runtime.theme_file_diagnostics.iter().cloned());
+                    self.state.theme_runtime = runtime;
+                    self.refresh_effective_app_theme();
+                }
+                Err(diagnostic) => {
+                    diagnostics.push(format!("{diagnostic}; kept the last valid theme"))
+                }
+            }
         }
 
         let status = if diagnostics.is_empty() {
@@ -1719,6 +1868,25 @@ impl App {
             }
             Mode::Navigator => {
                 input::handle_navigator_key(&mut self.state, &self.terminal_runtimes, key_event);
+            }
+            Mode::CommandPalette => {
+                self.dispatch_command_palette_key(key_event);
+            }
+            Mode::MissionInspector => {
+                input::handle_mission_inspector_key(&mut self.state, key_event);
+                self.process_plugin_inspector_refresh_request();
+            }
+            Mode::MissionHandoff => {
+                input::handle_mission_handoff_key(&mut self.state, key_event);
+            }
+            Mode::NewMission => {
+                input::handle_new_mission_key(&mut self.state, key_event);
+            }
+            Mode::ProofReview => {
+                input::handle_proof_review_key(&mut self.state, key_event);
+            }
+            Mode::AttentionInbox => {
+                input::handle_attention_inbox_key(&mut self.state, key_event);
             }
             Mode::Terminal => {
                 // Should not be called in terminal mode.
@@ -2381,6 +2549,94 @@ mod tests {
         let app = App::new(&config, true, None, api_rx, crate::api::EventHub::default());
 
         assert!(!app.state.redraw_on_focus_gained);
+    }
+
+    #[test]
+    fn fresh_startup_uses_the_nagi_night_theme() {
+        let config = Config::default();
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let app = App::new(&config, true, None, api_rx, crate::api::EventHub::default());
+
+        assert_eq!(app.state.theme_name, "nagi-night");
+        assert_eq!(app.state.palette, state::Palette::nagi_night());
+        assert_eq!(app.state.theme_runtime.light_name, "nagi-dawn");
+    }
+
+    #[test]
+    fn custom_theme_file_reloads_and_rolls_back_on_invalid_contrast() {
+        let _guard = config_env_lock().lock().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let config_path = directory.path().join("config.toml");
+        let themes_directory = directory.path().join("themes");
+        std::fs::create_dir_all(&themes_directory).unwrap();
+        std::fs::write(&config_path, "[theme]\nname = \"forest-calm\"\n").unwrap();
+        let theme_path = themes_directory.join("forest-calm.toml");
+        let valid_theme = |focus: &str, text: &str| {
+            format!(
+                r##"
+[meta]
+name = "forest calm"
+schema = 1
+appearance = "dark"
+
+[palette]
+canvas = "#101820"
+panel = "#182430"
+text = "{text}"
+muted = "#aeb8c2"
+focus = "{focus}"
+attention = "#ef7166"
+working = "#73a4d6"
+fresh = "#78ccb9"
+stale = "#d9ad63"
+
+[semantic]
+canvas = "canvas"
+panel = "panel"
+text = "text"
+text_muted = "muted"
+focus = "focus"
+attention = "attention"
+working = "working"
+proof_fresh = "fresh"
+proof_stale = "stale"
+"##
+            )
+        };
+        std::fs::write(&theme_path, valid_theme("#7ca8d8", "#f5f0e8")).unwrap();
+        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &config_path);
+        let config = crate::config::Config::load().config;
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(&config, true, None, api_rx, crate::api::EventHub::default());
+        let last_valid = app.state.palette.clone();
+
+        assert_eq!(app.state.theme_name, "forest-calm");
+        assert_eq!(
+            app.state.palette.accent,
+            ratatui::style::Color::Rgb(124, 168, 216)
+        );
+
+        std::fs::write(&theme_path, valid_theme("#7ca8d8", "#182431")).unwrap();
+        let report = app.reload_config();
+
+        assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
+        assert_eq!(app.state.palette, last_valid);
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.contains("kept the last valid theme")));
+
+        std::fs::write(&theme_path, valid_theme("#8db9e9", "#f5f0e8")).unwrap();
+        let report = app.reload_config();
+
+        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
+        assert_eq!(
+            app.state.palette.accent,
+            ratatui::style::Color::Rgb(141, 185, 233)
+        );
+
+        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
     }
 
     #[test]
@@ -4830,11 +5086,8 @@ last_pane = "prefix+tab"
 
         app.route_client_input(b"\r".to_vec());
 
-        assert_eq!(app.state.mode, Mode::Settings);
-        assert_eq!(
-            app.state.settings.section,
-            state::SettingsSection::Integrations
-        );
+        assert_eq!(app.state.mode, Mode::NewMission);
+        assert!(app.state.new_mission.is_some());
     }
 
     #[test]

@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::Rect;
+use ratatui::layout::{Layout, Rect};
 
 use crate::{
     app::{
-        state::{AppState, ExperimentSetting, SettingsSection, THEME_NAMES},
+        state::{AppState, ExperimentSetting, SettingsSection},
         App, Mode,
     },
     config::ToastDelivery,
@@ -70,9 +70,10 @@ fn normalize_theme_name(name: &str) -> String {
     name.to_lowercase().replace([' ', '_'], "-")
 }
 
-fn current_theme_index(theme_name: &str) -> usize {
+fn current_theme_index(state: &AppState, theme_name: &str) -> usize {
     let normalized = normalize_theme_name(theme_name);
-    THEME_NAMES
+    state
+        .available_theme_names()
         .iter()
         .position(|name| normalize_theme_name(name) == normalized)
         .unwrap_or(0)
@@ -97,10 +98,11 @@ fn toast_delivery_for_index(idx: usize) -> ToastDelivery {
 }
 
 fn preview_selected_theme(state: &mut AppState) {
-    use crate::app::state::Palette;
-
-    let name = THEME_NAMES[state.settings.list.selected];
-    if let Some(mut palette) = Palette::from_name(name) {
+    let names = state.available_theme_names();
+    let Some(name) = names.get(state.settings.list.selected) else {
+        return;
+    };
+    if let Some(mut palette) = state.base_palette_for_theme_name(name) {
         if let Some(custom) = &state.theme_runtime.custom {
             palette = palette.with_overrides(custom);
         }
@@ -108,7 +110,7 @@ fn preview_selected_theme(state: &mut AppState) {
             palette.accent = crate::config::parse_color(accent);
         }
         state.palette = palette;
-        state.theme_name = name.to_string();
+        state.theme_name.clone_from(name);
     }
 }
 
@@ -161,7 +163,10 @@ pub(super) fn update_settings_state(state: &mut AppState, key: KeyEvent) -> Opti
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 let previous = state.settings.list.selected;
-                state.settings.list.move_next(THEME_NAMES.len());
+                state
+                    .settings
+                    .list
+                    .move_next(state.available_theme_names().len());
                 if state.settings.list.selected != previous {
                     preview_selected_theme(state);
                 }
@@ -194,7 +199,7 @@ pub(super) fn update_settings_state(state: &mut AppState, key: KeyEvent) -> Opti
             }
             KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => {
                 state.settings.section = SettingsSection::Theme;
-                state.settings.list.selected = current_theme_index(&state.theme_name);
+                state.settings.list.selected = current_theme_index(state, &state.theme_name);
             }
             _ => {
                 if let Some(super::modal::ModalAction::Close) =
@@ -265,7 +270,7 @@ pub(super) fn update_settings_state(state: &mut AppState, key: KeyEvent) -> Opti
             }
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
                 state.settings.section = SettingsSection::Theme;
-                state.settings.list.selected = current_theme_index(&state.theme_name);
+                state.settings.list.selected = current_theme_index(state, &state.theme_name);
             }
             _ => {
                 if let Some(super::modal::ModalAction::Close) =
@@ -308,7 +313,7 @@ pub(crate) fn open_settings_at(state: &mut AppState, section: SettingsSection) {
     state.settings.original_theme = Some(state.theme_name.clone());
     state.settings.section = section;
     state.settings.list.selected = match section {
-        SettingsSection::Theme => current_theme_index(&state.theme_name),
+        SettingsSection::Theme => current_theme_index(state, &state.theme_name),
         SettingsSection::Sound => usize::from(!state.sound_enabled()),
         SettingsSection::Toast => toast_delivery_index(state.toast_delivery()),
         SettingsSection::PaneLabels => usize::from(!state.agent_border_labels_enabled()),
@@ -374,14 +379,22 @@ impl AppState {
 
         match self.settings.section {
             SettingsSection::Theme => {
-                let max_visible = area.height as usize;
+                let [list_area, _] = Layout::horizontal([
+                    ratatui::layout::Constraint::Percentage(42),
+                    ratatui::layout::Constraint::Percentage(58),
+                ])
+                .areas::<2>(area);
+                if col >= list_area.x + list_area.width {
+                    return None;
+                }
+                let max_visible = list_area.height as usize;
                 let scroll = if self.settings.list.selected >= max_visible {
                     self.settings.list.selected - max_visible + 1
                 } else {
                     0
                 };
-                let idx = scroll + (row - area.y) as usize;
-                (idx < THEME_NAMES.len()).then_some(idx)
+                let idx = scroll + (row - list_area.y) as usize;
+                (idx < self.available_theme_names().len()).then_some(idx)
             }
             SettingsSection::Sound => {
                 let list_y = area.y + 3;
@@ -425,7 +438,7 @@ impl AppState {
                 if let Some(section) = self.settings_tab_at(mouse.column, mouse.row) {
                     self.settings.section = section;
                     self.settings.list.select(match section {
-                        SettingsSection::Theme => current_theme_index(&self.theme_name),
+                        SettingsSection::Theme => current_theme_index(self, &self.theme_name),
                         SettingsSection::Sound => usize::from(!self.sound_enabled()),
                         SettingsSection::Toast => toast_delivery_index(self.toast_delivery()),
                         SettingsSection::PaneLabels => {
@@ -523,6 +536,34 @@ mod tests {
         assert_eq!(state.theme_name, original_theme);
         assert_eq!(state.palette.accent, original_palette.accent);
         assert_eq!(state.palette.panel_bg, original_palette.panel_bg);
+    }
+
+    #[test]
+    fn settings_selects_and_previews_a_loaded_custom_theme() {
+        let mut state = state_with_workspaces(&["test"]);
+        let mut custom = crate::app::state::Palette::nagi_dawn();
+        custom.accent = ratatui::style::Color::Rgb(12, 34, 56);
+        state
+            .theme_runtime
+            .file_palettes
+            .insert("forest-calm".to_string(), custom.clone());
+        state.theme_name = "nagi-night".to_string();
+        open_settings(&mut state);
+        let custom_index = state
+            .available_theme_names()
+            .iter()
+            .position(|name| name == "forest-calm")
+            .unwrap();
+        state.settings.list.selected = custom_index - 1;
+
+        update_settings_state(
+            &mut state,
+            KeyEvent::new(KeyCode::Down, KeyModifiers::empty()),
+        );
+
+        assert_eq!(state.settings.list.selected, custom_index);
+        assert_eq!(state.theme_name, "forest-calm");
+        assert_eq!(state.palette, custom);
     }
 
     #[test]

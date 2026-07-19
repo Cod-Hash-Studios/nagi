@@ -14,6 +14,22 @@ pub(super) fn render_panel_shell(
     border_color: Color,
     bg: Color,
 ) -> Option<Rect> {
+    render_panel_shell_with_border_set(
+        frame,
+        area,
+        border_color,
+        bg,
+        ratatui::symbols::border::PLAIN,
+    )
+}
+
+pub(super) fn render_panel_shell_with_border_set(
+    frame: &mut Frame,
+    area: Rect,
+    border_color: Color,
+    bg: Color,
+    border_set: ratatui::symbols::border::Set<'static>,
+) -> Option<Rect> {
     if area.width < 2 || area.height < 2 {
         return None;
     }
@@ -21,7 +37,7 @@ pub(super) fn render_panel_shell(
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(border_color))
-        .border_set(ratatui::symbols::border::PLAIN)
+        .border_set(border_set)
         .style(Style::default().bg(bg));
     let inner = block.inner(area);
     frame.render_widget(Clear, area);

@@ -132,6 +132,53 @@ impl App {
             return true;
         }
 
+        if self.state.mode == Mode::CommandPalette {
+            let area = self.state.onboarding_full_area();
+            match mouse.kind {
+                MouseEventKind::Moved => {
+                    if let Some(index) = crate::ui::command_palette_command_index_at(
+                        &self.state,
+                        area,
+                        mouse.column,
+                        mouse.row,
+                    ) {
+                        super::command_palette::select_command_palette_index(
+                            &mut self.state,
+                            index,
+                        );
+                    }
+                }
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some(index) = crate::ui::command_palette_command_index_at(
+                        &self.state,
+                        area,
+                        mouse.column,
+                        mouse.row,
+                    ) {
+                        self.dispatch_command_palette_index(index);
+                    } else if crate::ui::command_palette_popup_rect(area)
+                        .is_none_or(|popup| !rect_contains(popup, mouse.column, mouse.row))
+                    {
+                        leave_modal(&mut self.state);
+                    }
+                }
+                MouseEventKind::ScrollUp => {
+                    self.dispatch_command_palette_key(crossterm::event::KeyEvent::new(
+                        crossterm::event::KeyCode::Up,
+                        crossterm::event::KeyModifiers::NONE,
+                    ))
+                }
+                MouseEventKind::ScrollDown => {
+                    self.dispatch_command_palette_key(crossterm::event::KeyEvent::new(
+                        crossterm::event::KeyCode::Down,
+                        crossterm::event::KeyModifiers::NONE,
+                    ))
+                }
+                _ => {}
+            }
+            return true;
+        }
+
         if self.state.mode == Mode::Navigator {
             match mouse.kind {
                 MouseEventKind::Moved => {
@@ -140,9 +187,8 @@ impl App {
                         mouse.column,
                         mouse.row,
                     ) {
-                        self.state.navigator.selected = idx;
                         self.state
-                            .ensure_navigator_selection_visible_from(&self.terminal_runtimes);
+                            .select_navigator_index_from(&self.terminal_runtimes, idx);
                     }
                 }
                 MouseEventKind::Down(MouseButton::Left) => {
@@ -156,7 +202,8 @@ impl App {
                         mouse.column,
                         mouse.row,
                     ) {
-                        self.state.navigator.selected = idx;
+                        self.state
+                            .select_navigator_index_from(&self.terminal_runtimes, idx);
                         let target = self
                             .state
                             .navigator_rows_from(&self.terminal_runtimes)
@@ -181,9 +228,9 @@ impl App {
                 }
                 MouseEventKind::ScrollUp => {
                     self.state.navigator.scroll = self.state.navigator.scroll.saturating_sub(3);
-                    self.state.navigator.selected = self.state.navigator.scroll;
+                    let selected = self.state.navigator.scroll;
                     self.state
-                        .clamp_navigator_selection_from(&self.terminal_runtimes);
+                        .select_navigator_index_from(&self.terminal_runtimes, selected);
                 }
                 MouseEventKind::ScrollDown => {
                     let viewport = self.state.navigator_body_rect().height as usize;
@@ -192,9 +239,9 @@ impl App {
                         .navigator_max_scroll_from(&self.terminal_runtimes, viewport);
                     self.state.navigator.scroll =
                         self.state.navigator.scroll.saturating_add(3).min(max);
-                    self.state.navigator.selected = self.state.navigator.scroll;
+                    let selected = self.state.navigator.scroll;
                     self.state
-                        .clamp_navigator_selection_from(&self.terminal_runtimes);
+                        .select_navigator_index_from(&self.terminal_runtimes, selected);
                 }
                 _ => {}
             }
@@ -292,6 +339,29 @@ impl AppState {
 
     fn navigator_layout(&self) -> NavigatorLayout {
         let inner = self.navigator_inner_rect();
+        // The popup keeps breathing room around the terminal. These thresholds
+        // therefore map to approximately 120 and 80 terminal columns.
+        if inner.width >= 104 && inner.height >= 12 {
+            let list_width = (inner.width.saturating_mul(42) / 100).clamp(44, 64);
+            let inspector_x = inner.x.saturating_add(list_width).saturating_add(1);
+            let inspector_width = inner.width.saturating_sub(list_width).saturating_sub(1);
+            return NavigatorLayout {
+                header: Rect::new(inner.x, inner.y, inner.width, 1),
+                search: Rect::new(inner.x, inner.y + 2, list_width, 1),
+                body: Rect::new(inner.x, inner.y + 4, list_width, inner.height - 5),
+                detail: Rect::new(inspector_x, inner.y + 2, inspector_width, inner.height - 3),
+                footer: Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1),
+            };
+        }
+        if inner.width >= 68 && inner.height >= 14 {
+            return NavigatorLayout {
+                header: Rect::new(inner.x, inner.y, inner.width, 1),
+                search: Rect::new(inner.x, inner.y + 2, inner.width, 1),
+                body: Rect::new(inner.x, inner.y + 4, inner.width, inner.height - 9),
+                detail: Rect::new(inner.x, inner.y + inner.height - 4, inner.width, 3),
+                footer: Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1),
+            };
+        }
         if inner.height >= 7 {
             return NavigatorLayout {
                 header: Rect::new(inner.x, inner.y, inner.width, 1),
@@ -775,6 +845,56 @@ mod tests {
     }
 
     #[test]
+    fn navigator_layout_progressively_discloses_detail_at_key_widths() {
+        let mut app = app_for_mouse_test();
+
+        set_terminal_size(&mut app, 60, 24);
+        let compact_body = app.state.navigator_body_rect();
+        let compact_detail = app.state.navigator_detail_rect();
+        assert_eq!(compact_detail.height, 1);
+        assert_eq!(compact_detail.x, compact_body.x);
+
+        set_terminal_size(&mut app, 80, 24);
+        let medium_body = app.state.navigator_body_rect();
+        let medium_detail = app.state.navigator_detail_rect();
+        assert_eq!(medium_detail.height, 3);
+        assert_eq!(medium_detail.x, medium_body.x);
+        assert!(medium_detail.y > medium_body.y);
+
+        for width in [120, 200] {
+            set_terminal_size(&mut app, width, 32);
+            let body = app.state.navigator_body_rect();
+            let detail = app.state.navigator_detail_rect();
+            assert!(detail.height >= 6, "missing inspector at {width} columns");
+            assert!(detail.x > body.x.saturating_add(body.width));
+            assert_eq!(detail.y, app.state.navigator_search_rect().y);
+        }
+    }
+
+    #[test]
+    fn navigator_regions_never_overlap_at_supported_breakpoints() {
+        let mut app = app_for_mouse_test();
+        for (width, height) in [(60, 20), (80, 24), (120, 32), (200, 48)] {
+            set_terminal_size(&mut app, width, height);
+            let regions = [
+                app.state.navigator_header_rect(),
+                app.state.navigator_search_rect(),
+                app.state.navigator_body_rect(),
+                app.state.navigator_detail_rect(),
+                app.state.navigator_footer_rect(),
+            ];
+            for (index, left) in regions.iter().enumerate() {
+                for right in regions.iter().skip(index + 1) {
+                    assert!(
+                        !rects_overlap(*left, *right),
+                        "navigator regions overlap at {width}x{height}: {left:?} and {right:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn tiny_navigator_regions_do_not_overlap() {
         let mut app = app_for_mouse_test();
         set_terminal_size(&mut app, 40, 8);
@@ -817,6 +937,23 @@ mod tests {
         ));
 
         assert_eq!(app.state.mode, Mode::Navigate);
+    }
+
+    #[test]
+    fn command_palette_mouse_hover_tracks_the_visible_command() {
+        let mut app = app_for_mouse_test();
+        set_terminal_size(&mut app, 80, 24);
+        app.state.open_command_palette();
+        let area = app.state.onboarding_full_area();
+        let popup = crate::ui::command_palette_popup_rect(area).unwrap();
+
+        app.handle_mouse(mouse(MouseEventKind::Moved, popup.x + 3, popup.y + 6));
+
+        assert_eq!(app.state.command_palette.selected, 1);
+        assert_eq!(
+            app.state.command_palette.selected_id.as_deref(),
+            Some("core.detach")
+        );
     }
 
     #[test]

@@ -76,6 +76,12 @@ impl App {
             return;
         }
 
+        if key.code == KeyCode::Char(':') && key.modifiers.is_empty() {
+            self.cancel_copy_mode_if_active();
+            self.state.open_command_palette();
+            return;
+        }
+
         if let Some(action) =
             non_indexed_action_for_key(&self.state, raw_key, BindingDispatch::Prefix)
         {
@@ -1895,6 +1901,16 @@ mod tests {
         );
 
         assert_eq!(state.mode, Mode::Navigator);
+    }
+
+    #[test]
+    fn prefix_colon_opens_command_palette_without_forwarding_to_the_pane() {
+        let mut app = app_with_test_workspaces(&["test"]);
+        app.state.mode = Mode::Prefix;
+
+        app.handle_prefix_key(TerminalKey::new(KeyCode::Char(':'), KeyModifiers::empty()));
+
+        assert_eq!(app.state.mode, Mode::CommandPalette);
     }
 
     #[test]

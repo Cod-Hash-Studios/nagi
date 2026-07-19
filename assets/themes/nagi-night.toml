@@ -1,0 +1,47 @@
+[meta]
+name = "Nagi Night"
+schema = 1
+appearance = "dark"
+
+[palette]
+canvas = "#10161f"
+panel = "#192434"
+canvas_dim = "#0c1118"
+border = "#2b3a4e"
+paper = "#f3ebdd"
+muted = "#a8b0b9"
+bright = "#b8bfc7"
+faint = "#9aa4af"
+indigo = "#79a7d8"
+vermilion = "#e6655a"
+blue = "#6e9fd1"
+mint = "#72c9bb"
+amber = "#d5a15b"
+mauve = "#b8a0c9"
+green = "#7eb99a"
+yellow = "#d4b46a"
+
+[semantic]
+canvas = "canvas"
+panel = "panel"
+canvas_dim = "canvas_dim"
+border = "border"
+text = "paper"
+text_muted = "muted"
+text_bright = "bright"
+text_faint = "faint"
+focus = "indigo"
+attention = "vermilion"
+danger = "vermilion"
+working = "blue"
+proof_fresh = "mint"
+proof_stale = "amber"
+special = "mauve"
+done = "green"
+caution = "yellow"
+
+[components]
+border = "soft"
+selection = "rail"
+density = "comfortable"
+motion = "subtle"

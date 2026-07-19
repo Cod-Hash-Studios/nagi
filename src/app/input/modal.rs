@@ -202,8 +202,17 @@ pub(crate) fn handle_navigator_key(
         KeyCode::Esc => {
             leave_modal(state);
         }
+        KeyCode::Tab | KeyCode::BackTab => {
+            state.toggle_cockpit_scope_from(terminal_runtimes);
+        }
         KeyCode::Enter => {
             state.accept_navigator_selection_from(terminal_runtimes);
+        }
+        KeyCode::Char('n') if key.modifiers.is_empty() => {
+            super::mission::open_new_mission(state, terminal_runtimes);
+        }
+        KeyCode::Char('p' | ':') if key.modifiers.is_empty() => {
+            state.open_command_palette();
         }
         KeyCode::Char('/') => {
             state.navigator.state_filter = None;
@@ -257,15 +266,14 @@ pub(crate) fn handle_navigator_key(
             ),
         KeyCode::Char(' ') => state.toggle_selected_navigator_workspace_from(terminal_runtimes),
         KeyCode::Home => {
-            state.navigator.selected = 0;
-            state.ensure_navigator_selection_visible_from(terminal_runtimes);
+            state.select_navigator_index_from(terminal_runtimes, 0);
         }
         KeyCode::End | KeyCode::Char('G') => {
-            state.navigator.selected = state
+            let selected = state
                 .navigator_rows_from(terminal_runtimes)
                 .len()
                 .saturating_sub(1);
-            state.ensure_navigator_selection_visible_from(terminal_runtimes);
+            state.select_navigator_index_from(terminal_runtimes, selected);
         }
         _ => {}
     }
@@ -1727,6 +1735,21 @@ mod tests {
         );
 
         assert_eq!(state.mode, Mode::Terminal);
+    }
+
+    #[test]
+    fn navigator_p_opens_the_global_command_palette() {
+        let mut state = state_with_workspaces(&["alpha"]);
+        let terminal_runtimes = crate::terminal::TerminalRuntimeRegistry::new();
+        state.open_navigator_from(&terminal_runtimes);
+
+        handle_navigator_key(
+            &mut state,
+            &terminal_runtimes,
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE),
+        );
+
+        assert_eq!(state.mode, Mode::CommandPalette);
     }
 
     #[test]

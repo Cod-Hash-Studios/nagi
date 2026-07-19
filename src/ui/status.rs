@@ -209,6 +209,32 @@ pub(super) fn agent_icon(
     tick: u32,
     p: &Palette,
 ) -> (&'static str, Style) {
+    agent_icon_with_set(state, seen, tick, p, super::design::icons::IconSet::Unicode)
+}
+
+pub(super) fn agent_icon_with_set(
+    state: AgentState,
+    seen: bool,
+    tick: u32,
+    p: &Palette,
+    icons: super::design::icons::IconSet,
+) -> (&'static str, Style) {
+    if icons == super::design::icons::IconSet::Ascii {
+        let icon = match (state, seen) {
+            (AgentState::Blocked, _) => super::design::icons::SemanticIcon::Attention,
+            (AgentState::Working, _) => super::design::icons::SemanticIcon::Working,
+            (AgentState::Idle, _) => super::design::icons::SemanticIcon::ProofFresh,
+            (AgentState::Unknown, _) => return (".", Style::default().fg(p.overlay0)),
+        };
+        let color = match (state, seen) {
+            (AgentState::Blocked, _) => p.red,
+            (AgentState::Working, _) => p.yellow,
+            (AgentState::Idle, false) => p.teal,
+            (AgentState::Idle, true) => p.green,
+            (AgentState::Unknown, _) => p.overlay0,
+        };
+        return (icon.glyph(icons), Style::default().fg(color));
+    }
     match (state, seen) {
         (AgentState::Blocked, _) => ("◉", Style::default().fg(p.red)),
         (AgentState::Working, _) => (super::spinner_frame(tick), Style::default().fg(p.yellow)),

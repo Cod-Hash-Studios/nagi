@@ -5,13 +5,21 @@ use ratatui::{
     Frame,
 };
 
+mod attention;
+mod command_palette;
+mod components;
+mod design;
 mod dialogs;
 mod keybind_help;
 mod menus;
+mod mission_handoff;
+mod mission_inspector;
 mod mobile;
 mod navigator;
+mod new_mission;
 mod onboarding;
 mod panes;
+mod proof_review;
 mod release_notes;
 mod scrollbar;
 mod settings;
@@ -21,6 +29,14 @@ mod tabs;
 mod text;
 mod widgets;
 
+#[cfg(test)]
+mod golden;
+
+use self::attention::render_attention_inbox_overlay;
+use self::command_palette::render_command_palette_overlay;
+pub(crate) use self::command_palette::{
+    command_palette_command_index_at, command_palette_popup_rect,
+};
 use self::dialogs::{
     render_confirm_close_overlay, render_new_linked_worktree_overlay,
     render_open_existing_worktree_overlay, render_remove_worktree_overlay, render_rename_overlay,
@@ -30,18 +46,24 @@ use self::menus::{
     render_context_menu, render_copy_mode_overlay, render_global_launcher_menu,
     render_navigate_overlay, render_prefix_overlay, render_resize_overlay,
 };
+use self::mission_handoff::render_mission_handoff_overlay;
+pub(crate) use self::mission_inspector::mission_inspector_max_scroll;
+use self::mission_inspector::render_mission_inspector_overlay;
 use self::mobile::{
     compute_mobile_header_hit_areas, is_mobile_width, mobile_switcher_max_scroll_for_height,
     mobile_toast_banner_rect, render_mobile_header, render_mobile_panel,
     render_mobile_toast_banner,
 };
 use self::navigator::render_navigator_overlay;
+use self::new_mission::render_new_mission_overlay;
 pub(crate) use self::onboarding::onboarding_welcome_continue_rect;
 use self::onboarding::render_onboarding_overlay;
 pub(crate) use self::panes::popup_pane_rects;
 use self::panes::{
     compute_pane_infos, render_panes, render_popup_pane, resize_popup_pane, resize_tab_panes,
 };
+pub(crate) use self::proof_review::proof_check_count;
+use self::proof_review::render_proof_review_overlay;
 pub(crate) use self::release_notes::{
     product_announcement_display_lines, release_notes_close_button_rect,
     release_notes_display_lines, release_notes_wrapped_line_count, PRODUCT_ANNOUNCEMENT_MODAL_SIZE,
@@ -322,6 +344,9 @@ fn compute_view_internal(
         pane_infos,
         split_borders,
     };
+    if app.mode == Mode::Navigator {
+        app.reconcile_navigator_selection_from(terminal_runtimes);
+    }
     app.sync_copy_mode_search_geometry();
 }
 
@@ -394,6 +419,9 @@ fn compute_mobile_view(
         pane_infos,
         split_borders,
     };
+    if app.mode == Mode::Navigator {
+        app.reconcile_navigator_selection_from(terminal_runtimes);
+    }
     app.sync_copy_mode_search_geometry();
 }
 
@@ -458,6 +486,12 @@ pub fn render_with_runtime_registry(
         Mode::GlobalMenu => render_global_launcher_menu(app, frame),
         Mode::KeybindHelp => render_keybind_help_overlay(app, frame),
         Mode::Navigator => render_navigator_overlay(app, terminal_runtimes, frame),
+        Mode::CommandPalette => render_command_palette_overlay(app, frame),
+        Mode::MissionInspector => render_mission_inspector_overlay(app, frame),
+        Mode::MissionHandoff => render_mission_handoff_overlay(app, frame),
+        Mode::NewMission => render_new_mission_overlay(app, frame),
+        Mode::ProofReview => render_proof_review_overlay(app, frame),
+        Mode::AttentionInbox => render_attention_inbox_overlay(app, frame),
         Mode::Terminal => {}
     }
 }

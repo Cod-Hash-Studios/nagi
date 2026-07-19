@@ -123,6 +123,14 @@ pub enum SidebarCollapsedModeConfig {
     Hidden,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UiIconStyleConfig {
+    #[default]
+    Unicode,
+    Ascii,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RightClickPassthroughModifierConfig(Option<KeyModifiers>);
 
@@ -298,6 +306,41 @@ pub struct Config {
     pub advanced: AdvancedConfig,
     pub experimental: ExperimentalConfig,
     pub remote: RemoteConfig,
+    pub providers: ProvidersConfig,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct ProvidersConfig {
+    pub acp: Option<AcpProviderConfig>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct AcpProviderConfig {
+    /// Literal argv for a local ACP stdio agent. No shell is involved.
+    pub command: Vec<String>,
+}
+
+impl AcpProviderConfig {
+    pub(crate) fn endpoint(&self) -> Result<(std::path::PathBuf, Vec<String>), String> {
+        let Some(executable) = self.command.first() else {
+            return Err("providers.acp.command must contain an executable".into());
+        };
+        if executable.is_empty()
+            || executable.contains('\0')
+            || self.command.len() > 257
+            || self.command.iter().skip(1).any(|argument| {
+                argument.is_empty() || argument.len() > 16 * 1024 || argument.contains('\0')
+            })
+        {
+            return Err("providers.acp.command is not a valid bounded argv".into());
+        }
+        Ok((
+            std::path::PathBuf::from(executable),
+            self.command.iter().skip(1).cloned().collect(),
+        ))
+    }
 }
 
 #[derive(Debug)]
@@ -784,6 +827,8 @@ pub struct UiConfig {
     pub sidebar_collapsed_mode: SidebarCollapsedModeConfig,
     /// Terminal width at or below which Nagi uses the mobile single-column layout. Default: 64.
     pub mobile_width_threshold: u16,
+    /// Portable icon style. Default: unicode; ASCII never requires a special font.
+    pub icon_style: UiIconStyleConfig,
     /// Capture mouse input for Nagi's mouse UI. Default: true.
     pub mouse_capture: bool,
     /// Copy text selected with the mouse. Default: true.
@@ -992,6 +1037,7 @@ impl Default for UiConfig {
             sidebar_max_width: 36,
             sidebar_collapsed_mode: SidebarCollapsedModeConfig::Compact,
             mobile_width_threshold: DEFAULT_MOBILE_WIDTH_THRESHOLD,
+            icon_style: UiIconStyleConfig::Unicode,
             mouse_capture: true,
             copy_on_select: true,
             host_cursor: HostCursorModeConfig::Auto,
@@ -1643,6 +1689,13 @@ delay_seconds = {}
             config.advanced.scrollback_limit_bytes,
             DEFAULT_SCROLLBACK_LIMIT_BYTES
         );
+    }
+
+    #[test]
+    fn icon_style_defaults_to_unicode_and_accepts_ascii() {
+        assert_eq!(Config::default().ui.icon_style, UiIconStyleConfig::Unicode);
+        let config: Config = toml::from_str("[ui]\nicon_style = \"ascii\"\n").unwrap();
+        assert_eq!(config.ui.icon_style, UiIconStyleConfig::Ascii);
     }
 
     #[test]

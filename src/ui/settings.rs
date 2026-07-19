@@ -361,17 +361,28 @@ fn render_settings_integrations(app: &AppState, frame: &mut Frame, area: Rect) {
 }
 
 fn render_settings_theme(app: &AppState, frame: &mut Frame, area: Rect) {
-    use crate::app::state::THEME_NAMES;
-
     let p = &app.palette;
-    let items: Vec<ListItem> = THEME_NAMES
+    let tokens = super::design::tokens::UiTokens::from(p);
+    let [list_area, preview_area] =
+        Layout::horizontal([Constraint::Percentage(42), Constraint::Percentage(58)])
+            .areas::<2>(area);
+    let names = app.available_theme_names();
+    let icons = super::design::icons::IconSet::from(app.icon_style);
+    let items: Vec<ListItem> = names
         .iter()
         .map(|name| {
             let is_current = name.to_lowercase().replace([' ', '_'], "-")
                 == app.theme_name.to_lowercase().replace([' ', '_'], "-");
-            let marker = if is_current { " ✓" } else { "" };
+            let marker = if is_current {
+                match icons {
+                    super::design::icons::IconSet::Unicode => " ✓",
+                    super::design::icons::IconSet::Ascii => " +",
+                }
+            } else {
+                ""
+            };
             ListItem::new(Line::from(vec![
-                Span::styled(*name, Style::default().fg(p.subtext0)),
+                Span::styled(name.clone(), Style::default().fg(p.subtext0)),
                 Span::styled(marker, Style::default().fg(p.green)),
             ]))
         })
@@ -380,15 +391,111 @@ fn render_settings_theme(app: &AppState, frame: &mut Frame, area: Rect) {
     let list = List::new(items)
         .highlight_style(
             Style::default()
-                .bg(p.surface0)
-                .fg(p.text)
+                .fg(tokens.text)
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol(" ▸ ")
-        .style(Style::default().fg(p.subtext0));
+        .highlight_symbol(match icons {
+            super::design::icons::IconSet::Unicode => "▏ ",
+            super::design::icons::IconSet::Ascii => "> ",
+        })
+        .style(Style::default().fg(tokens.text_muted));
 
     let mut state = ListState::default().with_selected(Some(app.settings.list.selected));
-    frame.render_stateful_widget(list, area, &mut state);
+    frame.render_stateful_widget(list, list_area, &mut state);
+    render_theme_preview(app, frame, preview_area);
+}
+
+fn render_theme_preview(app: &AppState, frame: &mut Frame, area: Rect) {
+    if area.width < 8 || area.height == 0 {
+        return;
+    }
+    let p = &app.palette;
+    let tokens = super::design::tokens::UiTokens::from(p);
+    let icons = super::design::icons::IconSet::from(app.icon_style);
+    let semantic_icon = |icon: super::design::icons::SemanticIcon| icon.glyph(icons);
+    let divider = Rect::new(area.x, area.y, 1, area.height);
+    let divider_glyph = match icons {
+        super::design::icons::IconSet::Unicode => "│",
+        super::design::icons::IconSet::Ascii => "|",
+    };
+    frame.render_widget(
+        Paragraph::new(
+            (0..area.height)
+                .map(|_| Line::from(divider_glyph))
+                .collect::<Vec<_>>(),
+        )
+        .style(Style::default().fg(tokens.border)),
+        divider,
+    );
+    let content = Rect::new(
+        area.x.saturating_add(2),
+        area.y,
+        area.width.saturating_sub(2),
+        area.height,
+    );
+    let mut lines = vec![
+        Line::from(Span::styled(
+            app.theme_name.clone(),
+            Style::default()
+                .fg(tokens.text)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::default(),
+        Line::from(vec![
+            Span::styled(
+                format!(
+                    "{} ",
+                    semantic_icon(super::design::icons::SemanticIcon::FocusRail)
+                ),
+                Style::default().fg(tokens.focus),
+            ),
+            Span::styled(
+                "selected mission",
+                Style::default()
+                    .fg(tokens.text)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        super::components::state_badge::line(
+            super::components::state_badge::StateBadgeKind::Attention,
+            tokens,
+            icons,
+        ),
+        super::components::state_badge::line(
+            super::components::state_badge::StateBadgeKind::Working,
+            tokens,
+            icons,
+        ),
+        super::components::state_badge::line(
+            super::components::state_badge::StateBadgeKind::ProofFresh,
+            tokens,
+            icons,
+        ),
+        super::components::state_badge::line(
+            super::components::state_badge::StateBadgeKind::ProofStale,
+            tokens,
+            icons,
+        ),
+        super::components::progress_steps::line(
+            "acceptance criteria",
+            2,
+            3,
+            tokens,
+            icons,
+            content.width,
+        ),
+        Line::default(),
+        Line::from(Span::styled(
+            "Primary text",
+            Style::default().fg(tokens.text),
+        )),
+        Line::from(Span::styled(
+            "Secondary context",
+            Style::default().fg(tokens.text_muted),
+        )),
+    ];
+    lines.truncate(content.height as usize);
+    frame.render_widget(Paragraph::new(lines), content);
 }
 
 fn render_settings_toggle(
@@ -527,5 +634,62 @@ mod tests {
             .collect::<String>();
 
         assert!(rendered.contains("switch to ascii input source in prefix (macOS) [✓]"));
+    }
+
+    #[test]
+    fn theme_settings_preview_every_semantic_mission_state() {
+        let mut app = AppState::test_new();
+        app.settings.section = SettingsSection::Theme;
+        app.mode = Mode::Settings;
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+
+        terminal
+            .draw(|frame| render_settings_overlay(&app, frame, Rect::new(0, 0, 80, 24)))
+            .unwrap();
+
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        for label in [
+            "selected mission",
+            "NEEDS YOU",
+            "WORKING",
+            "PROOF FRESH",
+            "PROOF STALE",
+            "Primary text",
+            "Secondary context",
+        ] {
+            assert!(rendered.contains(label), "missing preview label: {label}");
+        }
+    }
+
+    #[test]
+    fn custom_file_theme_is_visible_in_the_appearance_list() {
+        let mut app = AppState::test_new();
+        app.theme_runtime
+            .file_palettes
+            .insert("forest-calm".to_string(), app.palette.clone());
+        app.theme_name = "forest-calm".to_string();
+        app.settings.section = SettingsSection::Theme;
+        app.settings.list.selected = app.available_theme_names().len() - 1;
+        app.mode = Mode::Settings;
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+
+        terminal
+            .draw(|frame| render_settings_overlay(&app, frame, Rect::new(0, 0, 80, 24)))
+            .unwrap();
+
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(rendered.contains("forest-calm"));
     }
 }

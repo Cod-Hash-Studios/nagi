@@ -138,7 +138,25 @@ pub struct Palette {
 }
 
 impl Palette {
-    /// Catppuccin Mocha — the default.
+    /// Nagi Night - calm ink surfaces with clear proof and attention states.
+    pub fn nagi_night() -> Self {
+        if let Some(palette) = crate::theme::builtins::palette("nagi-night") {
+            palette
+        } else {
+            Self::catppuccin()
+        }
+    }
+
+    /// Nagi Dawn - warm paper surfaces with deep indigo focus.
+    pub fn nagi_dawn() -> Self {
+        if let Some(palette) = crate::theme::builtins::palette("nagi-dawn") {
+            palette
+        } else {
+            Self::catppuccin_latte()
+        }
+    }
+
+    /// Catppuccin Mocha - the default.
     pub fn catppuccin() -> Self {
         Self {
             accent: Color::Rgb(137, 180, 250), // blue
@@ -537,6 +555,8 @@ impl Palette {
     /// Resolve a theme by name. Returns None for unknown names.
     pub fn from_name(name: &str) -> Option<Self> {
         match name.to_lowercase().replace([' ', '_'], "-").as_str() {
+            "nagi" | "nagi-night" | "night" => Some(Self::nagi_night()),
+            "nagi-dawn" => Some(Self::nagi_dawn()),
             "catppuccin" | "catppuccin-mocha" => Some(Self::catppuccin()),
             "catppuccin-latte" | "latte" | "light" => Some(Self::catppuccin_latte()),
             "terminal" => Some(Self::terminal()),
@@ -811,6 +831,12 @@ pub enum Mode {
     GlobalMenu,
     KeybindHelp,
     Navigator,
+    CommandPalette,
+    MissionInspector,
+    MissionHandoff,
+    NewMission,
+    ProofReview,
+    AttentionInbox,
 }
 
 impl Mode {
@@ -829,6 +855,11 @@ impl Mode {
             Mode::Prefix
                 | Mode::Navigate
                 | Mode::Navigator
+                | Mode::CommandPalette
+                | Mode::MissionInspector
+                | Mode::MissionHandoff
+                | Mode::ProofReview
+                | Mode::AttentionInbox
                 | Mode::Copy
                 | Mode::Resize
                 | Mode::ConfirmClose
@@ -842,6 +873,12 @@ impl Mode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NavigatorTarget {
+    MissionProject {
+        repository_path: String,
+    },
+    Mission {
+        mission_id: String,
+    },
     Workspace {
         ws_idx: usize,
     },
@@ -856,8 +893,18 @@ pub(crate) enum NavigatorTarget {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum NavigatorRowId {
+    MissionProject(String),
+    Mission(String),
+    Workspace(String),
+    Tab(String),
+    Pane(PaneId),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NavigatorRow {
+    pub id: NavigatorRowId,
     pub target: NavigatorTarget,
     pub depth: u8,
     pub label: String,
@@ -879,10 +926,19 @@ pub(crate) enum NavigatorStateFilter {
     Done,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum CockpitScope {
+    Missions,
+    #[default]
+    Sessions,
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct NavigatorState {
+    pub scope: CockpitScope,
     pub query: String,
     pub selected: usize,
+    pub selected_id: Option<NavigatorRowId>,
     pub scroll: usize,
     pub search_focused: bool,
     pub state_filter: Option<NavigatorStateFilter>,
@@ -1001,6 +1057,8 @@ impl ExperimentSetting {
 
 /// All built-in theme names in display order.
 pub const THEME_NAMES: &[&str] = &[
+    "nagi-night",
+    "nagi-dawn",
     "catppuccin",
     "catppuccin-latte",
     "terminal",
@@ -1081,6 +1139,8 @@ pub struct ThemeRuntimeConfig {
     pub auto_switch: bool,
     pub custom: Option<crate::config::CustomThemeColors>,
     pub legacy_accent: Option<String>,
+    pub file_palettes: std::collections::HashMap<String, Palette>,
+    pub theme_file_diagnostics: Vec<String>,
 }
 
 pub struct SettingsState {
@@ -1343,6 +1403,23 @@ pub struct KeybindHelpState {
     pub scroll: u16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AttentionAnswerDraft {
+    pub(crate) question_index: usize,
+    pub(crate) input: String,
+    pub(crate) answers: std::collections::BTreeMap<String, Vec<String>>,
+}
+
+impl AttentionAnswerDraft {
+    pub(crate) fn new() -> Self {
+        Self {
+            question_index: 0,
+            input: String::new(),
+            answers: std::collections::BTreeMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarWidthSource {
     ConfigDefault,
@@ -1356,6 +1433,80 @@ pub(crate) struct PaneFocusTarget {
     pub pane_id: PaneId,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum NewMissionStep {
+    Objective,
+    Criteria,
+    ProofCommand,
+    Provider,
+    Confirm,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NewMissionDraft {
+    pub(crate) step: NewMissionStep,
+    pub(crate) repository_path: std::path::PathBuf,
+    pub(crate) recipe: crate::project_recipe::ProjectRecipe,
+    pub(crate) project_recipe_summary: Option<String>,
+    pub(crate) objective: String,
+    pub(crate) criteria: String,
+    pub(crate) proof_command: String,
+    pub(crate) provider_index: usize,
+    pub(crate) workspace_write_confirmed: bool,
+    pub(crate) error: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct NewMissionLaunchRequest {
+    pub(crate) create: crate::api::schema::MissionCreateParams,
+    pub(crate) configure: crate::api::schema::MissionConfigureParams,
+    pub(crate) start: crate::api::schema::MissionStartParams,
+    /// Set only by the local interactive confirmation step. This capability is
+    /// deliberately absent from the public socket contract.
+    pub(crate) workspace_write_confirmed: bool,
+    pub(crate) branch: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct MissionHandoffDraft {
+    pub(crate) mission_id: String,
+    pub(crate) source_provider: crate::api::schema::MissionProvider,
+    pub(crate) target_provider: crate::api::schema::MissionProvider,
+    pub(crate) artifact: Option<crate::api::schema::MissionHandoffArtifactV1>,
+    pub(crate) workspace_write_confirmed: bool,
+    pub(crate) loading: bool,
+    pub(crate) error: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct MissionHandoffLaunchRequest {
+    pub(crate) params: crate::api::schema::MissionHandoffStartParams,
+    /// Set only by the local interactive confirmation step.
+    pub(crate) workspace_write_confirmed: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PluginInspectorTabRef {
+    pub(crate) plugin_id: String,
+    pub(crate) tab_id: String,
+    pub(crate) title: String,
+    pub(crate) source: String,
+}
+
+impl PluginInspectorTabRef {
+    pub(crate) fn key(&self) -> String {
+        format!("{}:{}", self.plugin_id, self.tab_id)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PluginInspectorRefreshRequest {
+    pub(crate) mission_id: String,
+    pub(crate) plugin_id: String,
+    pub(crate) tab_id: String,
+    pub(crate) source: String,
+}
+
 /// All application state — pure data, no channels or async runtime.
 /// Testable without PTYs or a tokio runtime.
 pub struct AppState {
@@ -1366,6 +1517,12 @@ pub struct AppState {
     pub(crate) pane_id_aliases: std::collections::HashMap<u32, PaneId>,
     pub(crate) public_pane_id_aliases: std::collections::HashMap<String, PaneId>,
     pub workspaces: Vec<Workspace>,
+    /// Read-only mission projection supplied by the single-writer server.
+    /// TUI interactions submit intents; they never mutate mission authority here.
+    pub(crate) mission_views: Vec<crate::api::schema::MissionViewV1>,
+    pub(crate) attention_items: Vec<crate::api::schema::AttentionItemV1>,
+    pub(crate) selected_mission_id: Option<String>,
+    pub(crate) selected_attention_id: Option<String>,
     pub active: Option<usize>,
     pub(crate) previous_pane_focus: Option<PaneFocusTarget>,
     pub selected: usize,
@@ -1386,6 +1543,12 @@ pub struct AppState {
     pub request_submit_worktree_open: bool,
     pub request_submit_worktree_remove: bool,
     pub request_reload_config: bool,
+    pub(crate) request_attention_response: Option<crate::api::schema::MissionRespondParams>,
+    pub(crate) request_mission_close: Option<crate::api::schema::MissionTarget>,
+    pub(crate) request_new_mission: Option<NewMissionLaunchRequest>,
+    pub(crate) request_mission_handoff_preview:
+        Option<crate::api::schema::MissionHandoffPreviewParams>,
+    pub(crate) request_mission_handoff_start: Option<MissionHandoffLaunchRequest>,
     /// Set when the headless server should ask attached clients to reload
     /// their client-local sound config from disk.
     pub request_client_config_reload: bool,
@@ -1407,6 +1570,23 @@ pub struct AppState {
     pub product_announcement: Option<ProductAnnouncementState>,
     pub keybind_help: KeybindHelpState,
     pub navigator: NavigatorState,
+    pub(crate) command_palette: super::command_palette::CommandPaletteState,
+    pub(crate) mission_inspector_scroll: usize,
+    pub(crate) mission_inspector_tab: usize,
+    pub(crate) request_plugin_inspector_refresh: Option<PluginInspectorRefreshRequest>,
+    pub(crate) plugin_inspector_active_key: Option<String>,
+    pub(crate) plugin_inspector_log_id: Option<String>,
+    pub(crate) plugin_inspector_document: Option<crate::api::schema::PluginUiDocumentV1>,
+    pub(crate) plugin_inspector_error: Option<String>,
+    pub(crate) proof_review_selected: usize,
+    pub(crate) proof_review_scroll: usize,
+    pub(crate) attention_selected: usize,
+    pub(crate) attention_scroll: usize,
+    pub(crate) attention_answer_input: Option<AttentionAnswerDraft>,
+    pub(crate) attention_error: Option<String>,
+    pub(crate) mission_action_error: Option<String>,
+    pub(crate) new_mission: Option<NewMissionDraft>,
+    pub(crate) mission_handoff: Option<MissionHandoffDraft>,
     pub copy_mode: Option<CopyModeState>,
     pub workspace_scroll: usize,
     pub agent_panel_scroll: usize,
@@ -1441,6 +1621,7 @@ pub struct AppState {
     pub sidebar_min_width: u16,
     pub sidebar_max_width: u16,
     pub mobile_width_threshold: u16,
+    pub icon_style: crate::config::UiIconStyleConfig,
     pub sidebar_width_source: SidebarWidthSource,
     pub sidebar_width_auto: bool,
     pub sidebar_collapsed: bool,
@@ -1545,6 +1726,54 @@ pub struct AppState {
 impl AppState {
     pub(crate) fn mark_session_dirty(&mut self) {
         self.session_dirty = true;
+    }
+
+    pub(crate) fn mission_plugin_inspector_tabs(&self) -> Vec<PluginInspectorTabRef> {
+        let mut tabs = self
+            .installed_plugins
+            .values()
+            .filter(|plugin| plugin.enabled && plugin.manifest_version == 2)
+            .flat_map(|plugin| {
+                plugin
+                    .inspector_tabs
+                    .iter()
+                    .map(|tab| PluginInspectorTabRef {
+                        plugin_id: plugin.plugin_id.clone(),
+                        tab_id: tab.id.clone(),
+                        title: tab.title.clone(),
+                        source: tab.source.clone(),
+                    })
+            })
+            .collect::<Vec<_>>();
+        tabs.sort_by(|left, right| {
+            left.plugin_id
+                .cmp(&right.plugin_id)
+                .then_with(|| left.tab_id.cmp(&right.tab_id))
+        });
+        tabs
+    }
+
+    pub(crate) fn available_theme_names(&self) -> Vec<String> {
+        let mut names = THEME_NAMES
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect::<Vec<_>>();
+        let mut file_names = self
+            .theme_runtime
+            .file_palettes
+            .keys()
+            .filter(|name| !THEME_NAMES.contains(&name.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        file_names.sort();
+        names.extend(file_names);
+        names
+    }
+
+    pub(crate) fn base_palette_for_theme_name(&self, name: &str) -> Option<Palette> {
+        let normalized = name.to_lowercase().replace([' ', '_'], "-");
+        Palette::from_name(&normalized)
+            .or_else(|| self.theme_runtime.file_palettes.get(&normalized).cloned())
     }
 
     pub(crate) fn remove_alias_shadowed_by_new_pane(&mut self, pane_id: PaneId) {
@@ -1739,6 +1968,10 @@ impl AppState {
             pane_id_aliases: std::collections::HashMap::new(),
             public_pane_id_aliases: std::collections::HashMap::new(),
             workspaces: Vec::new(),
+            mission_views: Vec::new(),
+            attention_items: Vec::new(),
+            selected_mission_id: None,
+            selected_attention_id: None,
             active: None,
             previous_pane_focus: None,
             selected: 0,
@@ -1756,6 +1989,11 @@ impl AppState {
             request_submit_worktree_open: false,
             request_submit_worktree_remove: false,
             request_reload_config: false,
+            request_attention_response: None,
+            request_mission_close: None,
+            request_new_mission: None,
+            request_mission_handoff_preview: None,
+            request_mission_handoff_start: None,
             request_client_config_reload: false,
             request_clipboard_write: None,
             creating_new_tab: false,
@@ -1773,6 +2011,23 @@ impl AppState {
             product_announcement: None,
             keybind_help: KeybindHelpState { scroll: 0 },
             navigator: NavigatorState::default(),
+            command_palette: super::command_palette::CommandPaletteState::default(),
+            mission_inspector_scroll: 0,
+            mission_inspector_tab: 0,
+            request_plugin_inspector_refresh: None,
+            plugin_inspector_active_key: None,
+            plugin_inspector_log_id: None,
+            plugin_inspector_document: None,
+            plugin_inspector_error: None,
+            proof_review_selected: 0,
+            proof_review_scroll: 0,
+            attention_selected: 0,
+            attention_scroll: 0,
+            attention_answer_input: None,
+            attention_error: None,
+            mission_action_error: None,
+            new_mission: None,
+            mission_handoff: None,
             copy_mode: None,
             workspace_scroll: 0,
             agent_panel_scroll: 0,
@@ -1817,6 +2072,7 @@ impl AppState {
             sidebar_min_width: 18,
             sidebar_max_width: 36,
             mobile_width_threshold: crate::config::DEFAULT_MOBILE_WIDTH_THRESHOLD,
+            icon_style: crate::config::UiIconStyleConfig::Unicode,
             sidebar_width_source: SidebarWidthSource::ConfigDefault,
             sidebar_width_auto: false,
             sidebar_collapsed: false,
@@ -1858,15 +2114,17 @@ impl AppState {
             toast_config: ToastConfig::default(),
             keybinds: Keybinds::default(),
             spinner_tick: 0,
-            palette: Palette::catppuccin(),
-            theme_name: "catppuccin".to_string(),
+            palette: Palette::nagi_night(),
+            theme_name: "nagi-night".to_string(),
             theme_runtime: ThemeRuntimeConfig {
-                manual_name: "catppuccin".to_string(),
-                dark_name: "catppuccin".to_string(),
-                light_name: "catppuccin-latte".to_string(),
+                manual_name: "nagi-night".to_string(),
+                dark_name: "nagi-night".to_string(),
+                light_name: "nagi-dawn".to_string(),
                 auto_switch: false,
                 custom: None,
                 legacy_accent: None,
+                file_palettes: std::collections::HashMap::new(),
+                theme_file_diagnostics: Vec::new(),
             },
             host_terminal_appearance: None,
             host_terminal_appearance_explicit: false,
@@ -2293,6 +2551,11 @@ mod tests {
                 "theme should resolve: {name}"
             );
         }
+    }
+
+    #[test]
+    fn nagi_theme_alias_resolves_to_night() {
+        assert_eq!(Palette::from_name("nagi"), Some(Palette::nagi_night()));
     }
 
     #[test]

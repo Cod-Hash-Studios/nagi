@@ -1,0 +1,46 @@
+[meta]
+name = "Nagi Dawn"
+schema = 1
+appearance = "light"
+
+[palette]
+canvas = "#f4f0e8"
+panel = "#ece6da"
+canvas_dim = "#efeadf"
+border = "#dad2c4"
+ink = "#171918"
+muted = "#5f5b55"
+faint = "#6f6a62"
+indigo = "#17365d"
+vermilion = "#b8382f"
+blue = "#2f6fa8"
+mint = "#2b7d72"
+amber = "#a5662c"
+mauve = "#70507c"
+green = "#3d7a5d"
+yellow = "#9a6b1f"
+
+[semantic]
+canvas = "canvas"
+panel = "panel"
+canvas_dim = "canvas_dim"
+border = "border"
+text = "ink"
+text_muted = "muted"
+text_bright = "muted"
+text_faint = "faint"
+focus = "indigo"
+attention = "vermilion"
+danger = "vermilion"
+working = "blue"
+proof_fresh = "mint"
+proof_stale = "amber"
+special = "mauve"
+done = "green"
+caution = "yellow"
+
+[components]
+border = "soft"
+selection = "rail"
+density = "comfortable"
+motion = "subtle"

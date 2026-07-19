@@ -7,12 +7,28 @@ use ratatui::{
 };
 
 use super::{
+    components::{
+        action_bar,
+        card::{self, Card},
+        empty_state, focus_rail,
+        inspector::{self, Inspector},
+        metric, progress_steps, skeleton,
+        state_badge::{self, StateBadgeKind},
+        surface::{self, SurfaceKind},
+        timeline,
+    },
+    design::{
+        icons::{IconSet, SemanticIcon},
+        tokens::UiTokens,
+    },
     scrollbar::{render_scrollbar, should_show_scrollbar},
-    status::{agent_icon, state_label_color},
+    status::{agent_icon_with_set, state_label_color},
     text::{display_width_u16, middle_elide, truncate_end},
-    widgets::{panel_contrast_fg, render_panel_shell},
+    widgets::render_panel_shell_with_border_set,
 };
-use crate::app::state::{AppState, NavigatorRow, NavigatorStateFilter, NavigatorTarget};
+use crate::app::state::{
+    AppState, CockpitScope, NavigatorRow, NavigatorStateFilter, NavigatorTarget,
+};
 use crate::terminal::TerminalRuntimeRegistry;
 
 pub(super) fn render_navigator_overlay(
@@ -21,8 +37,15 @@ pub(super) fn render_navigator_overlay(
     frame: &mut Frame,
 ) {
     let popup = app.navigator_popup_rect();
-    let Some(inner) = render_panel_shell(frame, popup, app.palette.accent, app.palette.panel_bg)
-    else {
+    let tokens = UiTokens::from(&app.palette);
+    let icons = IconSet::from(app.icon_style);
+    let Some(inner) = render_panel_shell_with_border_set(
+        frame,
+        popup,
+        tokens.focus,
+        tokens.panel,
+        icons.border_set(),
+    ) else {
         return;
     };
 
@@ -66,6 +89,20 @@ struct CockpitCounts {
 
 fn cockpit_counts(app: &AppState) -> CockpitCounts {
     let mut counts = CockpitCounts::default();
+    if app.navigator.scope == CockpitScope::Missions {
+        for mission in &app.mission_views {
+            use crate::api::schema::MissionStatus;
+            match mission.status {
+                MissionStatus::ReviewRequired | MissionStatus::Blocked | MissionStatus::Failed => {
+                    counts.blocked += 1
+                }
+                MissionStatus::Preparing | MissionStatus::Active => counts.working += 1,
+                MissionStatus::ReadyToClose | MissionStatus::Archived => counts.done += 1,
+                MissionStatus::Draft => {}
+            }
+        }
+        return counts;
+    }
     for workspace in &app.workspaces {
         for tab in &workspace.tabs {
             for pane_id in tab.layout.pane_ids() {
@@ -94,7 +131,16 @@ fn render_header(app: &AppState, frame: &mut Frame, area: Rect) {
         return;
     }
     let p = &app.palette;
-    let title = "  NAGI · AGENT COCKPIT";
+    let tokens = UiTokens::from(p);
+    let surface = match app.navigator.scope {
+        CockpitScope::Missions => "MISSION COCKPIT",
+        CockpitScope::Sessions => "SESSION COCKPIT",
+    };
+    let title = if matches!(app.icon_style, crate::config::UiIconStyleConfig::Ascii) {
+        format!("  NAGI | {surface}")
+    } else {
+        format!("  NAGI · {surface}")
+    };
     let counts = cockpit_counts(app);
     let metrics = format!(
         "{} need you   {} working   {} done  ",
@@ -102,45 +148,59 @@ fn render_header(app: &AppState, frame: &mut Frame, area: Rect) {
     );
     let gap = area
         .width
-        .saturating_sub(display_width_u16(title))
+        .saturating_sub(display_width_u16(&title))
         .saturating_sub(display_width_u16(&metrics));
     let mut spans = vec![Span::styled(
         title,
-        Style::default().fg(p.text).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(tokens.text)
+            .add_modifier(Modifier::BOLD),
     )];
     if gap > 0 {
         spans.push(Span::raw(" ".repeat(gap as usize)));
-        spans.push(Span::styled(
-            format!("{} need you", counts.blocked),
-            Style::default().fg(p.red).add_modifier(Modifier::BOLD),
+        spans.extend(metric::spans(
+            counts.blocked,
+            "need you",
+            tokens.attention,
+            tokens,
+            false,
         ));
         spans.push(Span::styled("   ", Style::default()));
-        spans.push(Span::styled(
-            format!("{} working", counts.working),
-            Style::default().fg(p.accent).add_modifier(Modifier::BOLD),
+        spans.extend(metric::spans(
+            counts.working,
+            "working",
+            tokens.working,
+            tokens,
+            false,
         ));
         spans.push(Span::styled("   ", Style::default()));
-        spans.push(Span::styled(
-            format!("{} done  ", counts.done),
-            Style::default().fg(p.green).add_modifier(Modifier::BOLD),
-        ));
+        spans.extend(metric::spans(counts.done, "done", p.green, tokens, false));
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
     let p = &app.palette;
+    let tokens = UiTokens::from(p);
     let focus_style = if app.navigator.search_focused {
-        Style::default().fg(p.accent).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(tokens.focus)
+            .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(p.overlay0)
+        Style::default().fg(tokens.text_muted)
     };
-    let count = app
-        .workspaces
-        .iter()
-        .flat_map(|workspace| workspace.tabs.iter())
-        .map(|tab| tab.panes.len())
-        .sum::<usize>();
+    let (count, noun, placeholder) = match app.navigator.scope {
+        CockpitScope::Missions => (app.mission_views.len(), "missions", "search missions"),
+        CockpitScope::Sessions => (
+            app.workspaces
+                .iter()
+                .flat_map(|workspace| workspace.tabs.iter())
+                .map(|tab| tab.panes.len())
+                .sum::<usize>(),
+            "panes",
+            "search panes",
+        ),
+    };
     let mut spans = vec![Span::styled(" / ", focus_style)];
     let query = app.navigator.query.trim();
     match app.navigator.state_filter {
@@ -176,18 +236,36 @@ fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
             "done",
             app,
         ),
+        None if query.is_empty()
+            && app.navigator.scope == CockpitScope::Missions
+            && app.mission_action_error.is_some() =>
+        {
+            spans.push(Span::styled(
+                format!(
+                    "! {}",
+                    truncate_end(
+                        app.mission_action_error.as_deref().unwrap_or_default(),
+                        area.width.saturating_sub(24) as usize,
+                    )
+                ),
+                Style::default().fg(tokens.attention),
+            ));
+        }
         None if query.is_empty() => spans.push(Span::styled(
-            "search panes",
-            Style::default().fg(p.overlay0),
+            placeholder,
+            Style::default().fg(tokens.text_muted),
         )),
-        None => spans.push(Span::styled(query.to_string(), Style::default().fg(p.text))),
+        None => spans.push(Span::styled(
+            query.to_string(),
+            Style::default().fg(tokens.text),
+        )),
     }
     spans.push(Span::styled(
         format!(
-            "{count:>width$} panes",
+            "{count:>width$} {noun}",
             width = area.width.saturating_sub(16) as usize
         ),
-        Style::default().fg(p.overlay0),
+        Style::default().fg(tokens.text_muted),
     ));
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
@@ -200,7 +278,13 @@ fn push_state_chip(
     label: &'static str,
     app: &AppState,
 ) {
-    let (icon, icon_style) = agent_icon(state, seen, tick, &app.palette);
+    let (icon, icon_style) = agent_icon_with_set(
+        state,
+        seen,
+        tick,
+        &app.palette,
+        IconSet::from(app.icon_style),
+    );
     spans.push(Span::styled(icon, icon_style.add_modifier(Modifier::BOLD)));
     spans.push(Span::raw(" "));
     spans.push(Span::styled(
@@ -215,9 +299,15 @@ fn render_separator(frame: &mut Frame, area: Rect, app: &AppState) {
     if area.height == 0 || area.width == 0 {
         return;
     }
-    let line = "─".repeat(area.width as usize);
+    let glyph = if matches!(app.icon_style, crate::config::UiIconStyleConfig::Ascii) {
+        "-"
+    } else {
+        "─"
+    };
+    let line = glyph.repeat(area.width as usize);
+    let tokens = UiTokens::from(&app.palette);
     frame.render_widget(
-        Paragraph::new(line).style(Style::default().fg(app.palette.surface1)),
+        Paragraph::new(line).style(Style::default().fg(tokens.border)),
         area,
     );
 }
@@ -229,6 +319,20 @@ fn render_rows(
     body: Rect,
 ) {
     let rows = app.navigator_rows_from(terminal_runtimes);
+    if rows.is_empty() {
+        let tokens = UiTokens::from(&app.palette);
+        empty_state::render(
+            frame,
+            body,
+            match app.navigator.scope {
+                CockpitScope::Missions => "No missions match",
+                CockpitScope::Sessions => "No panes match",
+            },
+            Some(("ctrl+u", "clear filter")),
+            tokens,
+        );
+        return;
+    }
     let start = app.navigator.scroll.min(rows.len());
     let end = rows.len().min(start.saturating_add(body.height as usize));
     for (visible_idx, row) in rows[start..end].iter().enumerate() {
@@ -242,59 +346,65 @@ fn render_rows(
 
 fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow, selected: bool) {
     let p = &app.palette;
+    let tokens = UiTokens::from(p);
+    let icons = IconSet::from(app.icon_style);
     frame.render_widget(Clear, rect);
-    let base_style = if selected {
-        Style::default().bg(p.accent).fg(panel_contrast_fg(p))
+    let surface_kind = if selected {
+        SurfaceKind::Elevated
     } else {
-        Style::default().bg(p.panel_bg).fg(p.text)
+        SurfaceKind::Panel
     };
-    let dim_style = if selected {
-        base_style
-    } else {
-        Style::default().fg(p.overlay0).bg(p.panel_bg)
-    };
+    let base_style = surface::style(tokens, surface_kind);
+    let row_background = base_style.bg.unwrap_or(tokens.panel);
+    let dim_style = Style::default().fg(tokens.text_muted).bg(row_background);
     let text_style = if selected {
         base_style.add_modifier(Modifier::BOLD)
     } else if row.is_current {
         Style::default()
-            .fg(p.text)
-            .bg(p.panel_bg)
+            .fg(tokens.text)
+            .bg(row_background)
             .add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(p.subtext0).bg(p.panel_bg)
+        Style::default().fg(tokens.text_muted).bg(row_background)
     };
-    let (status_icon, status_style) = agent_icon(row.status, row.seen, app.spinner_tick, p);
-    let status_style = if selected {
-        base_style.add_modifier(Modifier::BOLD)
-    } else {
-        status_style.bg(p.panel_bg)
-    };
+    let (status_icon, status_style) =
+        agent_icon_with_set(row.status, row.seen, app.spinner_tick, p, icons);
+    let status_style = status_style.bg(row_background);
 
     let prefix = if row.is_workspace {
         if row.expanded {
-            "▾"
+            SemanticIcon::Expanded.glyph(icons)
         } else {
-            "▸"
+            SemanticIcon::Collapsed.glyph(icons)
         }
     } else if row.depth > 0 {
-        "├─"
+        match icons {
+            IconSet::Unicode => "├─",
+            IconSet::Ascii => "|-",
+        }
     } else {
         "  "
     };
-    let current = if row.is_current { "◆" } else { " " };
-    let marker = if selected { "→" } else { " " };
+    let current = if row.is_current {
+        SemanticIcon::Current.glyph(icons)
+    } else {
+        " "
+    };
+    let focus_rail_width = display_width_u16(SemanticIcon::FocusRail.glyph(icons));
     let indent = "  ".repeat(row.depth as usize);
-    let left_fixed = format!(" {indent}{prefix} {marker} {current} ");
+    let navigation_prefix = format!("{indent}{prefix}   {current} ");
+    let left_fixed_width = focus_rail_width.saturating_add(display_width_u16(&navigation_prefix));
     let meta_width = metadata_width(rect.width);
     let left_budget = rect
         .width
         .saturating_sub(meta_width)
-        .saturating_sub(display_width_u16(&left_fixed))
+        .saturating_sub(left_fixed_width)
         .saturating_sub(3) as usize;
     let title = truncate_end(&row.label, left_budget);
 
     let spans = vec![
-        Span::styled(left_fixed, dim_style),
+        focus_rail::span(selected, tokens, icons),
+        Span::styled(navigation_prefix, dim_style),
         Span::styled(status_icon, status_style),
         Span::raw(" "),
         Span::styled(title, text_style),
@@ -308,15 +418,14 @@ fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow,
             meta_width,
             1,
         );
-        let meta = truncate_end(&row.meta, meta_width.saturating_sub(2) as usize);
-        let meta_style = if selected {
-            base_style
-        } else if row.is_workspace || row.is_tab {
-            Style::default().fg(p.overlay0).bg(p.panel_bg)
+        let portable_meta = portable_chrome_text(app, &row.meta);
+        let meta = truncate_end(&portable_meta, meta_width.saturating_sub(2) as usize);
+        let meta_style = if row.is_workspace || row.is_tab {
+            Style::default().fg(tokens.text_muted).bg(row_background)
         } else {
             Style::default()
                 .fg(state_label_color(row.status, row.seen, p))
-                .bg(p.panel_bg)
+                .bg(row_background)
         };
         frame.render_widget(
             Paragraph::new(format!(" {meta}")).style(meta_style),
@@ -354,9 +463,12 @@ fn render_navigator_scrollbar(
         frame,
         metrics,
         track,
-        app.palette.surface_dim,
-        app.palette.overlay0,
-        "▕",
+        UiTokens::from(&app.palette).panel,
+        UiTokens::from(&app.palette).text_muted,
+        match IconSet::from(app.icon_style) {
+            IconSet::Unicode => "▕",
+            IconSet::Ascii => "|",
+        },
     );
 }
 
@@ -381,15 +493,153 @@ fn render_detail(
     if area.height == 0 || area.width == 0 {
         return;
     }
-    render_separator(frame, area, app);
     let detail = selected_detail(app, terminal_runtimes);
     if detail.is_empty() {
         return;
     }
+    if area.height >= 6 {
+        render_inspector(app, terminal_runtimes, frame, area, &detail);
+        return;
+    }
+    if area.height >= 3 {
+        let row = selected_navigator_row(app, terminal_runtimes);
+        let title = row
+            .as_ref()
+            .map(|row| row.label.as_str())
+            .unwrap_or("Selection");
+        let tokens = UiTokens::from(&app.palette);
+        card::render(
+            frame,
+            area,
+            Card {
+                title,
+                body: vec![Line::from(Span::styled(
+                    middle_elide(&detail, area.width.saturating_sub(4) as usize),
+                    Style::default().fg(tokens.text_muted),
+                ))],
+                selected: true,
+            },
+            tokens,
+            IconSet::from(app.icon_style),
+        );
+        return;
+    }
+    render_separator(frame, area, app);
     let text = middle_elide(&detail, area.width.saturating_sub(2) as usize);
     frame.render_widget(
-        Paragraph::new(format!(" {text}")).style(Style::default().fg(app.palette.overlay0)),
+        Paragraph::new(format!(" {text}"))
+            .style(Style::default().fg(UiTokens::from(&app.palette).text_muted)),
         area,
+    );
+}
+
+fn selected_navigator_row(
+    app: &AppState,
+    terminal_runtimes: &TerminalRuntimeRegistry,
+) -> Option<NavigatorRow> {
+    app.navigator_rows_from(terminal_runtimes)
+        .get(app.navigator.selected)
+        .cloned()
+}
+
+fn render_inspector(
+    app: &AppState,
+    terminal_runtimes: &TerminalRuntimeRegistry,
+    frame: &mut Frame,
+    area: Rect,
+    summary: &str,
+) {
+    let Some(row) = selected_navigator_row(app, terminal_runtimes) else {
+        return;
+    };
+    if let NavigatorTarget::Mission { mission_id } = &row.target {
+        render_mission_inspector(app, frame, area, mission_id);
+        return;
+    }
+    if let NavigatorTarget::MissionProject { repository_path } = &row.target {
+        render_mission_project_inspector(app, frame, area, repository_path);
+        return;
+    }
+    let tokens = UiTokens::from(&app.palette);
+    let icons = IconSet::from(app.icon_style);
+    let state = match (row.status, row.seen) {
+        (crate::detect::AgentState::Blocked, _) => {
+            state_badge::line(StateBadgeKind::Attention, tokens, icons)
+        }
+        (crate::detect::AgentState::Working, _) => {
+            state_badge::line(StateBadgeKind::Working, tokens, icons)
+        }
+        (crate::detect::AgentState::Idle, false) => {
+            state_badge::line(StateBadgeKind::ProofFresh, tokens, icons)
+        }
+        (crate::detect::AgentState::Idle, true) => {
+            Line::from(Span::styled("IDLE", Style::default().fg(tokens.text_muted)))
+        }
+        (crate::detect::AgentState::Unknown, _) => Line::from(Span::styled(
+            "SHELL",
+            Style::default().fg(tokens.text_muted),
+        )),
+    };
+    let kind = if row.is_workspace {
+        "Workspace"
+    } else if row.is_tab {
+        "Tab"
+    } else {
+        "Pane"
+    };
+    let mut tail = match (row.status, row.seen) {
+        (crate::detect::AgentState::Working, _) => vec![
+            skeleton::line(
+                area.width.saturating_sub(4),
+                app.spinner_tick,
+                tokens,
+                icons,
+            ),
+            timeline::item("agent", "working now", "live", tokens, icons),
+        ],
+        (crate::detect::AgentState::Blocked, _) => {
+            vec![timeline::item(
+                "agent",
+                "waiting for input",
+                "now",
+                tokens,
+                icons,
+            )]
+        }
+        (crate::detect::AgentState::Idle, false) => {
+            vec![timeline::item("agent", "finished", "new", tokens, icons)]
+        }
+        (crate::detect::AgentState::Idle, true) => {
+            vec![timeline::item("agent", "idle", "live", tokens, icons)]
+        }
+        (crate::detect::AgentState::Unknown, _) => {
+            vec![timeline::item("shell", "attached", "live", tokens, icons)]
+        }
+    };
+    tail.push(Line::from(vec![
+        Span::styled("enter", Style::default().fg(tokens.focus)),
+        Span::styled(
+            " switch to selection",
+            Style::default().fg(tokens.text_muted),
+        ),
+    ]));
+    inspector::render(
+        frame,
+        area,
+        Inspector {
+            eyebrow: kind,
+            title: &row.label,
+            state,
+            summary,
+            facts: vec![
+                ("Type", kind.to_string()),
+                ("State", display_state(row.status, row.seen).to_string()),
+                ("Signal", portable_chrome_text(app, &row.meta)),
+            ],
+            tail,
+        },
+        tokens,
+        icons,
     );
 }
 
@@ -398,16 +648,258 @@ fn selected_detail(app: &AppState, terminal_runtimes: &TerminalRuntimeRegistry) 
     let Some(row) = rows.get(app.navigator.selected) else {
         return String::new();
     };
-    match row.target {
-        NavigatorTarget::Workspace { ws_idx } => workspace_detail(app, terminal_runtimes, ws_idx),
+    let detail = match &row.target {
+        NavigatorTarget::MissionProject { repository_path } => {
+            mission_project_detail(app, repository_path)
+        }
+        NavigatorTarget::Mission { mission_id } => mission_detail(app, mission_id),
+        NavigatorTarget::Workspace { ws_idx } => workspace_detail(app, terminal_runtimes, *ws_idx),
         NavigatorTarget::Tab { ws_idx, tab_idx } => {
-            tab_detail(app, terminal_runtimes, ws_idx, tab_idx)
+            tab_detail(app, terminal_runtimes, *ws_idx, *tab_idx)
         }
         NavigatorTarget::Pane {
             ws_idx,
             tab_idx,
             pane_id,
-        } => pane_detail(app, terminal_runtimes, ws_idx, tab_idx, pane_id),
+        } => pane_detail(app, terminal_runtimes, *ws_idx, *tab_idx, *pane_id),
+    };
+    portable_chrome_text(app, &detail)
+}
+
+fn mission_project_detail(app: &AppState, repository_path: &str) -> String {
+    let count = app
+        .mission_views
+        .iter()
+        .filter(|mission| mission.repository_path == repository_path)
+        .count();
+    format!(
+        "{repository_path}{}{} missions",
+        detail_separator(app),
+        count
+    )
+}
+
+fn mission_detail(app: &AppState, mission_id: &str) -> String {
+    let Some(mission) = app
+        .mission_views
+        .iter()
+        .find(|mission| mission.mission_id == mission_id)
+    else {
+        return String::new();
+    };
+    let mut parts = vec![
+        mission_status_text(mission.status).to_string(),
+        format!(
+            "{} / {} criteria fresh",
+            mission_fresh_criteria(mission),
+            mission.criteria.len()
+        ),
+    ];
+    if let Some(run) = &mission.run {
+        parts.push(mission_provider_text(run.provider).to_string());
+    }
+    parts.push(mission.objective.clone());
+    parts.join(detail_separator(app))
+}
+
+fn mission_fresh_criteria(mission: &crate::api::schema::MissionViewV1) -> usize {
+    mission
+        .criteria
+        .iter()
+        .filter(|criterion| {
+            !criterion.required_check_ids.is_empty()
+                && criterion.required_check_ids.iter().all(|required_id| {
+                    mission.checks.iter().any(|check| {
+                        check.check_id == *required_id
+                            && check.status == crate::api::schema::MissionCheckStatusV1::Passed
+                    })
+                })
+        })
+        .count()
+}
+
+fn mission_status_text(status: crate::api::schema::MissionStatus) -> &'static str {
+    use crate::api::schema::MissionStatus;
+    match status {
+        MissionStatus::Draft => "draft",
+        MissionStatus::Preparing => "preparing",
+        MissionStatus::Active => "working",
+        MissionStatus::ReviewRequired => "review required",
+        MissionStatus::ReadyToClose => "proven",
+        MissionStatus::Blocked => "blocked",
+        MissionStatus::Failed => "failed",
+        MissionStatus::Archived => "archived",
+    }
+}
+
+fn mission_provider_text(provider: crate::api::schema::MissionProvider) -> &'static str {
+    match provider {
+        crate::api::schema::MissionProvider::Codex => "Codex",
+        crate::api::schema::MissionProvider::ClaudeCode => "Claude Code",
+        crate::api::schema::MissionProvider::OpenCode => "OpenCode",
+        crate::api::schema::MissionProvider::Acp => "ACP agent",
+    }
+}
+
+fn mission_status_badge(
+    status: crate::api::schema::MissionStatus,
+    tokens: UiTokens,
+    icons: IconSet,
+) -> Line<'static> {
+    use crate::api::schema::MissionStatus;
+    match status {
+        MissionStatus::Preparing | MissionStatus::Active => {
+            state_badge::line(StateBadgeKind::Working, tokens, icons)
+        }
+        MissionStatus::ReadyToClose | MissionStatus::Archived => {
+            state_badge::line(StateBadgeKind::ProofFresh, tokens, icons)
+        }
+        MissionStatus::Draft => state_badge::line(StateBadgeKind::ProofStale, tokens, icons),
+        MissionStatus::ReviewRequired | MissionStatus::Blocked | MissionStatus::Failed => {
+            state_badge::line(StateBadgeKind::Attention, tokens, icons)
+        }
+    }
+}
+
+fn render_mission_inspector(app: &AppState, frame: &mut Frame, area: Rect, mission_id: &str) {
+    let Some(mission) = app
+        .mission_views
+        .iter()
+        .find(|mission| mission.mission_id == mission_id)
+    else {
+        return;
+    };
+    let tokens = UiTokens::from(&app.palette);
+    let icons = IconSet::from(app.icon_style);
+    let fresh = mission_fresh_criteria(mission);
+    let provider = mission
+        .run
+        .as_ref()
+        .map(|run| mission_provider_text(run.provider).to_string())
+        .unwrap_or_else(|| "not started".to_string());
+    let worktree = mission
+        .run
+        .as_ref()
+        .map(|run| run.worktree_path.clone())
+        .unwrap_or_else(|| mission.repository_path.clone());
+    let mut tail = vec![progress_steps::line(
+        "Acceptance criteria",
+        fresh,
+        mission.criteria.len(),
+        tokens,
+        icons,
+        area.width.saturating_sub(4),
+    )];
+    if mission.unresolved_attention_count > 0 {
+        tail.push(timeline::item(
+            "attention",
+            &format!(
+                "{} unresolved request(s)",
+                mission.unresolved_attention_count
+            ),
+            "now",
+            tokens,
+            icons,
+        ));
+    } else if mission.evidence_pack_digest.is_some() {
+        tail.push(timeline::item(
+            "proof",
+            "evidence pack recorded",
+            "fresh",
+            tokens,
+            icons,
+        ));
+    } else {
+        tail.push(timeline::item(
+            "mission",
+            mission_status_text(mission.status),
+            "current",
+            tokens,
+            icons,
+        ));
+    }
+    tail.push(Line::from(vec![
+        Span::styled("enter", Style::default().fg(tokens.focus)),
+        Span::styled(" open mission", Style::default().fg(tokens.text_muted)),
+        Span::styled("   tab", Style::default().fg(tokens.focus)),
+        Span::styled(" sessions", Style::default().fg(tokens.text_muted)),
+    ]));
+    inspector::render(
+        frame,
+        area,
+        Inspector {
+            eyebrow: "Mission",
+            title: &mission.title,
+            state: mission_status_badge(mission.status, tokens, icons),
+            summary: &mission.objective,
+            facts: vec![
+                ("Provider", provider),
+                (
+                    "Criteria",
+                    format!("{fresh} / {} fresh", mission.criteria.len()),
+                ),
+                ("Attention", mission.unresolved_attention_count.to_string()),
+                ("Worktree", worktree),
+            ],
+            tail,
+        },
+        tokens,
+        icons,
+    );
+}
+
+fn render_mission_project_inspector(
+    app: &AppState,
+    frame: &mut Frame,
+    area: Rect,
+    repository_path: &str,
+) {
+    let missions = app
+        .mission_views
+        .iter()
+        .filter(|mission| mission.repository_path == repository_path)
+        .collect::<Vec<_>>();
+    let tokens = UiTokens::from(&app.palette);
+    let icons = IconSet::from(app.icon_style);
+    let title = std::path::Path::new(repository_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(repository_path);
+    let attention = missions
+        .iter()
+        .filter(|mission| mission.unresolved_attention_count > 0)
+        .count();
+    inspector::render(
+        frame,
+        area,
+        Inspector {
+            eyebrow: "Project",
+            title,
+            state: if attention > 0 {
+                state_badge::line(StateBadgeKind::Attention, tokens, icons)
+            } else {
+                state_badge::line(StateBadgeKind::ProofStale, tokens, icons)
+            },
+            summary: repository_path,
+            facts: vec![
+                ("Missions", missions.len().to_string()),
+                ("Need you", attention.to_string()),
+            ],
+            tail: vec![Line::from(vec![
+                Span::styled("space", Style::default().fg(tokens.focus)),
+                Span::styled(" collapse project", Style::default().fg(tokens.text_muted)),
+            ])],
+        },
+        tokens,
+        icons,
+    );
+}
+
+fn portable_chrome_text(app: &AppState, text: &str) -> String {
+    if matches!(app.icon_style, crate::config::UiIconStyleConfig::Ascii) {
+        text.replace(" · ", " | ").replace('·', "|")
+    } else {
+        text.to_string()
     }
 }
 
@@ -425,7 +917,7 @@ fn workspace_detail(
     if !rowless_workspace_activity(app, terminal_runtimes, ws_idx).is_empty() {
         parts.push(rowless_workspace_activity(app, terminal_runtimes, ws_idx));
     }
-    parts.join(" · ")
+    parts.join(detail_separator(app))
 }
 
 fn tab_detail(
@@ -458,7 +950,7 @@ fn tab_detail(
     {
         parts.push(meta);
     }
-    parts.join(" · ")
+    parts.join(detail_separator(app))
 }
 
 fn pane_detail(
@@ -516,7 +1008,15 @@ fn pane_detail(
             }
         }
     }
-    parts.join(" · ")
+    parts.join(detail_separator(app))
+}
+
+fn detail_separator(app: &AppState) -> &'static str {
+    if matches!(app.icon_style, crate::config::UiIconStyleConfig::Ascii) {
+        " | "
+    } else {
+        " · "
+    }
 }
 
 fn rowless_workspace_activity(
@@ -561,41 +1061,57 @@ fn render_footer(app: &AppState, frame: &mut Frame, area: Rect) {
         return;
     }
     let p = &app.palette;
-    let key = Style::default().fg(p.accent).add_modifier(Modifier::BOLD);
-    let dim = Style::default().fg(p.overlay0);
-    let line = if app.navigator.search_focused {
-        Line::from(vec![
-            Span::styled(" enter", key),
-            Span::styled(" switch  ", dim),
-            Span::styled("↑↓", key),
-            Span::styled(" move  ", dim),
-            Span::styled("ctrl+u", key),
-            Span::styled(" clear  ", dim),
-            Span::styled("esc", key),
-            Span::styled(" back", dim),
-        ])
+    let tokens = UiTokens::from(p);
+    let portable = matches!(app.icon_style, crate::config::UiIconStyleConfig::Ascii);
+    let mut hints = if app.navigator.search_focused {
+        vec![
+            (
+                "enter",
+                if app.navigator.scope == CockpitScope::Missions {
+                    "open"
+                } else {
+                    "switch"
+                },
+            ),
+            (if portable { "up/down" } else { "↑↓" }, "move"),
+            ("ctrl+u", "clear"),
+            ("esc", "back"),
+        ]
     } else {
-        Line::from(vec![
-            Span::styled(" enter", key),
-            Span::styled(" switch  ", dim),
-            Span::styled("/", key),
-            Span::styled(" search  ", dim),
-            Span::styled("b/w/i/d/a", key),
-            Span::styled(" states  ", dim),
-            Span::styled("j/k/↑↓", key),
-            Span::styled(" move  ", dim),
-            Span::styled("esc", key),
-            Span::styled(" close", dim),
-        ])
+        vec![
+            (
+                "enter",
+                if app.navigator.scope == CockpitScope::Missions {
+                    "open"
+                } else {
+                    "switch"
+                },
+            ),
+            (
+                "tab",
+                if app.navigator.scope == CockpitScope::Missions {
+                    "sessions"
+                } else {
+                    "missions"
+                },
+            ),
+            ("/", "search"),
+            ("b/w/i/d/a", "states"),
+            (if portable { "j/k" } else { "j/k/↑↓" }, "move"),
+            ("esc", "close"),
+        ]
     };
-    frame.render_widget(Paragraph::new(line), area);
+    if !app.navigator.search_focused && app.navigator.scope == CockpitScope::Missions {
+        hints.insert(1, ("n", "new mission"));
+    }
+    action_bar::render(frame, area, &hints, tokens);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{detect::Agent, workspace::Workspace};
-    use ratatui::layout::Direction;
+    use ratatui::{backend::TestBackend, layout::Direction, Terminal};
 
     fn cockpit_app() -> AppState {
         let mut app = AppState::test_new();
@@ -682,5 +1198,197 @@ mod tests {
                 done: 1,
             }
         );
+    }
+
+    #[test]
+    fn selected_row_uses_a_focus_rail_without_an_accent_fill() {
+        let mut app = AppState::test_new();
+        app.palette = crate::app::state::Palette::nagi_night();
+        let row = NavigatorRow {
+            id: crate::app::state::NavigatorRowId::Workspace("workspace-1".to_string()),
+            target: NavigatorTarget::Workspace { ws_idx: 0 },
+            depth: 0,
+            label: "calm workspace".to_string(),
+            meta: "1 working".to_string(),
+            status: crate::detect::AgentState::Working,
+            seen: true,
+            is_current: true,
+            is_workspace: true,
+            is_tab: false,
+            expanded: true,
+            search_text: String::new(),
+        };
+        let area = Rect::new(0, 0, 40, 1);
+        let mut terminal = Terminal::new(TestBackend::new(area.width, area.height)).unwrap();
+
+        terminal
+            .draw(|frame| render_row(&app, frame, area, &row, true))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].symbol(), "▏");
+        assert_eq!(buffer[(0, 0)].style().fg, Some(app.palette.accent));
+        assert!((0..area.width).all(|x| buffer[(x, 0)].style().bg == Some(app.palette.surface0)));
+        assert!((0..area.width).all(|x| buffer[(x, 0)].style().bg != Some(app.palette.accent)));
+    }
+
+    #[test]
+    fn selected_row_honors_the_portable_ascii_icon_style() {
+        let mut app = AppState::test_new();
+        app.icon_style = crate::config::UiIconStyleConfig::Ascii;
+        let row = NavigatorRow {
+            id: crate::app::state::NavigatorRowId::Workspace("workspace-1".to_string()),
+            target: NavigatorTarget::Workspace { ws_idx: 0 },
+            depth: 0,
+            label: "portable workspace".to_string(),
+            meta: String::new(),
+            status: crate::detect::AgentState::Unknown,
+            seen: true,
+            is_current: true,
+            is_workspace: true,
+            is_tab: false,
+            expanded: false,
+            search_text: String::new(),
+        };
+        let area = Rect::new(0, 0, 40, 1);
+        let mut terminal = Terminal::new(TestBackend::new(area.width, area.height)).unwrap();
+
+        terminal
+            .draw(|frame| render_row(&app, frame, area, &row, true))
+            .unwrap();
+
+        let rendered = (0..area.width)
+            .map(|column| terminal.backend().buffer()[(column, 0)].symbol())
+            .collect::<String>();
+        assert!(rendered.is_ascii());
+        assert!(rendered.starts_with(">>"));
+        assert!(rendered.contains('*'));
+    }
+
+    fn render_cockpit_at(width: u16, height: u16, ascii: bool) -> String {
+        let mut app = cockpit_app();
+        app.icon_style = if ascii {
+            crate::config::UiIconStyleConfig::Ascii
+        } else {
+            crate::config::UiIconStyleConfig::Unicode
+        };
+        let sidebar_width = width.min(20);
+        app.view.sidebar_rect = Rect::new(0, 0, sidebar_width, height);
+        app.view.terminal_area = Rect::new(
+            sidebar_width,
+            0,
+            width.saturating_sub(sidebar_width),
+            height,
+        );
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|frame| render_navigator_overlay(&app, &TerminalRuntimeRegistry::new(), frame))
+            .unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>()
+    }
+
+    fn mission_cockpit_app() -> AppState {
+        let mut app = AppState::test_new();
+        app.set_mission_views(vec![crate::api::schema::MissionViewV1 {
+            schema_version: crate::api::schema::ContractVersionV1,
+            mission_id: "polish".into(),
+            title: "Polish the cockpit".into(),
+            repository_path: "/repos/nagi".into(),
+            objective: "Make parallel agent work calm and inspectable".into(),
+            criteria: vec![crate::api::schema::MissionCriterionSummaryV1 {
+                criterion_id: Some("a".repeat(64)),
+                description: "Responsive mission cockpit".into(),
+                coverage: crate::api::schema::MissionCriterionCoverageV1::Covered,
+                required_check_ids: vec!["ui".into()],
+            }],
+            closure_configured: true,
+            declared_check_count: 1,
+            checks: vec![crate::api::schema::MissionCheckSummaryV1 {
+                check_id: "ui".into(),
+                kind: crate::api::schema::MissionCheckKindV1::Command,
+                required: true,
+                covered_criterion_ids: vec!["a".repeat(64)],
+                status: crate::api::schema::MissionCheckStatusV1::Passed,
+            }],
+            evidence: Vec::new(),
+            evidence_pack_digest: Some("b".repeat(64)),
+            details_available: true,
+            status: crate::api::schema::MissionStatus::ReadyToClose,
+            run: Some(crate::api::schema::MissionRunViewV1 {
+                run_id: "run-1".into(),
+                provider: crate::api::schema::MissionProvider::OpenCode,
+                mode: crate::api::schema::MissionProviderMode::Managed,
+                worktree_path: "/repos/nagi-worktree".into(),
+                base_revision: "c".repeat(40),
+                execute_declared_checks: true,
+                execute_project_recipe: false,
+                handoff_from_run_id: None,
+                handoff_artifact_sha256: None,
+            }),
+            run_history: Vec::new(),
+            unresolved_attention_count: 0,
+            updated_at_millis: 1,
+        }]);
+        app.view.sidebar_rect = Rect::new(0, 0, 20, 32);
+        app.view.terminal_area = Rect::new(20, 0, 100, 32);
+        app.open_navigator();
+        app.select_navigator_index_from(&TerminalRuntimeRegistry::new(), 1);
+        app
+    }
+
+    #[test]
+    fn mission_cockpit_renders_objective_provider_and_fresh_proof() {
+        let app = mission_cockpit_app();
+        let mut terminal = Terminal::new(TestBackend::new(120, 32)).unwrap();
+        terminal
+            .draw(|frame| render_navigator_overlay(&app, &TerminalRuntimeRegistry::new(), frame))
+            .unwrap();
+        let output = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(output.contains("MISSION COCKPIT"));
+        assert!(output.contains("Polish the cockpit"));
+        assert!(output.contains("Make parallel agent work"));
+        assert!(output.contains("OpenCode"));
+        assert!(output.contains("1 / 1 fresh"));
+    }
+
+    #[test]
+    fn cockpit_renders_at_all_supported_breakpoints() {
+        for (width, height) in [(60, 20), (80, 24), (120, 32), (200, 48)] {
+            let output = render_cockpit_at(width, height, false);
+            assert!(
+                output.contains("NAGI"),
+                "missing header at {width}x{height}"
+            );
+        }
+        let wide = render_cockpit_at(120, 32, false);
+        assert!(wide.contains("CONTEXT"));
+        assert!(wide.contains("ACTIVITY"));
+    }
+
+    #[test]
+    fn complete_cockpit_chrome_is_ascii_in_portable_mode() {
+        let output = render_cockpit_at(120, 32, true);
+        let non_ascii = output
+            .chars()
+            .enumerate()
+            .filter(|(_, character)| !character.is_ascii())
+            .map(|(index, character)| (index % 120, index / 120, character))
+            .collect::<Vec<_>>();
+        assert!(output.is_ascii(), "non-ASCII cockpit glyphs: {non_ascii:?}");
+        assert!(output.contains("NAGI | SESSION COCKPIT"));
+        assert!(output.contains("CONTEXT"));
     }
 }

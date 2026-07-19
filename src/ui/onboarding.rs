@@ -12,7 +12,7 @@ use super::widgets::{
 };
 use crate::app::AppState;
 
-const ONBOARDING_PREFIX_LABEL: &str = "ctrl+b";
+const ONBOARDING_PREFIX_LABEL: &str = "n";
 
 pub(super) fn render_onboarding_overlay(app: &AppState, frame: &mut Frame, area: Rect) {
     super::dim_background(frame, area);
@@ -56,14 +56,14 @@ fn render_onboarding_welcome(app: &AppState, frame: &mut Frame, area: Rect) {
         header_rows[0],
     );
     frame.render_widget(
-        Paragraph::new("  terminal workspace manager for coding agents")
+        Paragraph::new("  calm, isolated agent work with proof at the end")
             .style(Style::default().fg(app.palette.overlay0)),
         header_rows[1],
     );
 
     frame.render_widget(
         Paragraph::new(
-            "  this is a mouse-first terminal.\n  click the sidebar to switch workspaces, drag pane\n  borders to resize, right-click for context menus.",
+            "  Start with the outcome, not a wall of terminals.\n  Nagi creates an isolated checkout, runs your agent,\n  gathers every question, then verifies the result.",
         )
         .style(Style::default().fg(app.palette.overlay1)),
         content_rows[0],
@@ -78,25 +78,27 @@ fn render_onboarding_welcome(app: &AppState, frame: &mut Frame, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            " enters prefix mode · ",
+            " opens your first mission · ",
             Style::default().fg(app.palette.overlay1),
         ),
         Span::styled(
-            "?",
+            "nagi doctor",
             Style::default()
                 .fg(app.palette.accent)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            " shows keybinds and settings",
+            " checks this machine before you start",
             Style::default().fg(app.palette.overlay1),
         ),
     ]);
     frame.render_widget(Paragraph::new(key_line), content_rows[2]);
 
     frame.render_widget(
-        Paragraph::new("  next: install optional agent integrations for more reliable state")
-            .style(Style::default().fg(app.palette.overlay1)),
+        Paragraph::new(
+            "  close means fresh checks passed. Agent output alone is never treated as proof.",
+        )
+        .style(Style::default().fg(app.palette.overlay1)),
         content_rows[3],
     );
 

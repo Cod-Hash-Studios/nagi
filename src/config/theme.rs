@@ -5,7 +5,7 @@ use tracing::warn;
 ///
 /// ```toml
 /// [theme]
-/// name = "tokyo-night"  # built-in: catppuccin, terminal, dracula, nord, etc.
+/// name = "nagi-night"  # built-in: nagi-night, nagi-dawn, catppuccin, etc.
 ///
 /// [theme.custom]        # override individual tokens on top of the base
 /// accent = "#f5c2e7"
@@ -14,7 +14,7 @@ use tracing::warn;
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct ThemeConfig {
-    /// Built-in theme name. Default: "catppuccin".
+    /// Built-in theme name. Default: "nagi-night".
     pub name: Option<String>,
     /// Follow host terminal light/dark appearance and switch between theme names.
     pub auto_switch: bool,

@@ -36,7 +36,9 @@ fn modified_url_click_modifier_matches_terminal_mouse_reporting() {
     assert_eq!(modified_url_click_modifier(), KeyModifiers::CONTROL);
 }
 
+mod command_palette;
 mod copy_mode;
+mod mission;
 mod modal;
 mod mouse;
 mod navigate;
@@ -47,6 +49,11 @@ mod sidebar;
 mod terminal;
 
 pub(crate) use self::{
+    mission::{
+        handle_attention_inbox_key, handle_mission_handoff_key, handle_mission_inspector_key,
+        handle_new_mission_key, handle_proof_review_key, insert_attention_answer_text,
+        insert_new_mission_text, open_new_mission,
+    },
     modal::{
         handle_global_menu_key, handle_keybind_help_key, handle_navigator_key,
         insert_navigator_search_text, insert_rename_input_text,
@@ -54,7 +61,6 @@ pub(crate) use self::{
     navigate::{
         terminal_direct_indexed_navigation_action, terminal_direct_non_indexed_navigation_action,
     },
-    settings::open_settings_at,
 };
 use self::{
     modal::{
@@ -110,6 +116,19 @@ impl App {
                 Mode::KeybindHelp => handle_keybind_help_key(&mut self.state, key_event),
                 Mode::Navigator => {
                     handle_navigator_key(&mut self.state, &self.terminal_runtimes, key_event)
+                }
+                Mode::CommandPalette => self.dispatch_command_palette_key(key_event),
+                Mode::MissionInspector => {
+                    mission::handle_mission_inspector_key(&mut self.state, key_event);
+                    self.process_plugin_inspector_refresh_request();
+                }
+                Mode::MissionHandoff => {
+                    mission::handle_mission_handoff_key(&mut self.state, key_event)
+                }
+                Mode::NewMission => mission::handle_new_mission_key(&mut self.state, key_event),
+                Mode::ProofReview => mission::handle_proof_review_key(&mut self.state, key_event),
+                Mode::AttentionInbox => {
+                    mission::handle_attention_inbox_key(&mut self.state, key_event)
                 }
                 Mode::Terminal => unreachable!(),
             },
@@ -169,6 +188,12 @@ impl App {
                 insert_navigator_search_text(&mut self.state, &self.terminal_runtimes, text);
                 true
             }
+            Mode::CommandPalette => {
+                command_palette::insert_command_palette_text(&mut self.state, text);
+                true
+            }
+            Mode::NewMission => insert_new_mission_text(&mut self.state, text),
+            Mode::AttentionInbox => insert_attention_answer_text(&mut self.state, text),
             Mode::Copy => {
                 let Some(prompt) = self
                     .state
@@ -189,12 +214,12 @@ impl App {
 
     pub(crate) fn handle_onboarding_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Right | KeyCode::Char('l') => self.open_settings_from_onboarding(),
+            KeyCode::Right | KeyCode::Char('l') => self.complete_onboarding_to_mission(),
             _ => {
                 if let Some(ModalAction::Continue) =
                     modal_action_from_key(&key, ONBOARDING_WELCOME_ACTIONS)
                 {
-                    self.open_settings_from_onboarding();
+                    self.complete_onboarding_to_mission();
                 }
             }
         }
@@ -606,6 +631,8 @@ pub(crate) fn modal_paste_target_active(state: &AppState) -> bool {
             .as_ref()
             .is_some_and(|open| open.search_focused),
         Mode::Navigator => state.navigator.search_focused,
+        Mode::CommandPalette => true,
+        Mode::AttentionInbox => state.attention_answer_input.is_some(),
         Mode::Copy => state
             .copy_mode
             .as_ref()
