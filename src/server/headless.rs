@@ -6719,6 +6719,10 @@ fn seed_startup_workspace_if_empty(app: &mut app::App) {
         return;
     };
 
+    seed_startup_workspace(app, cwd);
+}
+
+fn seed_startup_workspace(app: &mut app::App, cwd: PathBuf) {
     if !app.state.workspaces.is_empty() {
         info!(
             cwd = %cwd.display(),
@@ -6727,8 +6731,20 @@ fn seed_startup_workspace_if_empty(app: &mut app::App) {
         return;
     }
 
+    let previous_mode = app.state.mode;
+    let preserve_mode = matches!(
+        previous_mode,
+        app::Mode::Onboarding
+            | app::Mode::ReleaseNotes
+            | app::Mode::ProductAnnouncement
+            | app::Mode::Settings
+    );
+
     match app.create_workspace_with_options(cwd.clone(), true) {
         Ok(_) => {
+            if preserve_mode {
+                app.state.mode = previous_mode;
+            }
             info!(cwd = %cwd.display(), "created startup workspace");
         }
         Err(err) => {
@@ -9627,6 +9643,17 @@ next_tab = ""
 
         assert_eq!(server.app.state.mode, crate::app::Mode::NewMission);
         assert!(server.app.state.new_mission.is_some());
+    }
+
+    #[tokio::test]
+    async fn startup_workspace_preserves_first_run_onboarding() {
+        let mut server = test_headless_server();
+        assert_eq!(server.app.state.mode, crate::app::Mode::Onboarding);
+
+        seed_startup_workspace(&mut server.app, std::env::temp_dir());
+
+        assert_eq!(server.app.state.mode, crate::app::Mode::Onboarding);
+        assert_eq!(server.app.state.workspaces.len(), 1);
     }
 
     #[test]
