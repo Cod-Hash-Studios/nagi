@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: proof-review
+# theme: terminal-16
+# size: 60x20
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 752ac09ac8fbf19c3f80f42e2f2955c6b73c716bf392fd49f693fd0be0d974e0
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ no agents                                        │ switch
+   +----------------------------------------------------+
+   |PROOF REVIEW  Fix login redirect                    |
+   |READY TO CLOSE  1 required check(s) · 0 unresolved a|
+   |----------------------------------------------------|
+   |> PASS      tests  required                         |
+   |                                                    |
+   |                                                    |
+   |                                                    |
+   |                                                    |
+   |                                                    |
+   |SELECTED EVIDENCE  -                                |
+   |Workspace  ccccccccccccccccccc…cccccccccccccccccccc |
+   |Artifacts  1   Recorded  110                        |
+   |                                                    |
+   |j/k select  c recheck + close  esc mission          |
+   +----------------------------------------------------+
+
+

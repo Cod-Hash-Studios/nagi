@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: proof-review
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: a63bb9d8784f8f11285dfac7a050dd40a8cf38880fb1e1d0645cba34bbd798c4
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main+--------------------------------------------------------------------------------------------------------+
+ · miss|PROOF REVIEW  Fix login redirect                                                                        |
+   main|READY TO CLOSE  1 required check(s) · 0 unresolved attention                                            |
+ · miss|--------------------------------------------------------------------------------------------------------|
+   main|> PASS      tests  required                                                                             |
+ · miss|                                                                                                        |
+   main|                                                                                                        |
+ · miss|                                                                                                        |
+   main|                                                                                                        |
+ · miss|                                                                                                        |
+   main|                                                                                                        |
+       |                                                                                                        |
+ new   |                                                                                                        |
+───────|                                                                                                        |
+ agents|                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |SELECTED EVIDENCE  -                                                                                    |
+       |Workspace  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc                             |
+       |Artifacts  1   Recorded  110                                                                            |
+       |                                                                                                        |
+       |j/k select  c recheck + close  esc mission                                                              |
+       +--------------------------------------------------------------------------------------------------------+
+                         │
+                         │
+                        «│

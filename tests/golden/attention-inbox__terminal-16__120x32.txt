@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: attention-inbox
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 42d9b83a67536161fc21c7d354d7f8b639f9b4b559cad68fd6475e1724570851
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main+--------------------------------------------------------------------------------------------------------+
+ · miss|ATTENTION INBOX  1 open · 1 delivery uncertain                                                          |
+   main|One place for provider questions and scoped consent                                                     |
+ · miss|--------------------------------------------------------------------------------------------------------|
+   main|> HIGH     Confirm whether the inter…        | PERMISSION REQUEST  HIGH                                 |
+ · miss|   mission-3 · OpenCode · delivery uncertain | Confirm whether the interrupted deployment was applied   |
+   main|  CRITICAL Allow the release agent t…        |                                                          |
+ · miss|   mission-3 · OpenCode · open               | WHY AND SCOPE  -                                         |
+   main|                                             | One GitHub release for the current immutable commit      |
+ · miss|                                             |                                                          |
+   main|                                             | Mission    mission-3                                     |
+       |                                             | Provider   OpenCode                                      |
+ new   |                                             | State      delivery uncertain                            |
+───────|                                             | Delivery   unknown, reconcile                            |
+ agents|                                             | Route      managed response                              |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |j/k move  esc mission                                                                                   |
+       +--------------------------------------------------------------------------------------------------------+
+                         │
+                         │
+                        «│

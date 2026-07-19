@@ -1,0 +1,31 @@
+# nagi-ui-golden v1
+# surface: mission-cockpit
+# theme: terminal-16
+# size: 80x24
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 4b42a12675752a3ea2e397bbdf3295b2ddad0d4565c8adef075f1841804c3074
+# ---
+ spaces                  │ 1       +
+                         │
+ · na+--------------------------------------------------------------------+
+   ma|  NAGI | MISSION COCKPIT           2 need you   1 working   1 done  |
+ · mi|--------------------------------------------------------------------|
+   ma| / search missions                                                  |
+ · mi|--------------------------------------------------------------------|
+   ma| v     ! repo (4)                                2 need you | 1 wo… |
+ · mi|   |-     ! Reconcile proof after a disconnect…  blocked | Codex |… |
+   ma|   |-     ! Recover a failed setup recipe safe…  failed | Codex | … |
+     |   |-     ~ Index 500 repository sessions with…  working | Codex |… |
+ new |>  |-   * + Fix login redirect                   proven | Codex | … |
+─────|                                                                    |
+ agen|                                                                    |
+     |                                                                    |
+     |                                                                    |
+     |                                                                    |
+     |+ Fix login redirect ----------------------------------------------+|
+     ||proven | 1 / 1 criteria fresh |…e the requested page after login  ||
+     |+------------------------------------------------------------------+|
+     |enter open  n new mission  tab sessions  / search  b/w/i/d/a states |
+     +--------------------------------------------------------------------+
+                         │
+                        «│

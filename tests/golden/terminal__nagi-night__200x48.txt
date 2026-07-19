@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: terminal
+# theme: nagi-night
+# size: 200x48
+# palette: Palette { accent: Rgb(121, 167, 216), panel_bg: Rgb(16, 22, 31), surface0: Rgb(25, 36, 52), surface1: Rgb(43, 58, 78), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(243, 235, 221), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(126, 185, 154), yellow: Rgb(212, 180, 106), red: Rgb(230, 101, 90), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: 01bc8befb1977c255aa703baa9efd6df4dd8708292511de950c05ec7f893cf22
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-001           │
+   main                  │
+ · mission-002           │
+   main                  │
+ · mission-003           │
+   main                  │
+ · mission-004           │
+   main                  │
+ · mission-005           │
+   main                  │
+ · mission-006           │
+   main                  │
+ · mission-007           │
+   main                  │
+                         │
+                         │
+                         │
+                         │
+                         │
+ new                 menu│
+─────────────────────────│
+ agents           grouped│
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                        «│

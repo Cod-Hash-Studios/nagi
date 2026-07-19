@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: mission-cockpit
+# theme: nagi-dawn
+# size: 120x32
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: d68c74b5b0e0d04619a79366fd0ee4eea771d728a5eb5f75241fab806b4a5d01
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ · miss│  NAGI · MISSION COCKPIT                                               2 need you   1 working   1 done  │
+   main│────────────────────────────────────────────────────────────────────────────────────────────────────────│
+ · miss│ / search missions                           │ MISSION                                                  │
+   main│─────────────────────────────────────────────│─Fix login redirect───────────────────────────────────────│
+ · miss│ ▾     ◉ repo (4)                            │ ✓ PROOF FRESH                                            │
+   main│   ├─     ◉ Reconcile proof after a discon…  │                                                          │
+ · miss│   ├─     ◉ Recover a failed setup recipe …  │ CONTEXT  ─                                               │
+   main│   ├─     ⠋ Index 500 repository sessions …  │ Preserve the requested page after login                  │
+ · miss│▏  ├─   ◆ ● Fix login redirect               │ Provider  Codex                                          │
+   main│                                             │ Criteria  1 / 1 fresh                                    │
+       │                                             │ Attention 0                                              │
+ new   │                                             │ Worktree  /repo                                          │
+───────│                                             │                                                          │
+ agents│                                             │ ACTIVITY  ─                                              │
+       │                                             │ ◉ Acceptance criteria  1/1 fresh                         │
+       │                                             │ │ mission proven  current                                │
+       │                                             │ enter open mission   tab sessions                        │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │enter open  n new mission  tab sessions  / search  b/w/i/d/a states  j/k/↑↓ move  esc close             │
+       ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                        «│

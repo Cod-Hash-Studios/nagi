@@ -1,0 +1,31 @@
+# nagi-ui-golden v1
+# surface: proof-review
+# theme: custom-ume
+# size: 80x24
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: fd87a90b35c154459adee41303cbaa6da7d6a822dcfa3de19d2c73c8f90b98ec
+# ---
+ spaces                  │ 1       +
+                         │
+ · na╭────────────────────────────────────────────────────────────────────╮
+   ma│PROOF REVIEW  Fix login redirect                                    │
+ · mi│READY TO CLOSE  1 required check(s) · 0 unresolved attention        │
+   ma│────────────────────────────────────────────────────────────────────│
+ · mi│▏ PASS      tests  required                                         │
+   ma│                                                                    │
+ · mi│                                                                    │
+   ma│                                                                    │
+     │                                                                    │
+ new │                                                                    │
+─────│                                                                    │
+ agen│                                                                    │
+     │                                                                    │
+     │                                                                    │
+     │SELECTED EVIDENCE  ─                                                │
+     │Workspace  ccccccccccccccccccccccccccc…cccccccccccccccccccccccccccc │
+     │Artifacts  1   Recorded  110                                        │
+     │                                                                    │
+     │j/k select  c recheck + close  esc mission                          │
+     ╰────────────────────────────────────────────────────────────────────╯
+                         │
+                        «│

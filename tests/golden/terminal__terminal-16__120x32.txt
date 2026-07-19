@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: terminal
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 5ec0f0e4c6dbe7be09237a4b7b1e036e597b6f8743322d849a57bddf9bf47e9c
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main                 ▕│
+ · mission-001          ▕│
+   main                 ▕│
+ · mission-002          ▕│
+   main                 ▕│
+ · mission-003          ▕│
+   main                 ▕│
+ · mission-004          ▕│
+   main                 ▕│
+ · mission-005          ▕│
+   main                 ▕│
+                        ▕│
+ new                 menu│
+─────────────────────────│
+ agents           grouped│
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                        «│

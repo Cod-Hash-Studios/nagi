@@ -1,0 +1,31 @@
+# nagi-ui-golden v1
+# surface: command-palette
+# theme: nagi-dawn
+# size: 80x24
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: 5432f3e95936368740369cb3d87236a3e572a0281c6a9c36173c8cd22247286c
+# ---
+ spaces                  │ 1       +
+  ╭──────────────────────────────────────────────────────────────────────────╮
+ ·│COMMANDS  7  core + providers + plugins                                   │
+  │› Type to search commands…                                                │
+ ·│──────────────────────────────────────────────────────────────────────────│
+  │▏ Open cockpit                                                      core  │
+ ·│  Inspect every workspace and agent                                       │
+  │  Detach session                                                    core  │
+ ·│  Leave panes running in the background                                   │
+  │  Show keybindings                                                  core  │
+  │  Review keyboard controls                                                │
+ n│  Reload configuration                                              core  │
+──│  Apply the latest config and theme files                                 │
+ a│  Open settings                                                     core  │
+  │  Customize appearance and behavior                                       │
+  │  New tab                                                           core  │
+  │  Add a tab to the current workspace                                      │
+  │  New workspace                                                     core  │
+  │  Start another durable workspace                                         │
+  │                                                                          │
+  │                                                                          │
+  │enter run  ↑↓ select  esc close                                           │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+                        «│

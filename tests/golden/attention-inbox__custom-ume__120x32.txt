@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: attention-inbox
+# theme: custom-ume
+# size: 120x32
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: a61c672458b20f1347f9cc839346e4425c08d0271d4946db7d707917007c9023
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ · miss│ATTENTION INBOX  1 open · 1 delivery uncertain                                                          │
+   main│One place for provider questions and scoped consent                                                     │
+ · miss│────────────────────────────────────────────────────────────────────────────────────────────────────────│
+   main│▏ HIGH     Confirm whether the inter…        │ PERMISSION REQUEST  HIGH                                 │
+ · miss│   mission-3 · OpenCode · delivery uncertain │ Confirm whether the interrupted deployment was applied   │
+   main│  CRITICAL Allow the release agent t…        │                                                          │
+ · miss│   mission-3 · OpenCode · open               │ WHY AND SCOPE  ─                                         │
+   main│                                             │ One GitHub release for the current immutable commit      │
+ · miss│                                             │                                                          │
+   main│                                             │ Mission    mission-3                                     │
+       │                                             │ Provider   OpenCode                                      │
+ new   │                                             │ State      delivery uncertain                            │
+───────│                                             │ Delivery   unknown, reconcile                            │
+ agents│                                             │ Route      managed response                              │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │j/k move  esc mission                                                                                   │
+       ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                        «│

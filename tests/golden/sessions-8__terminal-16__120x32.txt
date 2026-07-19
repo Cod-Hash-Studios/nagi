@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: sessions-8
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 40e2f8b9fc0c5aa80557e42c3565137b581dfd16c7211618d7cf6133000546ea
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main+--------------------------------------------------------------------------------------------------------+
+ · miss|  NAGI | SESSION COCKPIT                                               0 need you   0 working   0 done  |
+   main|--------------------------------------------------------------------------------------------------------|
+ · miss| / search panes                           8  | PANE                                                     |
+   main|---------------------------------------------|-pane 1---------------------------------------------------|
+ · miss| v   * . nagi-release-with-a-deliberately-…  | SHELL                                                    |
+   main|>  |-   * . pane 1                           |                                                          |
+ · miss| v     . mission-001 (1)                     | CONTEXT  -                                               |
+   main|   |-     . pane 1                           | nagi-release-with-a-deliberately-long-workspace-label | p|
+ · miss| v     . mission-002 (1)                     | Type      Pane                                           |
+   main|   |-     . pane 1                           | State     unknown                                        |
+       | v     . mission-003 (1)                     | Signal    shell                                          |
+ new   |   |-     . pane 1                           |                                                          |
+───────| v     . mission-004 (1)                     | ACTIVITY  -                                              |
+ agents|   |-     . pane 1                           | | shell attached  live                                   |
+       | v     . mission-005 (1)                     | enter switch to selection                                |
+       |   |-     . pane 1                           |                                                          |
+       | v     . mission-006 (1)                     |                                                          |
+       |   |-     . pane 1                           |                                                          |
+       | v     . mission-007 (1)                     |                                                          |
+       |   |-     . pane 1                           |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |enter switch  tab missions  / search  b/w/i/d/a states  j/k move  esc close                             |
+       +--------------------------------------------------------------------------------------------------------+
+                         │
+                         │
+                        «│

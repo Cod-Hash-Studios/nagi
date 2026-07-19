@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: attention-inbox
+# theme: custom-ume
+# size: 200x48
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: 939d19a68f13e4e61a140612e57e875d663462afc67bd39ca3b489df76821681
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-0╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   main     │ATTENTION INBOX  1 open · 1 delivery uncertain                                                                                                                                │
+ · mission-0│One place for provider questions and scoped consent                                                                                                                           │
+   main     │──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+ · mission-0│▏ HIGH     Confirm whether the interrupted deployment was applied          │ PERMISSION REQUEST  HIGH                                                                         │
+   main     │   mission-3 · OpenCode · delivery uncertain                               │ Confirm whether the interrupted deployment was applied                                           │
+ · mission-0│  CRITICAL Allow the release agent to publish signed artifacts             │                                                                                                  │
+   main     │   mission-3 · OpenCode · open                                             │ WHY AND SCOPE  ─                                                                                 │
+ · mission-0│                                                                           │ One GitHub release for the current immutable commit                                              │
+   main     │                                                                           │                                                                                                  │
+ · mission-0│                                                                           │ Mission    mission-3                                                                             │
+   main     │                                                                           │ Provider   OpenCode                                                                              │
+ · mission-0│                                                                           │ State      delivery uncertain                                                                    │
+   main     │                                                                           │ Delivery   unknown, reconcile                                                                    │
+            │                                                                           │ Route      managed response                                                                      │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+ new        │                                                                           │                                                                                                  │
+────────────│                                                                           │                                                                                                  │
+ agents     │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │                                                                           │                                                                                                  │
+            │j/k move  esc mission                                                                                                                                                         │
+            ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                        «│

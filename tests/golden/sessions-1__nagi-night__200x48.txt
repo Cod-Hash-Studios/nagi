@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: sessions-1
+# theme: nagi-night
+# size: 200x48
+# palette: Palette { accent: Rgb(121, 167, 216), panel_bg: Rgb(16, 22, 31), surface0: Rgb(25, 36, 52), surface1: Rgb(43, 58, 78), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(243, 235, 221), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(126, 185, 154), yellow: Rgb(212, 180, 106), red: Rgb(230, 101, 90), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: b0bb587960eed8eaae570ede37deb2d8457a805b88723b8be884a5e37e210498
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+            ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+            │  NAGI · SESSION COCKPIT                                                                                                                     0 need you   0 working   0 done  │
+            │──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+            │ / search panes                                               1  │ PANE                                                                                                       │
+            │─────────────────────────────────────────────────────────────────│─pane 1─────────────────────────────────────────────────────────────────────────────────────────────────────│
+            │ ▾   ◆ ○ nagi-release-with-a-deliberately-long-w…                │ SHELL                                                                                                      │
+            │▏  ├─   ◆ ○ pane 1                                 shell         │                                                                                                            │
+            │                                                                 │ CONTEXT  ─                                                                                                 │
+            │                                                                 │ nagi-release-with-a-deliberately-long-workspace-label · pane 1 · shell                                     │
+            │                                                                 │ Type      Pane                                                                                             │
+            │                                                                 │ State     unknown                                                                                          │
+            │                                                                 │ Signal    shell                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │ ACTIVITY  ─                                                                                                │
+            │                                                                 │ │ shell attached  live                                                                                     │
+            │                                                                 │ enter switch to selection                                                                                  │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+ new        │                                                                 │                                                                                                            │
+────────────│                                                                 │                                                                                                            │
+ agents     │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │enter switch  tab missions  / search  b/w/i/d/a states  j/k/↑↓ move  esc close                                                                                                │
+            ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                        «│

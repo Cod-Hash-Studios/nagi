@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: command-palette
+# theme: custom-ume
+# size: 60x20
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: cccd73f6dca7cc4496c12baa7a365bd57607900279586e88b758c32d10876e6e
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ n╭──────────────────────────────────────────────────────╮
+  │COMMANDS  7  core + providers + plugins               │
+  │› Type to search commands…                            │
+  │──────────────────────────────────────────────────────│
+  │▏ Open cockpit                                  core  │
+  │  Inspect every workspace and agent                   │
+  │  Detach session                                core  │
+  │  Leave panes running in the background               │
+  │  Show keybindings                              core  │
+  │  Review keyboard controls                            │
+  │  Reload configuration                          core  │
+  │  Apply the latest config and theme files             │
+  │  Open settings                                 core  │
+  │  Customize appearance and behavior                   │
+  │  New tab                                       core  │
+  │  Add a tab to the current workspace                  │
+  │enter run  ↑↓ select  esc close                       │
+  ╰──────────────────────────────────────────────────────╯
+

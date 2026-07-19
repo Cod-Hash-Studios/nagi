@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: mission-cockpit
+# theme: custom-ume
+# size: 200x48
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: 1ce3e1cbdde78103e9fb773973847551e18af0382cd7a6d11631fc84e5cf35bc
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-0╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   main     │  NAGI · MISSION COCKPIT                                                                                                                     2 need you   1 working   1 done  │
+ · mission-0│──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+   main     │ / search missions                                               │ MISSION                                                                                                    │
+ · mission-0│─────────────────────────────────────────────────────────────────│─Fix login redirect─────────────────────────────────────────────────────────────────────────────────────────│
+   main     │ ▾     ◉ repo (4)                                  2 need you …  │ ✓ PROOF FRESH                                                                                              │
+ · mission-0│   ├─     ◉ Reconcile proof after a disconnected…  blocked · C…  │                                                                                                            │
+   main     │   ├─     ◉ Recover a failed setup recipe safely   failed · Co…  │ CONTEXT  ─                                                                                                 │
+ · mission-0│   ├─     ⠋ Index 500 repository sessions withou…  working · C…  │ Preserve the requested page after login                                                                    │
+   main     │▏  ├─   ◆ ● Fix login redirect                     proven · Co…  │ Provider  Codex                                                                                            │
+ · mission-0│                                                                 │ Criteria  1 / 1 fresh                                                                                      │
+   main     │                                                                 │ Attention 0                                                                                                │
+ · mission-0│                                                                 │ Worktree  /repo                                                                                            │
+   main     │                                                                 │                                                                                                            │
+            │                                                                 │ ACTIVITY  ─                                                                                                │
+            │                                                                 │ ◉ Acceptance criteria  1/1 fresh                                                                           │
+            │                                                                 │ │ mission proven  current                                                                                  │
+            │                                                                 │ enter open mission   tab sessions                                                                          │
+            │                                                                 │                                                                                                            │
+ new        │                                                                 │                                                                                                            │
+────────────│                                                                 │                                                                                                            │
+ agents     │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │                                                                 │                                                                                                            │
+            │enter open  n new mission  tab sessions  / search  b/w/i/d/a states  j/k/↑↓ move  esc close                                                                                   │
+            ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                        «│

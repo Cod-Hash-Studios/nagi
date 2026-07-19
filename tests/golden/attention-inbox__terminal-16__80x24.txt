@@ -1,0 +1,31 @@
+# nagi-ui-golden v1
+# surface: attention-inbox
+# theme: terminal-16
+# size: 80x24
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 90c3b01e8f705c46721bf12afbc2190bbb83ffae29bdc9e11a52879fd5a33f41
+# ---
+ spaces                  │ 1       +
+                         │
+ · na+--------------------------------------------------------------------+
+   ma|ATTENTION INBOX  1 open · 1 delivery uncertain                      |
+ · mi|One place for provider questions and scoped consent                 |
+   ma|--------------------------------------------------------------------|
+ · mi|> HIGH     Confirm whether the interrupted deployment was a…        |
+   ma|  CRITICAL Allow the release agent to publish signed artifa…        |
+ · mi|                                                                    |
+   ma|                                                                    |
+     |                                                                    |
+ new |                                                                    |
+─────|                                                                    |
+ agen|                                                                    |
+     || PERMISSION REQUEST  HIGH                                          |
+     || Confirm whether the interrupted deployment was applied            |
+     ||                                                                   |
+     || WHY AND SCOPE  -                                                  |
+     || One GitHub release for the current immutable commit               |
+     ||                                                                   |
+     |j/k move  esc mission                                               |
+     +--------------------------------------------------------------------+
+                         │
+                        «│

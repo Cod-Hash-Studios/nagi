@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: command-palette
+# theme: nagi-night
+# size: 200x48
+# palette: Palette { accent: Rgb(121, 167, 216), panel_bg: Rgb(16, 22, 31), surface0: Rgb(25, 36, 52), surface1: Rgb(43, 58, 78), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(243, 235, 221), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(126, 185, 154), yellow: Rgb(212, 180, 106), red: Rgb(230, 101, 90), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: e5a4e6c4bed45792cc7845fae376caf4722f6b35d64175c2dac461e305731f5b
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-001           │
+   main                  │
+ · mission-002           │
+   main                  │
+ · mission-003           │
+   main                  │
+ · mission-004           │
+   main                  │
+ · mission-005           │                            ╭──────────────────────────────────────────────────────────────────────────────────────────╮
+   main                  │                            │COMMANDS  7  core + providers + plugins                                                   │
+ · mission-006           │                            │› Type to search commands…                                                                │
+   main                  │                            │──────────────────────────────────────────────────────────────────────────────────────────│
+ · mission-007           │                            │▏ Open cockpit                                                                      core  │
+   main                  │                            │  Inspect every workspace and agent                                                       │
+                         │                            │  Detach session                                                                    core  │
+                         │                            │  Leave panes running in the background                                                   │
+                         │                            │  Show keybindings                                                                  core  │
+                         │                            │  Review keyboard controls                                                                │
+                         │                            │  Reload configuration                                                              core  │
+ new                 menu│                            │  Apply the latest config and theme files                                                 │
+─────────────────────────│                            │  Open settings                                                                     core  │
+ agents           grouped│                            │  Customize appearance and behavior                                                       │
+                         │                            │  New tab                                                                           core  │
+                         │                            │  Add a tab to the current workspace                                                      │
+                         │                            │  New workspace                                                                     core  │
+                         │                            │  Start another durable workspace                                                         │
+                         │                            │                                                                                          │
+                         │                            │                                                                                          │
+                         │                            │                                                                                          │
+                         │                            │                                                                                          │
+                         │                            │enter run  ↑↓ select  esc close                                                           │
+                         │                            ╰──────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                        «│

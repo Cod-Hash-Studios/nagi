@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: sessions-8
+# theme: nagi-dawn
+# size: 120x32
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: 29c5003d4556efd81c40ba49cbdcfb5470a8dbf3008483433b204633b22443ef
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ · miss│  NAGI · SESSION COCKPIT                                               0 need you   0 working   0 done  │
+   main│────────────────────────────────────────────────────────────────────────────────────────────────────────│
+ · miss│ / search panes                           8  │ PANE                                                     │
+   main│─────────────────────────────────────────────│─pane 1───────────────────────────────────────────────────│
+ · miss│ ▾   ◆ ○ nagi-release-with-a-deliberately-…  │ SHELL                                                    │
+   main│▏  ├─   ◆ ○ pane 1                           │                                                          │
+ · miss│ ▾     ○ mission-001 (1)                     │ CONTEXT  ─                                               │
+   main│   ├─     ○ pane 1                           │ nagi-release-with-a-deliberately-long-workspace-label · p│
+ · miss│ ▾     ○ mission-002 (1)                     │ Type      Pane                                           │
+   main│   ├─     ○ pane 1                           │ State     unknown                                        │
+       │ ▾     ○ mission-003 (1)                     │ Signal    shell                                          │
+ new   │   ├─     ○ pane 1                           │                                                          │
+───────│ ▾     ○ mission-004 (1)                     │ ACTIVITY  ─                                              │
+ agents│   ├─     ○ pane 1                           │ │ shell attached  live                                   │
+       │ ▾     ○ mission-005 (1)                     │ enter switch to selection                                │
+       │   ├─     ○ pane 1                           │                                                          │
+       │ ▾     ○ mission-006 (1)                     │                                                          │
+       │   ├─     ○ pane 1                           │                                                          │
+       │ ▾     ○ mission-007 (1)                     │                                                          │
+       │   ├─     ○ pane 1                           │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │                                             │                                                          │
+       │enter switch  tab missions  / search  b/w/i/d/a states  j/k/↑↓ move  esc close                          │
+       ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                        «│

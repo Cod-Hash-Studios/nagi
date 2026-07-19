@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: mission-inspector
+# theme: nagi-dawn
+# size: 60x20
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: 368ece43bcab2ac5cc82fa01cd8d59f52c7ed630a68ba7fc740131ee94972e30
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ no agents                                        │ switch
+   ╭────────────────────────────────────────────────────╮
+   │MISSION  Fix login redirect                         │
+   │✓ PROOF FRESH                                       │
+   │ Overview                                           │
+   │────────────────────────────────────────────────────│
+   │OBJECTIVE  ─                                        │
+   │Preserve the requested page after login             │
+   │                                                    │
+   │Provider   Codex                                    │
+   │Worktree   /repo                                    │
+   │Attention  0                                        │
+   │                                                    │
+   │ACCEPTANCE CRITERIA  ─                              │
+   │◉ Fresh proof  1/1 fresh                            │
+   │tab extensions  p proof  a attention  h handoff  j/k│
+   ╰────────────────────────────────────────────────────╯
+
+

@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: mission-cockpit
+# theme: terminal-16
+# size: 60x20
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 33f1a4de5721de9d386f3b995aaa1a8821bddbc27da9e44a76463bf65262aec8
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ no agents                                        │ switch
+   +----------------------------------------------------+
+   |  NAGI | MISSION COCKPIT                            |
+   |----------------------------------------------------|
+   | / search missions                                  |
+   |----------------------------------------------------|
+   | v     ! repo (4)                      2 need you … |
+   |   |-     ! Reconcile proof after a …  blocked | C… |
+   |   |-     ! Recover a failed setup r…  failed | Co… |
+   |   |-     ~ Index 500 repository ses…  working | C… |
+   |>  |-   * + Fix login redirect         proven | Co… |
+   |                                                    |
+   |                                                    |
+   |                                                    |
+   | proven | 1 / 1 criteria …equested page after login-|
+   |enter open  n new mission  tab sessions  / search  b|
+   +----------------------------------------------------+
+
+

@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: settings
+# theme: terminal-16
+# size: 200x48
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: f734ba4e5116ee7bb21e473e4a8404dbe6ab19dccfae476378e1589f6bfb1af1
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-001           │
+   main                  │
+ · mission-002           │
+   main                  │
+ · mission-003           │
+   main                  │
+ · mission-004           │
+   main                  │
+ · mission-005           │
+   main                  │                                    ┌──────────────────────────────────────────────────────────────────────────┐
+ · mission-006           │                                    │ settings                                                                 │
+   main                  │                                    │ theme   sound   toasts   pane labels   integrations   experiments        │
+ · mission-007           │                                    │──────────────────────────────────────────────────────────────────────────│
+   main                  │                                    │                                                                          │
+                         │                                    │> nagi-night                   | terminal-16                              │
+                         │                                    │  nagi-dawn                    |                                          │
+                         │                                    │  catppuccin                   | > selected mission                       │
+                         │                                    │  catppuccin-latte             | ! NEEDS YOU                              │
+                         │                                    │  terminal                     | ~ WORKING                                │
+ new                 menu│                                    │  tokyo-night                  | + PROOF FRESH                            │
+─────────────────────────│                                    │  tokyo-night-day              | ! PROOF STALE                            │
+ agents           grouped│                                    │  dracula                      | * acceptance criteria  2/3 fresh         │
+                         │                                    │  nord                         |                                          │
+                         │                                    │  gruvbox                      | Primary text                             │
+                         │                                    │  gruvbox-light                | Secondary context                        │
+                         │                                    │  one-dark                     |                                          │
+                         │                                    │  one-light                    |                                          │
+                         │                                    │                                                                          │
+                         │                                    │ ↑↓ select  tab section                                                   │
+                         │                                    │                           ↵ apply    esc close                           │
+                         │                                    └──────────────────────────────────────────────────────────────────────────┘
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                        «│

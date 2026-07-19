@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: settings
+# theme: custom-ume
+# size: 120x32
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: c25363d2585e3790ea928a41054a9035eeaed01f51ab23e9fd54a8884c737ff7
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main                 ▕│
+ · mission-001          ▕│
+   main               ┌──────────────────────────────────────────────────────────────────────────┐
+ · mission-002        │ settings                                                                 │
+   main               │ theme   sound   toasts   pane labels   integrations   experiments        │
+ · mission-003        │──────────────────────────────────────────────────────────────────────────│
+   main               │                                                                          │
+ · mission-004        │▏ nagi-night                   │ custom-ume                               │
+   main               │  nagi-dawn                    │                                          │
+ · mission-005        │  catppuccin                   │ ▏ selected mission                       │
+   main               │  catppuccin-latte             │ ● NEEDS YOU                              │
+                      │  terminal                     │ ● WORKING                                │
+ new                 m│  tokyo-night                  │ ✓ PROOF FRESH                            │
+──────────────────────│  tokyo-night-day              │ ! PROOF STALE                            │
+ agents           grou│  dracula                      │ ◉ acceptance criteria  2/3 fresh         │
+                      │  nord                         │                                          │
+                      │  gruvbox                      │ Primary text                             │
+                      │  gruvbox-light                │ Secondary context                        │
+                      │  one-dark                     │                                          │
+                      │  one-light                    │                                          │
+                      │                                                                          │
+                      │ ↑↓ select  tab section                                                   │
+                      │                           ↵ apply    esc close                           │
+                      └──────────────────────────────────────────────────────────────────────────┘
+                         │
+                         │
+                         │
+                         │
+                        «│

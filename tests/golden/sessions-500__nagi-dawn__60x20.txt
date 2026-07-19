@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: sessions-500
+# theme: nagi-dawn
+# size: 60x20
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: 577b8812f3a2d4ba62869c69ba6440a3d0a654c768efb729ce3b4104037807c6
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ no agents                                        │ switch
+   ╭────────────────────────────────────────────────────╮
+   │  NAGI · SESSION COCKPIT                            │
+   │────────────────────────────────────────────────────│
+   │ / search panes                                 500 │
+   │────────────────────────────────────────────────────│
+   │ ▾   ◆ ○ nagi-release-with-a-deliber…              ▕│
+   │▏  ├─   ◆ ○ pane 1                     shell       ▕│
+   │ ▾     ○ mission-001 (1)                           ▕│
+   │   ├─     ○ pane 1                     shell       ▕│
+   │ ▾     ○ mission-002 (1)                           ▕│
+   │   ├─     ○ pane 1                     shell       ▕│
+   │ ▾     ○ mission-003 (1)                           ▕│
+   │   ├─     ○ pane 1                     shell       ▕│
+   │ nagi-release-with-a-deli…ce-label · pane 1 · shell─│
+   │enter switch  tab missions  / search  b/w/i/d/a stat│
+   ╰────────────────────────────────────────────────────╯
+
+

@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: command-palette
+# theme: custom-ume
+# size: 120x32
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: ccf070dd80cbc599fdffbe92d787c5b534c92051e6553886f258a84174d3a134
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main                 ▕│
+ · mission-001╭──────────────────────────────────────────────────────────────────────────────────────────╮
+   main       │COMMANDS  7  core + providers + plugins                                                   │
+ · mission-002│› Type to search commands…                                                                │
+   main       │──────────────────────────────────────────────────────────────────────────────────────────│
+ · mission-003│▏ Open cockpit                                                                      core  │
+   main       │  Inspect every workspace and agent                                                       │
+ · mission-004│  Detach session                                                                    core  │
+   main       │  Leave panes running in the background                                                   │
+ · mission-005│  Show keybindings                                                                  core  │
+   main       │  Review keyboard controls                                                                │
+              │  Reload configuration                                                              core  │
+ new          │  Apply the latest config and theme files                                                 │
+──────────────│  Open settings                                                                     core  │
+ agents       │  Customize appearance and behavior                                                       │
+              │  New tab                                                                           core  │
+              │  Add a tab to the current workspace                                                      │
+              │  New workspace                                                                     core  │
+              │  Start another durable workspace                                                         │
+              │                                                                                          │
+              │                                                                                          │
+              │                                                                                          │
+              │                                                                                          │
+              │enter run  ↑↓ select  esc close                                                           │
+              ╰──────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                        «│

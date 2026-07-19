@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: sessions-500
+# theme: terminal-16
+# size: 60x20
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 4b526fd1a01461077f6536d6c909dc9f76e80983552f250965f1e3c9d76ec414
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ no agents                                        │ switch
+   +----------------------------------------------------+
+   |  NAGI | SESSION COCKPIT                            |
+   |----------------------------------------------------|
+   | / search panes                                 500 |
+   |----------------------------------------------------|
+   | v   * . nagi-release-with-a-deliber…              ||
+   |>  |-   * . pane 1                     shell       ▕|
+   | v     . mission-001 (1)                           ▕|
+   |   |-     . pane 1                     shell       ▕|
+   | v     . mission-002 (1)                           ▕|
+   |   |-     . pane 1                     shell       ▕|
+   | v     . mission-003 (1)                           ▕|
+   |   |-     . pane 1                     shell       ▕|
+   | nagi-release-with-a-deli…ce-label | pane 1 | shell-|
+   |enter switch  tab missions  / search  b/w/i/d/a stat|
+   +----------------------------------------------------+
+
+

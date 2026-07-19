@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: settings
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: c685645a6ad47a7011f7860332a82b2033ec603d8d0992288e23b40c5d865475
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main                 ▕│
+ · mission-001          ▕│
+   main               ┌──────────────────────────────────────────────────────────────────────────┐
+ · mission-002        │ settings                                                                 │
+   main               │ theme   sound   toasts   pane labels   integrations   experiments        │
+ · mission-003        │──────────────────────────────────────────────────────────────────────────│
+   main               │                                                                          │
+ · mission-004        │> nagi-night                   | terminal-16                              │
+   main               │  nagi-dawn                    |                                          │
+ · mission-005        │  catppuccin                   | > selected mission                       │
+   main               │  catppuccin-latte             | ! NEEDS YOU                              │
+                      │  terminal                     | ~ WORKING                                │
+ new                 m│  tokyo-night                  | + PROOF FRESH                            │
+──────────────────────│  tokyo-night-day              | ! PROOF STALE                            │
+ agents           grou│  dracula                      | * acceptance criteria  2/3 fresh         │
+                      │  nord                         |                                          │
+                      │  gruvbox                      | Primary text                             │
+                      │  gruvbox-light                | Secondary context                        │
+                      │  one-dark                     |                                          │
+                      │  one-light                    |                                          │
+                      │                                                                          │
+                      │ ↑↓ select  tab section                                                   │
+                      │                           ↵ apply    esc close                           │
+                      └──────────────────────────────────────────────────────────────────────────┘
+                         │
+                         │
+                         │
+                         │
+                        «│

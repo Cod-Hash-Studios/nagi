@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: settings
+# theme: terminal-16
+# size: 60x20
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 7ac2c97293724e6669b4ca3bb0baca4988a2de51c16300676471064fa31ea0f7
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ n┌──────────────────────────────────────────────────────┐
+  │ settings                                             │
+  │ theme   sound   toasts   pane labels   integrations  │
+  │──────────────────────────────────────────────────────│
+  │                                                      │
+  │> nagi-night           | terminal-16                  │
+  │  nagi-dawn            |                              │
+  │  catppuccin           | > selected mission           │
+  │  catppuccin-latte     | ! NEEDS YOU                  │
+  │  terminal             | ~ WORKING                    │
+  │  tokyo-night          | + PROOF FRESH                │
+  │  tokyo-night-day      | ! PROOF STALE                │
+  │  dracula              | * acceptance crit.  2/3 fresh│
+  │  nord                 |                              │
+  │                                                      │
+  │ ↑↓ select  tab section                               │
+  │                 ↵ apply    esc close                 │
+  └──────────────────────────────────────────────────────┘
+

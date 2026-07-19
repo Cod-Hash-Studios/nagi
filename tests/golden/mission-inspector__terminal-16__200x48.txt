@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: mission-inspector
+# theme: terminal-16
+# size: 200x48
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 24d5cf4cd4037684f5a2d74afed04ebfdcdb4348fad59b0136cc9aae26069085
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-0+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   main     |MISSION  Fix login redirect                                                                                                                                                   |
+ · mission-0|+ PROOF FRESH                                                                                                                                                                 |
+   main     | Overview                                                                                                                                                                     |
+ · mission-0|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+   main     |OBJECTIVE  -                                                                                                                                                                  |
+ · mission-0|Preserve the requested page after login                                                                                                                                       |
+   main     |                                                                                                                                                                              |
+ · mission-0|Provider   Codex                                                                                                                                                              |
+   main     |Worktree   /repo                                                                                                                                                              |
+ · mission-0|Attention  0                                                                                                                                                                  |
+   main     |                                                                                                                                                                              |
+ · mission-0|ACCEPTANCE CRITERIA  -                                                                                                                                                        |
+   main     |* Fresh proof  1/1 fresh                                                                                                                                                      |
+            | OK Redirect test passes                                                                                                                                                      |
+            |                                                                                                                                                                              |
+            |CHECKS AND EVIDENCE  -                                                                                                                                                        |
+            | PASS     tests  required                                                                                                                                                     |
+            |                                                                                                                                                                              |
+ new        |                                                                                                                                                                              |
+────────────|                                                                                                                                                                              |
+ agents     |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |                                                                                                                                                                              |
+            |tab extensions  p proof  a attention  h handoff  j/k scroll  esc cockpit                                                                                                      |
+            +------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+                         │
+                         │
+                         │
+                        «│

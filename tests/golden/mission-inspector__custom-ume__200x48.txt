@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: mission-inspector
+# theme: custom-ume
+# size: 200x48
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: 27c8223fb99b1ab6fdc00fe93925518d20abcbe4d69f308b84a179950ae70039
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-0╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   main     │MISSION  Fix login redirect                                                                                                                                                   │
+ · mission-0│✓ PROOF FRESH                                                                                                                                                                 │
+   main     │ Overview                                                                                                                                                                     │
+ · mission-0│──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+   main     │OBJECTIVE  ─                                                                                                                                                                  │
+ · mission-0│Preserve the requested page after login                                                                                                                                       │
+   main     │                                                                                                                                                                              │
+ · mission-0│Provider   Codex                                                                                                                                                              │
+   main     │Worktree   /repo                                                                                                                                                              │
+ · mission-0│Attention  0                                                                                                                                                                  │
+   main     │                                                                                                                                                                              │
+ · mission-0│ACCEPTANCE CRITERIA  ─                                                                                                                                                        │
+   main     │◉ Fresh proof  1/1 fresh                                                                                                                                                      │
+            │ ✓ Redirect test passes                                                                                                                                                       │
+            │                                                                                                                                                                              │
+            │CHECKS AND EVIDENCE  ─                                                                                                                                                        │
+            │ PASS     tests  required                                                                                                                                                     │
+            │                                                                                                                                                                              │
+ new        │                                                                                                                                                                              │
+────────────│                                                                                                                                                                              │
+ agents     │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │tab extensions  p proof  a attention  h handoff  j/k scroll  esc cockpit                                                                                                      │
+            ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                        «│

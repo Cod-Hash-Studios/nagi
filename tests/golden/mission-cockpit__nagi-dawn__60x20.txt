@@ -1,0 +1,27 @@
+# nagi-ui-golden v1
+# surface: mission-cockpit
+# theme: nagi-dawn
+# size: 60x20
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: 7d9667d57b6a5f9c9c35bf4a717b71d9ceb7e85cf4119171a983db6593ac444a
+# ---
+ · nagi-release-with-a-deliberately-long-…  tab 1 │
+ no agents                                        │ switch
+   ╭────────────────────────────────────────────────────╮
+   │  NAGI · MISSION COCKPIT                            │
+   │────────────────────────────────────────────────────│
+   │ / search missions                                  │
+   │────────────────────────────────────────────────────│
+   │ ▾     ◉ repo (4)                      2 need you … │
+   │   ├─     ◉ Reconcile proof after a …  blocked · C… │
+   │   ├─     ◉ Recover a failed setup r…  failed · Co… │
+   │   ├─     ⠋ Index 500 repository ses…  working · C… │
+   │▏  ├─   ◆ ● Fix login redirect         proven · Co… │
+   │                                                    │
+   │                                                    │
+   │                                                    │
+   │ proven · 1 / 1 criteria …equested page after login─│
+   │enter open  n new mission  tab sessions  / search  b│
+   ╰────────────────────────────────────────────────────╯
+
+

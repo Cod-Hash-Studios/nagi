@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: mission-cockpit
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: 9e6ef11ce55b897be6d7b30147423c1de0569e167b2e8d7bab45f3b10987d633
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main+--------------------------------------------------------------------------------------------------------+
+ · miss|  NAGI | MISSION COCKPIT                                               2 need you   1 working   1 done  |
+   main|--------------------------------------------------------------------------------------------------------|
+ · miss| / search missions                           | MISSION                                                  |
+   main|---------------------------------------------|-Fix login redirect---------------------------------------|
+ · miss| v     ! repo (4)                            | + PROOF FRESH                                            |
+   main|   |-     ! Reconcile proof after a discon…  |                                                          |
+ · miss|   |-     ! Recover a failed setup recipe …  | CONTEXT  -                                               |
+   main|   |-     ~ Index 500 repository sessions …  | Preserve the requested page after login                  |
+ · miss|>  |-   * + Fix login redirect               | Provider  Codex                                          |
+   main|                                             | Criteria  1 / 1 fresh                                    |
+       |                                             | Attention 0                                              |
+ new   |                                             | Worktree  /repo                                          |
+───────|                                             |                                                          |
+ agents|                                             | ACTIVITY  -                                              |
+       |                                             | * Acceptance criteria  1/1 fresh                         |
+       |                                             | | mission proven  current                                |
+       |                                             | enter open mission   tab sessions                        |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |                                             |                                                          |
+       |enter open  n new mission  tab sessions  / search  b/w/i/d/a states  j/k move  esc close                |
+       +--------------------------------------------------------------------------------------------------------+
+                         │
+                         │
+                        «│
