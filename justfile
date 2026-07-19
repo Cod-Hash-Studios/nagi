@@ -95,6 +95,11 @@ ui-goldens:
 ui-goldens-update:
     python3 scripts/render_ui_goldens.py --update
 
+# Exercise the clean onboarding and first-mission path through a real PTY
+first-mission-smoke:
+    cargo build --locked
+    python3 scripts/first_mission_smoke.py --binary target/debug/nagi
+
 # Exercise hard crash, provider disconnect, and hostile plugin boundaries
 chaos-test:
     python3 scripts/chaos_runtime.py

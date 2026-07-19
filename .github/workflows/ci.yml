@@ -139,6 +139,14 @@ jobs:
         if: matrix.kind == 'unix'
         run: just ci '${{ matrix.nextest_filter }}'
 
+      - name: Clean-install and start a first mission
+        if: matrix.kind == 'unix'
+        shell: bash
+        run: |
+          install_root="$RUNNER_TEMP/nagi-clean-install"
+          cargo install --path . --locked --root "$install_root" --debug --force
+          python3 scripts/first_mission_smoke.py --binary "$install_root/bin/nagi"
+
       - name: Run Windows checks
         if: matrix.kind == 'windows'
         shell: pwsh
