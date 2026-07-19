@@ -582,6 +582,16 @@
           "description": "Terminal width at or below which Nagi uses the mobile single-column layout."
         },
         {
+          "key": "ui.icon_style",
+          "type": "enum",
+          "default": "unicode",
+          "description": "Portable icon style. ASCII never requires a special font.",
+          "values": [
+            "unicode",
+            "ascii"
+          ]
+        },
+        {
           "key": "ui.mouse_capture",
           "type": "boolean",
           "default": "true",
@@ -1022,6 +1032,18 @@
           "type": "string",
           "default": "\"~/.nagi/worktrees\"",
           "description": "Root directory under which Nagi creates <repo>/<branch-slug> checkouts."
+        }
+      ]
+    },
+    {
+      "id": "providers",
+      "title": "Providers",
+      "keys": [
+        {
+          "key": "providers.acp.command",
+          "type": "list of strings",
+          "default": "unset",
+          "description": "Literal argv for a local ACP stdio agent. Nagi never invokes a shell, rejects empty or oversized arguments, and requires interactive write-scope consent before launch."
         }
       ]
     },

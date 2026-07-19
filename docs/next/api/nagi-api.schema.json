@@ -3,6 +3,554 @@
   "protocol": 16,
   "schema_version": 1,
   "schemas": {
+    "attention_item_v1": {
+      "$defs": {
+        "AttentionDecisionV1": {
+          "enum": [
+            "approve_once",
+            "approve_for_session",
+            "allow_for_mission",
+            "deny",
+            "answer"
+          ],
+          "type": "string"
+        },
+        "AttentionDeliveryStateV1": {
+          "description": "State of the latest provider response attempt. `DeliveryUnknown` is kept\ndistinct from a definite rejection because retrying those cases has\ndifferent safety consequences.",
+          "oneOf": [
+            {
+              "properties": {
+                "state": {
+                  "const": "not_requested",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "requested_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "pending",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "requested_at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "acknowledged",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "code": {
+                  "$ref": "#/schemas/attention_item_v1/$defs/AttentionFailureCodeV1"
+                },
+                "state": {
+                  "const": "definitely_not_applied",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "code",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "code": {
+                  "$ref": "#/schemas/attention_item_v1/$defs/AttentionFailureCodeV1"
+                },
+                "state": {
+                  "const": "delivery_unknown",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "code",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "state": {
+                  "const": "not_applicable",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "AttentionFailureCodeV1": {
+          "enum": [
+            "rejected",
+            "disconnected_before_write",
+            "timeout",
+            "transport_closed"
+          ],
+          "type": "string"
+        },
+        "AttentionKindV1": {
+          "enum": [
+            "permission_request",
+            "provider_question",
+            "command_failed",
+            "worktree_conflict",
+            "turn_complete",
+            "disconnected",
+            "security_warning",
+            "manual_verification"
+          ],
+          "type": "string"
+        },
+        "AttentionPaneTargetV1": {
+          "properties": {
+            "pane_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "workspace_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id",
+            "pane_id"
+          ],
+          "type": "object"
+        },
+        "AttentionQuestionOptionV1": {
+          "properties": {
+            "description": {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "label": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "description"
+          ],
+          "type": "object"
+        },
+        "AttentionQuestionV1": {
+          "properties": {
+            "custom_allowed": {
+              "type": "boolean"
+            },
+            "header": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "id": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "multiple": {
+              "type": "boolean"
+            },
+            "options": {
+              "items": {
+                "$ref": "#/schemas/attention_item_v1/$defs/AttentionQuestionOptionV1"
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            "prompt": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "header",
+            "prompt",
+            "multiple",
+            "custom_allowed"
+          ],
+          "type": "object"
+        },
+        "AttentionResponseCapabilityV1": {
+          "enum": [
+            "reliable",
+            "open_pane_only"
+          ],
+          "type": "string"
+        },
+        "AttentionRiskV1": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "AttentionSourceV1": {
+          "enum": [
+            "structured_hook",
+            "provider_api",
+            "process",
+            "terminal_heuristic"
+          ],
+          "type": "string"
+        },
+        "AttentionStateV1": {
+          "oneOf": [
+            {
+              "properties": {
+                "state": {
+                  "const": "open",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "decision": {
+                  "$ref": "#/schemas/attention_item_v1/$defs/AttentionDecisionV1"
+                },
+                "requested_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "pending_response",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "decision",
+                "actor",
+                "requested_at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "decision": {
+                  "$ref": "#/schemas/attention_item_v1/$defs/AttentionDecisionV1"
+                },
+                "state": {
+                  "const": "resolved",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "decision",
+                "actor",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "code": {
+                  "$ref": "#/schemas/attention_item_v1/$defs/AttentionFailureCodeV1"
+                },
+                "decision": {
+                  "$ref": "#/schemas/attention_item_v1/$defs/AttentionDecisionV1"
+                },
+                "state": {
+                  "const": "reconciliation_required",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "decision",
+                "actor",
+                "code",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reason": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "state": {
+                  "const": "dismissed",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "actor",
+                "reason",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "expired",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "at_millis"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "MissionProvider": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "open_code",
+            "acp"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Provider-neutral attention projection. It deliberately separates the item\nlifecycle from response delivery so an uncertain write cannot look\nresolved merely because the provider connection disappeared.",
+      "properties": {
+        "attention_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "type": "string"
+        },
+        "created_at_millis": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "delivery": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionDeliveryStateV1"
+        },
+        "expires_at_millis": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionKindV1"
+        },
+        "mission_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "type": "string"
+        },
+        "occurrence_count": {
+          "format": "uint32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pane": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionPaneTargetV1"
+        },
+        "provider": {
+          "$ref": "#/schemas/attention_item_v1/$defs/MissionProvider"
+        },
+        "questions": {
+          "description": "Provider-native question contract. Empty for permission and recovered\nitems. IDs are exact response keys, not UI-generated labels.",
+          "items": {
+            "$ref": "#/schemas/attention_item_v1/$defs/AttentionQuestionV1"
+          },
+          "maxItems": 4,
+          "type": "array"
+        },
+        "requested_action": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "response_capability": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionResponseCapabilityV1"
+        },
+        "risk": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionRiskV1"
+        },
+        "run_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "session_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionSourceV1"
+        },
+        "state": {
+          "$ref": "#/schemas/attention_item_v1/$defs/AttentionStateV1"
+        },
+        "unread": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "attention_id",
+        "mission_id",
+        "run_id",
+        "session_id",
+        "pane",
+        "kind",
+        "requested_action",
+        "scope",
+        "risk",
+        "provider",
+        "source",
+        "response_capability",
+        "created_at_millis",
+        "occurrence_count",
+        "unread",
+        "state",
+        "delivery"
+      ],
+      "title": "AttentionItemV1",
+      "type": "object"
+    },
     "error_response": {
       "$defs": {
         "ErrorBody": {
@@ -1174,6 +1722,1641 @@
       "title": "EventEnvelope",
       "type": "object"
     },
+    "mission_view_v1": {
+      "$defs": {
+        "MissionCheckKindV1": {
+          "enum": [
+            "command",
+            "manual"
+          ],
+          "type": "string"
+        },
+        "MissionCheckStatusV1": {
+          "description": "Mirrors every outcome currently produced by the core proof evaluator.",
+          "enum": [
+            "passed",
+            "failed",
+            "stale",
+            "missing",
+            "manual_missing",
+            "provider_claim_only",
+            "declaration_mismatch",
+            "identity_mismatch",
+            "artifact_missing_or_changed",
+            "manual_not_authorized"
+          ],
+          "type": "string"
+        },
+        "MissionCheckSummaryV1": {
+          "properties": {
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "covered_criterion_ids": {
+              "items": {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "kind": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionCheckKindV1"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "status": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionCheckStatusV1"
+            }
+          },
+          "required": [
+            "check_id",
+            "kind",
+            "required",
+            "covered_criterion_ids",
+            "status"
+          ],
+          "type": "object"
+        },
+        "MissionCriterionCoverageV1": {
+          "enum": [
+            "unknown",
+            "uncovered",
+            "covered"
+          ],
+          "type": "string"
+        },
+        "MissionCriterionSummaryV1": {
+          "properties": {
+            "coverage": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionCriterionCoverageV1"
+            },
+            "criterion_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "required_check_ids": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            }
+          },
+          "required": [
+            "description",
+            "coverage",
+            "required_check_ids"
+          ],
+          "type": "object"
+        },
+        "MissionEvidenceAssessmentV1": {
+          "description": "Assessment values for evidence records that actually exist. Missing\nevidence is represented on the corresponding check summary instead.",
+          "enum": [
+            "passed",
+            "failed",
+            "stale",
+            "provider_claim_only",
+            "declaration_mismatch",
+            "identity_mismatch",
+            "artifact_missing_or_changed",
+            "manual_not_authorized"
+          ],
+          "type": "string"
+        },
+        "MissionEvidenceKindV1": {
+          "enum": [
+            "command",
+            "manual",
+            "provider_claim"
+          ],
+          "type": "string"
+        },
+        "MissionEvidenceSummaryV1": {
+          "properties": {
+            "artifact_count": {
+              "format": "uint32",
+              "maximum": 32,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "assessment": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionEvidenceAssessmentV1"
+            },
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "duration_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "exit_code": {
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionEvidenceKindV1"
+            },
+            "manual_override": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "recorded_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviewer": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "workspace_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "check_id",
+            "kind",
+            "assessment",
+            "workspace_digest",
+            "recorded_at_millis",
+            "artifact_count"
+          ],
+          "type": "object"
+        },
+        "MissionProvider": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "open_code",
+            "acp"
+          ],
+          "type": "string"
+        },
+        "MissionProviderMode": {
+          "enum": [
+            "managed",
+            "passthrough"
+          ],
+          "type": "string"
+        },
+        "MissionRunViewV1": {
+          "properties": {
+            "base_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
+            },
+            "execute_declared_checks": {
+              "type": "boolean"
+            },
+            "execute_project_recipe": {
+              "default": false,
+              "type": "boolean"
+            },
+            "handoff_artifact_sha256": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "handoff_from_run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mode": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionProviderMode"
+            },
+            "provider": {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionProvider"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "worktree_path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id",
+            "provider",
+            "mode",
+            "worktree_path",
+            "base_revision",
+            "execute_declared_checks"
+          ],
+          "type": "object"
+        },
+        "MissionStatus": {
+          "enum": [
+            "draft",
+            "preparing",
+            "active",
+            "review_required",
+            "ready_to_close",
+            "blocked",
+            "failed",
+            "archived"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Complete first-generation mission projection for cockpit and automation\nconsumers. `MissionInfo` remains only as a strict legacy migration shape.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/schemas/mission_view_v1/$defs/MissionCheckSummaryV1"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "closure_configured": {
+          "type": "boolean"
+        },
+        "criteria": {
+          "items": {
+            "$ref": "#/schemas/mission_view_v1/$defs/MissionCriterionSummaryV1"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array"
+        },
+        "declared_check_count": {
+          "format": "uint32",
+          "maximum": 32,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "details_available": {
+          "description": "False only for a projection migrated from the legacy summary, whose\ncheck and evidence details were never present on the wire.",
+          "type": "boolean"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/schemas/mission_view_v1/$defs/MissionEvidenceSummaryV1"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "evidence_pack_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mission_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "type": "string"
+        },
+        "objective": {
+          "maxLength": 8192,
+          "minLength": 1,
+          "type": "string"
+        },
+        "repository_path": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "run": {
+          "anyOf": [
+            {
+              "$ref": "#/schemas/mission_view_v1/$defs/MissionRunViewV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_history": {
+          "items": {
+            "$ref": "#/schemas/mission_view_v1/$defs/MissionRunViewV1"
+          },
+          "maxItems": 128,
+          "type": "array"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/schemas/mission_view_v1/$defs/MissionStatus"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "unresolved_attention_count": {
+          "format": "uint32",
+          "maximum": 100000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "updated_at_millis": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "mission_id",
+        "title",
+        "repository_path",
+        "objective",
+        "criteria",
+        "closure_configured",
+        "declared_check_count",
+        "checks",
+        "evidence",
+        "details_available",
+        "status",
+        "unresolved_attention_count",
+        "updated_at_millis"
+      ],
+      "title": "MissionViewV1",
+      "type": "object"
+    },
+    "plugin_inspector_input_v1": {
+      "$defs": {
+        "MissionCheckKindV1": {
+          "enum": [
+            "command",
+            "manual"
+          ],
+          "type": "string"
+        },
+        "MissionCheckStatusV1": {
+          "description": "Mirrors every outcome currently produced by the core proof evaluator.",
+          "enum": [
+            "passed",
+            "failed",
+            "stale",
+            "missing",
+            "manual_missing",
+            "provider_claim_only",
+            "declaration_mismatch",
+            "identity_mismatch",
+            "artifact_missing_or_changed",
+            "manual_not_authorized"
+          ],
+          "type": "string"
+        },
+        "MissionCheckSummaryV1": {
+          "properties": {
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "covered_criterion_ids": {
+              "items": {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "kind": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionCheckKindV1"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "status": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionCheckStatusV1"
+            }
+          },
+          "required": [
+            "check_id",
+            "kind",
+            "required",
+            "covered_criterion_ids",
+            "status"
+          ],
+          "type": "object"
+        },
+        "MissionCriterionCoverageV1": {
+          "enum": [
+            "unknown",
+            "uncovered",
+            "covered"
+          ],
+          "type": "string"
+        },
+        "MissionCriterionSummaryV1": {
+          "properties": {
+            "coverage": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionCriterionCoverageV1"
+            },
+            "criterion_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "required_check_ids": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            }
+          },
+          "required": [
+            "description",
+            "coverage",
+            "required_check_ids"
+          ],
+          "type": "object"
+        },
+        "MissionEvidenceAssessmentV1": {
+          "description": "Assessment values for evidence records that actually exist. Missing\nevidence is represented on the corresponding check summary instead.",
+          "enum": [
+            "passed",
+            "failed",
+            "stale",
+            "provider_claim_only",
+            "declaration_mismatch",
+            "identity_mismatch",
+            "artifact_missing_or_changed",
+            "manual_not_authorized"
+          ],
+          "type": "string"
+        },
+        "MissionEvidenceKindV1": {
+          "enum": [
+            "command",
+            "manual",
+            "provider_claim"
+          ],
+          "type": "string"
+        },
+        "MissionEvidenceSummaryV1": {
+          "properties": {
+            "artifact_count": {
+              "format": "uint32",
+              "maximum": 32,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "assessment": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionEvidenceAssessmentV1"
+            },
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "duration_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "exit_code": {
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionEvidenceKindV1"
+            },
+            "manual_override": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "recorded_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviewer": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "workspace_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "check_id",
+            "kind",
+            "assessment",
+            "workspace_digest",
+            "recorded_at_millis",
+            "artifact_count"
+          ],
+          "type": "object"
+        },
+        "MissionProvider": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "open_code",
+            "acp"
+          ],
+          "type": "string"
+        },
+        "MissionProviderMode": {
+          "enum": [
+            "managed",
+            "passthrough"
+          ],
+          "type": "string"
+        },
+        "MissionRunViewV1": {
+          "properties": {
+            "base_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
+            },
+            "execute_declared_checks": {
+              "type": "boolean"
+            },
+            "execute_project_recipe": {
+              "default": false,
+              "type": "boolean"
+            },
+            "handoff_artifact_sha256": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "handoff_from_run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mode": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionProviderMode"
+            },
+            "provider": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionProvider"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "worktree_path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id",
+            "provider",
+            "mode",
+            "worktree_path",
+            "base_revision",
+            "execute_declared_checks"
+          ],
+          "type": "object"
+        },
+        "MissionStatus": {
+          "enum": [
+            "draft",
+            "preparing",
+            "active",
+            "review_required",
+            "ready_to_close",
+            "blocked",
+            "failed",
+            "archived"
+          ],
+          "type": "string"
+        },
+        "MissionViewV1": {
+          "description": "Complete first-generation mission projection for cockpit and automation\nconsumers. `MissionInfo` remains only as a strict legacy migration shape.",
+          "properties": {
+            "checks": {
+              "items": {
+                "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionCheckSummaryV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "closure_configured": {
+              "type": "boolean"
+            },
+            "criteria": {
+              "items": {
+                "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionCriterionSummaryV1"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "type": "array"
+            },
+            "declared_check_count": {
+              "format": "uint32",
+              "maximum": 32,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "details_available": {
+              "description": "False only for a projection migrated from the legacy summary, whose\ncheck and evidence details were never present on the wire.",
+              "type": "boolean"
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionEvidenceSummaryV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "evidence_pack_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "objective": {
+              "maxLength": 8192,
+              "minLength": 1,
+              "type": "string"
+            },
+            "repository_path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "run": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionRunViewV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "run_history": {
+              "items": {
+                "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionRunViewV1"
+              },
+              "maxItems": 128,
+              "type": "array"
+            },
+            "schema_version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "status": {
+              "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionStatus"
+            },
+            "title": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "unresolved_attention_count": {
+              "format": "uint32",
+              "maximum": 100000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "updated_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema_version",
+            "mission_id",
+            "title",
+            "repository_path",
+            "objective",
+            "criteria",
+            "closure_configured",
+            "declared_check_count",
+            "checks",
+            "evidence",
+            "details_available",
+            "status",
+            "unresolved_attention_count",
+            "updated_at_millis"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Host-authored input for a mission inspector contribution.",
+      "properties": {
+        "mission": {
+          "$ref": "#/schemas/plugin_inspector_input_v1/$defs/MissionViewV1"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "mission"
+      ],
+      "title": "PluginInspectorInputV1",
+      "type": "object"
+    },
+    "plugin_ui_document_v1": {
+      "$defs": {
+        "PluginUiBlockV1": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "rows": {
+                  "items": {
+                    "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiRowV1"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                "title": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": {
+                  "const": "section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "title",
+                "rows"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiMetricV1"
+                  },
+                  "maxItems": 16,
+                  "type": "array"
+                },
+                "type": {
+                  "const": "metrics",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "items"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "items": {
+                    "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiListItemV1"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                "title": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "list",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "items"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "title": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tone": {
+                  "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiToneV1"
+                },
+                "type": {
+                  "const": "notice",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "tone",
+                "body"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "PluginUiListItemV1": {
+          "additionalProperties": false,
+          "properties": {
+            "detail": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "tone": {
+              "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiToneV1",
+              "default": "neutral"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "type": "object"
+        },
+        "PluginUiMetricV1": {
+          "additionalProperties": false,
+          "properties": {
+            "detail": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "label": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "tone": {
+              "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiToneV1",
+              "default": "neutral"
+            },
+            "value": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "value"
+          ],
+          "type": "object"
+        },
+        "PluginUiRowV1": {
+          "additionalProperties": false,
+          "properties": {
+            "label": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "tone": {
+              "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiToneV1",
+              "default": "neutral"
+            },
+            "value": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "value"
+          ],
+          "type": "object"
+        },
+        "PluginUiToneV1": {
+          "enum": [
+            "neutral",
+            "success",
+            "warning",
+            "danger"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "A bounded, theme-safe document returned by a plugin inspector source.",
+      "properties": {
+        "blocks": {
+          "items": {
+            "$ref": "#/schemas/plugin_ui_document_v1/$defs/PluginUiBlockV1"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "summary": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "blocks"
+      ],
+      "title": "PluginUiDocumentV1",
+      "type": "object"
+    },
+    "proof_receipt_v1": {
+      "$defs": {
+        "ProofArtifactV1": {
+          "properties": {
+            "content_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "media_type": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content_digest",
+            "media_type"
+          ],
+          "type": "object"
+        },
+        "ProofClosureDecisionV1": {
+          "enum": [
+            "ready_to_close",
+            "archived"
+          ],
+          "type": "string"
+        },
+        "ProofEvidenceSourceV1": {
+          "description": "Only command and authorized manual evidence can appear in a verified\nreceipt. Provider claims are intentionally absent because the proof\nevaluator never accepts them as closure evidence.",
+          "oneOf": [
+            {
+              "properties": {
+                "args": {
+                  "items": {
+                    "maxLength": 4096,
+                    "type": "string"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "cwd": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "exit_code": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "finished_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "command",
+                  "type": "string"
+                },
+                "program": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "started_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "program",
+                "args",
+                "cwd",
+                "exit_code",
+                "started_at_millis",
+                "finished_at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "is_override": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "manual",
+                  "type": "string"
+                },
+                "reason": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "recorded_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reviewer": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "reviewer",
+                "reason",
+                "is_override",
+                "recorded_at_millis"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "ProofEvidenceV1": {
+          "properties": {
+            "artifacts": {
+              "items": {
+                "$ref": "#/schemas/proof_receipt_v1/$defs/ProofArtifactV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "covered_criterion_ids": {
+              "items": {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "declaration_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "evidence_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "source": {
+              "$ref": "#/schemas/proof_receipt_v1/$defs/ProofEvidenceSourceV1"
+            }
+          },
+          "required": [
+            "check_id",
+            "declaration_digest",
+            "evidence_digest",
+            "required",
+            "covered_criterion_ids",
+            "source",
+            "artifacts"
+          ],
+          "type": "object"
+        },
+        "ProofIdentityV1": {
+          "properties": {
+            "base_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "repository_identity": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "worktree_identity": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "mission_id",
+            "run_id",
+            "repository_identity",
+            "worktree_identity",
+            "base_revision"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Portable receipt minted only after the core verifier has bound fresh\nevidence to one mission run, worktree and authority snapshot.",
+      "properties": {
+        "attention_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "authority_head_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "authority_sequence": {
+          "format": "uint64",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "checkset_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "criteria_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/schemas/proof_receipt_v1/$defs/ProofClosureDecisionV1"
+        },
+        "evidence_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "fresh_evidence": {
+          "items": {
+            "$ref": "#/schemas/proof_receipt_v1/$defs/ProofEvidenceV1"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "head_revision": {
+          "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/schemas/proof_receipt_v1/$defs/ProofIdentityV1"
+        },
+        "lease_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "seal_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "subject_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "verified_at_millis": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "workspace_digest": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "identity",
+        "head_revision",
+        "workspace_digest",
+        "criteria_digest",
+        "checkset_digest",
+        "attention_digest",
+        "evidence_digest",
+        "subject_digest",
+        "seal_digest",
+        "authority_head_digest",
+        "lease_digest",
+        "authority_sequence",
+        "verified_at_millis",
+        "decision",
+        "fresh_evidence"
+      ],
+      "title": "ProofReceiptV1",
+      "type": "object"
+    },
+    "provider_capabilities_v1": {
+      "$defs": {
+        "MissionProvider": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "open_code",
+            "acp"
+          ],
+          "type": "string"
+        },
+        "MissionProviderMode": {
+          "enum": [
+            "managed",
+            "passthrough"
+          ],
+          "type": "string"
+        },
+        "ProviderCapabilitySourceV1": {
+          "enum": [
+            "negotiated",
+            "adapter_declaration",
+            "observed_fallback"
+          ],
+          "type": "string"
+        },
+        "ProviderCapabilityV1": {
+          "oneOf": [
+            {
+              "properties": {
+                "status": {
+                  "const": "supported",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "detail": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "status": {
+                  "const": "partial",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "detail"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "detail": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "const": "unsupported",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "detail": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "ProviderRuntimeRequirementV1": {
+          "oneOf": [
+            {
+              "properties": {
+                "strategy": {
+                  "const": "not_pinned",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "strategy"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "strategy": {
+                  "const": "exact",
+                  "type": "string"
+                },
+                "version": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "strategy",
+                "version"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Capability declaration for one provider integration and execution mode.\nA four-state capability avoids turning an absent or partial protocol signal\ninto a misleading boolean claim.",
+      "properties": {
+        "adapter_contract_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "diffs": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "interruption": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "mode": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/MissionProviderMode"
+        },
+        "permissions": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "provider": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/MissionProvider"
+        },
+        "provider_version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "questions": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "resume": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "runtime_requirement": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderRuntimeRequirementV1"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilitySourceV1"
+        },
+        "streaming": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "turns": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        },
+        "usage": {
+          "$ref": "#/schemas/provider_capabilities_v1/$defs/ProviderCapabilityV1"
+        }
+      },
+      "required": [
+        "schema_version",
+        "provider",
+        "mode",
+        "source",
+        "adapter_contract_version",
+        "runtime_requirement",
+        "resume",
+        "turns",
+        "permissions",
+        "questions",
+        "diffs",
+        "interruption",
+        "usage",
+        "streaming"
+      ],
+      "title": "ProviderCapabilitiesV1",
+      "type": "object"
+    },
     "request": {
       "$defs": {
         "AgentReadParams": {
@@ -1313,6 +3496,38 @@
           },
           "required": [
             "target"
+          ],
+          "type": "object"
+        },
+        "AttentionListParams": {
+          "properties": {
+            "include_closed": {
+              "default": false,
+              "type": "boolean"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "AttentionTarget": {
+          "properties": {
+            "attention_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "attention_id"
           ],
           "type": "object"
         },
@@ -2101,6 +4316,58 @@
           ],
           "type": "object"
         },
+        "MissionHandoffPreviewParams": {
+          "additionalProperties": false,
+          "properties": {
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/schemas/request/$defs/MissionProvider"
+            }
+          },
+          "required": [
+            "mission_id",
+            "to"
+          ],
+          "type": "object"
+        },
+        "MissionHandoffStartParams": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_sha256": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "generated_at_millis": {
+              "description": "Timestamp from the inspected preview. The server rebuilds that exact\nartifact before starting the continuation.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/schemas/request/$defs/MissionProvider"
+            }
+          },
+          "required": [
+            "mission_id",
+            "to",
+            "generated_at_millis",
+            "artifact_sha256"
+          ],
+          "type": "object"
+        },
         "MissionPathRule": {
           "oneOf": [
             {
@@ -2153,7 +4420,8 @@
           "enum": [
             "codex",
             "claude_code",
-            "open_code"
+            "open_code",
+            "acp"
           ],
           "type": "string"
         },
@@ -2218,6 +4486,16 @@
         "MissionStartParams": {
           "additionalProperties": false,
           "properties": {
+            "execute_declared_checks": {
+              "default": false,
+              "description": "Explicit consent to execute the mission's declared commands after the\nprovider finishes. Commands run with the local user's OS permissions.",
+              "type": "boolean"
+            },
+            "execute_project_recipe": {
+              "default": false,
+              "description": "Explicit local consent to run `.nagi/project.toml` setup and services.\nThe public socket cannot grant this authority.",
+              "type": "boolean"
+            },
             "mission_id": {
               "maxLength": 128,
               "minLength": 1,
@@ -3187,6 +5465,17 @@
           },
           "type": "object"
         },
+        "PluginCapabilityApproveParams": {
+          "properties": {
+            "plugin_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "plugin_id"
+          ],
+          "type": "object"
+        },
         "PluginInvocationContext": {
           "properties": {
             "clicked_url": {
@@ -3308,6 +5597,11 @@
                   "type": "null"
                 }
               ]
+            },
+            "trust_native": {
+              "default": false,
+              "description": "Explicit acknowledgement that a legacy native plugin executes with the\ncurrent user's OS permissions. Defaults to false for every migrated or\nremote request.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -4532,6 +6826,102 @@
         {
           "properties": {
             "method": {
+              "const": "mission.proof.get",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.handoff.preview",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionHandoffPreviewParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.handoff.start",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionHandoffStartParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "mission.close",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/MissionTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "attention.list",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AttentionListParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "attention.get",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AttentionTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "client.window_title.set",
               "type": "string"
             },
@@ -5684,6 +8074,38 @@
         {
           "properties": {
             "method": {
+              "const": "plugin.capability.approve",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PluginCapabilityApproveParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "plugin.capability.revoke",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PluginSetEnabledParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "plugin.action.list",
               "type": "string"
             },
@@ -6218,6 +8640,541 @@
             "unknown"
           ],
           "type": "string"
+        },
+        "AttentionDecisionV1": {
+          "enum": [
+            "approve_once",
+            "approve_for_session",
+            "allow_for_mission",
+            "deny",
+            "answer"
+          ],
+          "type": "string"
+        },
+        "AttentionDeliveryStateV1": {
+          "description": "State of the latest provider response attempt. `DeliveryUnknown` is kept\ndistinct from a definite rejection because retrying those cases has\ndifferent safety consequences.",
+          "oneOf": [
+            {
+              "properties": {
+                "state": {
+                  "const": "not_requested",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "requested_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "pending",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "requested_at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "acknowledged",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "code": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionFailureCodeV1"
+                },
+                "state": {
+                  "const": "definitely_not_applied",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "code",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "attempt": {
+                  "format": "uint32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "code": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionFailureCodeV1"
+                },
+                "state": {
+                  "const": "delivery_unknown",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "attempt",
+                "code",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "state": {
+                  "const": "not_applicable",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "AttentionFailureCodeV1": {
+          "enum": [
+            "rejected",
+            "disconnected_before_write",
+            "timeout",
+            "transport_closed"
+          ],
+          "type": "string"
+        },
+        "AttentionItemV1": {
+          "description": "Provider-neutral attention projection. It deliberately separates the item\nlifecycle from response delivery so an uncertain write cannot look\nresolved merely because the provider connection disappeared.",
+          "properties": {
+            "attention_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "created_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "delivery": {
+              "$ref": "#/schemas/success_response/$defs/AttentionDeliveryStateV1"
+            },
+            "expires_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/schemas/success_response/$defs/AttentionKindV1"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "occurrence_count": {
+              "format": "uint32",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "pane": {
+              "$ref": "#/schemas/success_response/$defs/AttentionPaneTargetV1"
+            },
+            "provider": {
+              "$ref": "#/schemas/success_response/$defs/MissionProvider"
+            },
+            "questions": {
+              "description": "Provider-native question contract. Empty for permission and recovered\nitems. IDs are exact response keys, not UI-generated labels.",
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/AttentionQuestionV1"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "requested_action": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "response_capability": {
+              "$ref": "#/schemas/success_response/$defs/AttentionResponseCapabilityV1"
+            },
+            "risk": {
+              "$ref": "#/schemas/success_response/$defs/AttentionRiskV1"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "schema_version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "scope": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "session_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/schemas/success_response/$defs/AttentionSourceV1"
+            },
+            "state": {
+              "$ref": "#/schemas/success_response/$defs/AttentionStateV1"
+            },
+            "unread": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "schema_version",
+            "attention_id",
+            "mission_id",
+            "run_id",
+            "session_id",
+            "pane",
+            "kind",
+            "requested_action",
+            "scope",
+            "risk",
+            "provider",
+            "source",
+            "response_capability",
+            "created_at_millis",
+            "occurrence_count",
+            "unread",
+            "state",
+            "delivery"
+          ],
+          "type": "object"
+        },
+        "AttentionKindV1": {
+          "enum": [
+            "permission_request",
+            "provider_question",
+            "command_failed",
+            "worktree_conflict",
+            "turn_complete",
+            "disconnected",
+            "security_warning",
+            "manual_verification"
+          ],
+          "type": "string"
+        },
+        "AttentionPaneTargetV1": {
+          "properties": {
+            "pane_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "workspace_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id",
+            "pane_id"
+          ],
+          "type": "object"
+        },
+        "AttentionQuestionOptionV1": {
+          "properties": {
+            "description": {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "label": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "description"
+          ],
+          "type": "object"
+        },
+        "AttentionQuestionV1": {
+          "properties": {
+            "custom_allowed": {
+              "type": "boolean"
+            },
+            "header": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "id": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "multiple": {
+              "type": "boolean"
+            },
+            "options": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/AttentionQuestionOptionV1"
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            "prompt": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "header",
+            "prompt",
+            "multiple",
+            "custom_allowed"
+          ],
+          "type": "object"
+        },
+        "AttentionResponseCapabilityV1": {
+          "enum": [
+            "reliable",
+            "open_pane_only"
+          ],
+          "type": "string"
+        },
+        "AttentionRiskV1": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "AttentionSourceV1": {
+          "enum": [
+            "structured_hook",
+            "provider_api",
+            "process",
+            "terminal_heuristic"
+          ],
+          "type": "string"
+        },
+        "AttentionStateV1": {
+          "oneOf": [
+            {
+              "properties": {
+                "state": {
+                  "const": "open",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "decision": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionDecisionV1"
+                },
+                "requested_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "pending_response",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "decision",
+                "actor",
+                "requested_at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "decision": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionDecisionV1"
+                },
+                "state": {
+                  "const": "resolved",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "decision",
+                "actor",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "code": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionFailureCodeV1"
+                },
+                "decision": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionDecisionV1"
+                },
+                "state": {
+                  "const": "reconciliation_required",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "decision",
+                "actor",
+                "code",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "actor": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reason": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "state": {
+                  "const": "dismissed",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "actor",
+                "reason",
+                "at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "const": "expired",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state",
+                "at_millis"
+              ],
+              "type": "object"
+            }
+          ]
         },
         "ClientWindowTitleReason": {
           "enum": [
@@ -6905,9 +9862,21 @@
             "enabled": {
               "type": "boolean"
             },
+            "entrypoint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "events": {
               "items": {
                 "$ref": "#/schemas/success_response/$defs/PluginManifestEventHook"
+              },
+              "type": "array"
+            },
+            "inspector_tabs": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PluginInspectorTabContributionV2"
               },
               "type": "array"
             },
@@ -6920,12 +9889,25 @@
             "manifest_path": {
               "type": "string"
             },
+            "manifest_version": {
+              "default": 1,
+              "description": "Legacy manifests migrate to version 1.",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
             "min_nagi_version": {
               "default": "",
               "type": "string"
             },
             "name": {
               "type": "string"
+            },
+            "native_trusted": {
+              "default": false,
+              "description": "Native plugins are executable only after a user explicitly grants\nunrestricted trust. Legacy registry entries migrate to false.",
+              "type": "boolean"
             },
             "panes": {
               "items": {
@@ -6947,6 +9929,16 @@
             },
             "plugin_root": {
               "type": "string"
+            },
+            "requested_capabilities": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "runtime": {
+              "$ref": "#/schemas/success_response/$defs/PluginRuntimeV2",
+              "default": "trusted-native"
             },
             "source": {
               "$ref": "#/schemas/success_response/$defs/PluginSourceInfo",
@@ -7127,51 +10119,370 @@
             }
           ]
         },
-        "MissionInfo": {
+        "MissionCheckKindV1": {
+          "enum": [
+            "command",
+            "manual"
+          ],
+          "type": "string"
+        },
+        "MissionCheckStatusV1": {
+          "description": "Mirrors every outcome currently produced by the core proof evaluator.",
+          "enum": [
+            "passed",
+            "failed",
+            "stale",
+            "missing",
+            "manual_missing",
+            "provider_claim_only",
+            "declaration_mismatch",
+            "identity_mismatch",
+            "artifact_missing_or_changed",
+            "manual_not_authorized"
+          ],
+          "type": "string"
+        },
+        "MissionCheckSummaryV1": {
+          "properties": {
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "covered_criterion_ids": {
+              "items": {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "kind": {
+              "$ref": "#/schemas/success_response/$defs/MissionCheckKindV1"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "status": {
+              "$ref": "#/schemas/success_response/$defs/MissionCheckStatusV1"
+            }
+          },
+          "required": [
+            "check_id",
+            "kind",
+            "required",
+            "covered_criterion_ids",
+            "status"
+          ],
+          "type": "object"
+        },
+        "MissionCriterionCoverageV1": {
+          "enum": [
+            "unknown",
+            "uncovered",
+            "covered"
+          ],
+          "type": "string"
+        },
+        "MissionCriterionSummaryV1": {
+          "properties": {
+            "coverage": {
+              "$ref": "#/schemas/success_response/$defs/MissionCriterionCoverageV1"
+            },
+            "criterion_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "required_check_ids": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            }
+          },
+          "required": [
+            "description",
+            "coverage",
+            "required_check_ids"
+          ],
+          "type": "object"
+        },
+        "MissionEvidenceAssessmentV1": {
+          "description": "Assessment values for evidence records that actually exist. Missing\nevidence is represented on the corresponding check summary instead.",
+          "enum": [
+            "passed",
+            "failed",
+            "stale",
+            "provider_claim_only",
+            "declaration_mismatch",
+            "identity_mismatch",
+            "artifact_missing_or_changed",
+            "manual_not_authorized"
+          ],
+          "type": "string"
+        },
+        "MissionEvidenceKindV1": {
+          "enum": [
+            "command",
+            "manual",
+            "provider_claim"
+          ],
+          "type": "string"
+        },
+        "MissionEvidenceSummaryV1": {
+          "properties": {
+            "artifact_count": {
+              "format": "uint32",
+              "maximum": 32,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "assessment": {
+              "$ref": "#/schemas/success_response/$defs/MissionEvidenceAssessmentV1"
+            },
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "duration_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "exit_code": {
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/schemas/success_response/$defs/MissionEvidenceKindV1"
+            },
+            "manual_override": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "recorded_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviewer": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "workspace_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "check_id",
+            "kind",
+            "assessment",
+            "workspace_digest",
+            "recorded_at_millis",
+            "artifact_count"
+          ],
+          "type": "object"
+        },
+        "MissionHandoffArtifactV1": {
+          "additionalProperties": false,
           "properties": {
             "acceptance_criteria": {
               "items": {
+                "maxLength": 1024,
+                "minLength": 1,
                 "type": "string"
               },
+              "maxItems": 16,
+              "minItems": 1,
               "type": "array"
             },
-            "check_count": {
-              "format": "uint",
+            "artifact_sha256": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "base_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
+            },
+            "checks": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/MissionCheckSummaryV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "decisions": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/MissionHandoffDecisionV1"
+              },
+              "maxItems": 128,
+              "type": "array"
+            },
+            "diff": {
+              "$ref": "#/schemas/success_response/$defs/MissionHandoffDiffV1"
+            },
+            "generated_at_millis": {
+              "format": "uint64",
               "minimum": 0,
               "type": "integer"
             },
-            "closure_configured": {
-              "type": "boolean"
+            "head_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
             },
             "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
               "type": "string"
             },
             "objective": {
+              "maxLength": 8192,
+              "minLength": 1,
               "type": "string"
             },
             "repository_path": {
+              "maxLength": 4096,
+              "minLength": 1,
               "type": "string"
             },
-            "run": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/success_response/$defs/MissionRunInfo"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "status": {
-              "$ref": "#/schemas/success_response/$defs/MissionStatus"
-            },
-            "title": {
-              "type": "string"
-            },
-            "unresolved_attention_count": {
-              "format": "uint",
-              "minimum": 0,
+            "schema_version": {
+              "const": 1,
               "type": "integer"
+            },
+            "selected_logs": {
+              "items": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "source_provider": {
+              "$ref": "#/schemas/success_response/$defs/MissionProvider"
+            },
+            "source_run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "suggested_run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "target_provider": {
+              "$ref": "#/schemas/success_response/$defs/MissionProvider"
+            },
+            "warnings": {
+              "items": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "worktree_path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema_version",
+            "artifact_sha256",
+            "generated_at_millis",
+            "mission_id",
+            "source_run_id",
+            "suggested_run_id",
+            "source_provider",
+            "target_provider",
+            "repository_path",
+            "worktree_path",
+            "base_revision",
+            "head_revision",
+            "objective",
+            "acceptance_criteria",
+            "diff",
+            "decisions",
+            "checks",
+            "selected_logs",
+            "warnings"
+          ],
+          "type": "object"
+        },
+        "MissionHandoffDecisionStateV1": {
+          "enum": [
+            "requested",
+            "acknowledged",
+            "failed",
+            "reconciliation_required"
+          ],
+          "type": "string"
+        },
+        "MissionHandoffDecisionV1": {
+          "additionalProperties": false,
+          "properties": {
+            "actor_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "attention_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "decision": {
+              "$ref": "#/schemas/success_response/$defs/AttentionDecisionV1"
+            },
+            "state": {
+              "$ref": "#/schemas/success_response/$defs/MissionHandoffDecisionStateV1"
             },
             "updated_at_millis": {
               "format": "uint64",
@@ -7180,16 +10491,45 @@
             }
           },
           "required": [
-            "mission_id",
-            "title",
-            "repository_path",
-            "objective",
-            "acceptance_criteria",
-            "closure_configured",
-            "check_count",
-            "status",
-            "unresolved_attention_count",
+            "attention_id",
+            "decision",
+            "actor_id",
+            "state",
             "updated_at_millis"
+          ],
+          "type": "object"
+        },
+        "MissionHandoffDiffV1": {
+          "additionalProperties": false,
+          "properties": {
+            "changed_paths": {
+              "items": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 200000,
+              "type": "array"
+            },
+            "dirty": {
+              "type": "boolean"
+            },
+            "stat": {
+              "maxLength": 32768,
+              "type": "string"
+            },
+            "workspace_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_digest",
+            "dirty",
+            "changed_paths",
+            "stat"
           ],
           "type": "object"
         },
@@ -7197,7 +10537,8 @@
           "enum": [
             "codex",
             "claude_code",
-            "open_code"
+            "open_code",
+            "acp"
           ],
           "type": "string"
         },
@@ -7208,10 +10549,36 @@
           ],
           "type": "string"
         },
-        "MissionRunInfo": {
+        "MissionRunViewV1": {
           "properties": {
             "base_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
               "type": "string"
+            },
+            "execute_declared_checks": {
+              "type": "boolean"
+            },
+            "execute_project_recipe": {
+              "default": false,
+              "type": "boolean"
+            },
+            "handoff_artifact_sha256": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "handoff_from_run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "mode": {
               "$ref": "#/schemas/success_response/$defs/MissionProviderMode"
@@ -7220,9 +10587,14 @@
               "$ref": "#/schemas/success_response/$defs/MissionProvider"
             },
             "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
               "type": "string"
             },
             "worktree_path": {
+              "maxLength": 4096,
+              "minLength": 1,
               "type": "string"
             }
           },
@@ -7231,7 +10603,8 @@
             "provider",
             "mode",
             "worktree_path",
-            "base_revision"
+            "base_revision",
+            "execute_declared_checks"
           ],
           "type": "object"
         },
@@ -7277,6 +10650,128 @@
             "mission_id",
             "title",
             "repository_path",
+            "status",
+            "unresolved_attention_count",
+            "updated_at_millis"
+          ],
+          "type": "object"
+        },
+        "MissionViewV1": {
+          "description": "Complete first-generation mission projection for cockpit and automation\nconsumers. `MissionInfo` remains only as a strict legacy migration shape.",
+          "properties": {
+            "checks": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/MissionCheckSummaryV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "closure_configured": {
+              "type": "boolean"
+            },
+            "criteria": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/MissionCriterionSummaryV1"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "type": "array"
+            },
+            "declared_check_count": {
+              "format": "uint32",
+              "maximum": 32,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "details_available": {
+              "description": "False only for a projection migrated from the legacy summary, whose\ncheck and evidence details were never present on the wire.",
+              "type": "boolean"
+            },
+            "evidence": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/MissionEvidenceSummaryV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "evidence_pack_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "objective": {
+              "maxLength": 8192,
+              "minLength": 1,
+              "type": "string"
+            },
+            "repository_path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "run": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/MissionRunViewV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "run_history": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/MissionRunViewV1"
+              },
+              "maxItems": 128,
+              "type": "array"
+            },
+            "schema_version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "status": {
+              "$ref": "#/schemas/success_response/$defs/MissionStatus"
+            },
+            "title": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "unresolved_attention_count": {
+              "format": "uint32",
+              "maximum": 100000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "updated_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema_version",
+            "mission_id",
+            "title",
+            "repository_path",
+            "objective",
+            "criteria",
+            "closure_configured",
+            "declared_check_count",
+            "checks",
+            "evidence",
+            "details_available",
             "status",
             "unresolved_attention_count",
             "updated_at_millis"
@@ -8025,6 +11520,7 @@
         "PluginActionContext": {
           "enum": [
             "global",
+            "mission",
             "workspace",
             "tab",
             "pane",
@@ -8163,6 +11659,98 @@
             "failed"
           ],
           "type": "string"
+        },
+        "PluginGrantV1": {
+          "additionalProperties": false,
+          "properties": {
+            "approved_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "approved_by": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "capabilities": {
+              "items": {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 64,
+              "type": "array"
+            },
+            "manifest_sha256": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "plugin_id": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "plugin_version": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "revoked_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "runtime": {
+              "$ref": "#/schemas/success_response/$defs/PluginRuntimeV2"
+            },
+            "schema_version": {
+              "const": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema_version",
+            "plugin_id",
+            "plugin_version",
+            "runtime",
+            "manifest_sha256",
+            "capabilities",
+            "approved_by",
+            "approved_at_millis"
+          ],
+          "type": "object"
+        },
+        "PluginInspectorTabContributionV2": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "source": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "source"
+          ],
+          "type": "object"
         },
         "PluginInvocationContext": {
           "properties": {
@@ -8490,6 +12078,13 @@
           ],
           "type": "string"
         },
+        "PluginRuntimeV2": {
+          "enum": [
+            "wasi-component",
+            "trusted-native"
+          ],
+          "type": "string"
+        },
         "PluginSourceInfo": {
           "properties": {
             "installed_unix_ms": {
@@ -8565,6 +12160,331 @@
             }
           ]
         },
+        "ProofArtifactV1": {
+          "properties": {
+            "content_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "media_type": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content_digest",
+            "media_type"
+          ],
+          "type": "object"
+        },
+        "ProofClosureDecisionV1": {
+          "enum": [
+            "ready_to_close",
+            "archived"
+          ],
+          "type": "string"
+        },
+        "ProofEvidenceSourceV1": {
+          "description": "Only command and authorized manual evidence can appear in a verified\nreceipt. Provider claims are intentionally absent because the proof\nevaluator never accepts them as closure evidence.",
+          "oneOf": [
+            {
+              "properties": {
+                "args": {
+                  "items": {
+                    "maxLength": 4096,
+                    "type": "string"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "cwd": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "exit_code": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "finished_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "command",
+                  "type": "string"
+                },
+                "program": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "started_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "program",
+                "args",
+                "cwd",
+                "exit_code",
+                "started_at_millis",
+                "finished_at_millis"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "is_override": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "manual",
+                  "type": "string"
+                },
+                "reason": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "recorded_at_millis": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reviewer": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "reviewer",
+                "reason",
+                "is_override",
+                "recorded_at_millis"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "ProofEvidenceV1": {
+          "properties": {
+            "artifacts": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/ProofArtifactV1"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            "check_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "covered_criterion_ids": {
+              "items": {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "declaration_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "evidence_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "source": {
+              "$ref": "#/schemas/success_response/$defs/ProofEvidenceSourceV1"
+            }
+          },
+          "required": [
+            "check_id",
+            "declaration_digest",
+            "evidence_digest",
+            "required",
+            "covered_criterion_ids",
+            "source",
+            "artifacts"
+          ],
+          "type": "object"
+        },
+        "ProofIdentityV1": {
+          "properties": {
+            "base_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
+            },
+            "mission_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "repository_identity": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "run_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            "worktree_identity": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "mission_id",
+            "run_id",
+            "repository_identity",
+            "worktree_identity",
+            "base_revision"
+          ],
+          "type": "object"
+        },
+        "ProofReceiptV1": {
+          "description": "Portable receipt minted only after the core verifier has bound fresh\nevidence to one mission run, worktree and authority snapshot.",
+          "properties": {
+            "attention_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "authority_head_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "authority_sequence": {
+              "format": "uint64",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "checkset_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "criteria_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "decision": {
+              "$ref": "#/schemas/success_response/$defs/ProofClosureDecisionV1"
+            },
+            "evidence_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "fresh_evidence": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/ProofEvidenceV1"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            },
+            "head_revision": {
+              "pattern": "^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$",
+              "type": "string"
+            },
+            "identity": {
+              "$ref": "#/schemas/success_response/$defs/ProofIdentityV1"
+            },
+            "lease_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "schema_version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "seal_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "subject_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "verified_at_millis": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "workspace_digest": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schema_version",
+            "identity",
+            "head_revision",
+            "workspace_digest",
+            "criteria_digest",
+            "checkset_digest",
+            "attention_digest",
+            "evidence_digest",
+            "subject_digest",
+            "seal_digest",
+            "authority_head_digest",
+            "lease_digest",
+            "authority_sequence",
+            "verified_at_millis",
+            "decision",
+            "fresh_evidence"
+          ],
+          "type": "object"
+        },
         "ReadFormat": {
           "enum": [
             "text",
@@ -8635,7 +12555,7 @@
             {
               "properties": {
                 "mission": {
-                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                  "$ref": "#/schemas/success_response/$defs/MissionViewV1"
                 },
                 "type": {
                   "const": "mission_info",
@@ -8654,7 +12574,7 @@
                   "type": "boolean"
                 },
                 "mission": {
-                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                  "$ref": "#/schemas/success_response/$defs/MissionViewV1"
                 },
                 "type": {
                   "const": "mission_created",
@@ -8674,7 +12594,7 @@
                   "type": "boolean"
                 },
                 "mission": {
-                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                  "$ref": "#/schemas/success_response/$defs/MissionViewV1"
                 },
                 "type": {
                   "const": "mission_configured",
@@ -8691,7 +12611,7 @@
             {
               "properties": {
                 "mission": {
-                  "$ref": "#/schemas/success_response/$defs/MissionInfo"
+                  "$ref": "#/schemas/success_response/$defs/MissionViewV1"
                 },
                 "type": {
                   "const": "mission_run_started",
@@ -8740,6 +12660,89 @@
               "required": [
                 "type",
                 "missions"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "receipt": {
+                  "$ref": "#/schemas/success_response/$defs/ProofReceiptV1"
+                },
+                "type": {
+                  "const": "mission_proof",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "receipt"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "artifact": {
+                  "$ref": "#/schemas/success_response/$defs/MissionHandoffArtifactV1"
+                },
+                "type": {
+                  "const": "mission_handoff_preview",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "artifact"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mission": {
+                  "$ref": "#/schemas/success_response/$defs/MissionViewV1"
+                },
+                "type": {
+                  "const": "mission_close_accepted",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mission"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "items": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/AttentionItemV1"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "attention_list",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "items"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "item": {
+                  "$ref": "#/schemas/success_response/$defs/AttentionItemV1"
+                },
+                "type": {
+                  "const": "attention_info",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "item"
               ],
               "type": "object"
             },
@@ -9595,6 +13598,46 @@
               "required": [
                 "type",
                 "plugin"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "grant": {
+                  "$ref": "#/schemas/success_response/$defs/PluginGrantV1"
+                },
+                "plugin": {
+                  "$ref": "#/schemas/success_response/$defs/InstalledPluginInfo"
+                },
+                "type": {
+                  "const": "plugin_capabilities_approved",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "plugin",
+                "grant"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "plugin": {
+                  "$ref": "#/schemas/success_response/$defs/InstalledPluginInfo"
+                },
+                "revoked": {
+                  "type": "boolean"
+                },
+                "type": {
+                  "const": "plugin_capabilities_revoked",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "plugin",
+                "revoked"
               ],
               "type": "object"
             },

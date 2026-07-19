@@ -101,7 +101,7 @@ Raw socket method names use dot notation:
 | Notification | `notification.show` |
 | Client | `client.window_title.set`, `client.window_title.clear` |
 | Session | `session.snapshot` |
-| Mission | `mission.create`, `mission.list`, `mission.get`, `mission.configure`, `mission.start`, `mission.respond` |
+| Mission | `mission.create`, `mission.list`, `mission.get`, `mission.configure`, `mission.start`, `mission.respond`, `mission.proof.get`, `mission.handoff.preview`, `mission.handoff.start`, `mission.close` |
 | Workspace | `workspace.create`, `workspace.list`, `workspace.get`, `workspace.focus`, `workspace.rename`, `workspace.move`, `workspace.report_metadata`, `workspace.close` |
 | Worktree | `worktree.list`, `worktree.create`, `worktree.open`, `worktree.remove` |
 | Tab | `tab.create`, `tab.list`, `tab.get`, `tab.focus`, `tab.rename`, `tab.move`, `tab.close` |
@@ -124,14 +124,30 @@ boundary is intentionally narrow:
 | `mission.list` | none | Returns durable mission summaries. |
 | `mission.get` | `mission_id` | Returns the full public mission projection. |
 | `mission.configure` | `mission_id`, `checks` | Freezes 1–32 command or manual checks. Every acceptance criterion must be covered. A different second configuration is rejected. |
-| `mission.start` | `mission_id`, `run_id`, `provider`, `mode`; optional `worktree_path` | Claims one canonical Git checkout and starts Codex or Claude Code in managed, read-only mode. The closure plan must already exist. |
+| `mission.start` | `mission_id`, `run_id`, `provider`, `mode`; optional `worktree_path`, `execute_declared_checks` | Claims one canonical Git checkout and starts Codex, Claude Code, OpenCode, or a configured ACP agent in managed mode. The closure plan must already exist. |
 | `mission.respond` | `mission_id`, `run_id`, `attention_id`, `decision`; optional `answers` | Reserved for the interactive consent path. It currently always returns `interactive_consent_required` and does not send a provider response. |
 
-`provider` accepts `codex`, `claude_code`, or `open_code`; `mode` accepts
-`managed` or `passthrough`. In the current build, OpenCode mission start and
-all passthrough starts return an availability error. Managed Codex and Claude
-Code processes receive read-only workspace access. There is no API switch that
-silently grants write access.
+`execute_project_recipe` is persisted for restart recovery but cannot be
+authorized through the public socket. Sending it as `true` returns
+`interactive_consent_required`. The local mission cockpit previews the
+`.nagi/project.toml` scope and is the only path that can approve setup and
+service execution.
+
+`provider` accepts `codex`, `claude_code`, `open_code`, or `acp`; `mode` accepts
+`managed` or `passthrough`. Every provider supports managed starts. ACP uses the
+local stdio command configured in `providers.acp.command` and always requires
+explicit write-scope confirmation in the local cockpit. Every
+passthrough start returns an availability error. Public managed starts receive
+read-only workspace access. There is no API switch that silently grants write
+access.
+
+`mission.handoff.preview` creates a redacted, digest-bound snapshot of the
+objective, decisions, checks and current Git workspace. Starting the continuation
+requires `mission.handoff.start` with that exact `artifact_sha256` and
+`generated_at_millis`. Any intervening workspace or mission change returns
+`handoff_artifact_changed`. The next provider continues the same mission in the
+same worktree, prior evidence becomes stale, and the source run remains in
+`run_history`.
 
 Mission errors use stable codes where callers need branching behavior:
 
@@ -140,9 +156,10 @@ Mission errors use stable codes where callers need branching behavior:
 | `feature_unavailable` | Mission storage is unavailable on this platform. |
 | `mission_not_found`, `mission_conflict` | The mission is missing, or an immutable definition/configuration differs. |
 | `invalid_mission`, `invalid_repository`, `invalid_closure` | IDs, text, Git root, criteria coverage, or check declarations are invalid. |
-| `provider_unavailable`, `provider_mode_unavailable` | OpenCode start or passthrough mode is not wired in the current build. |
+| `provider_unavailable`, `provider_mode_unavailable` | The provider executable is unavailable, or passthrough mode is not wired. |
 | `run_conflict`, `invalid_run`, `provider_start_failed` | The run ID conflicts, cannot form a claim identity, or the provider process did not start. |
 | `interactive_consent_required` | `mission.respond` is blocked until the mission cockpit can confirm the decision. |
+| `handoff_artifact_changed`, `handoff_attention_unresolved` | The inspected snapshot is stale, or source-run attention still needs a decision. |
 
 The generated schema is the source of truth for nested `checks`, path rules,
 response decisions, result objects, and field-length constraints. Check the
@@ -418,19 +435,24 @@ Installed and linked plugins persist across restarts. Nagi writes a
 running, then startup loads it automatically. On startup, Nagi re-reads each
 manifest from its original path; if the file is missing or unparseable the entry
 is kept with a `warnings` field so `plugin.list` surfaces it.
+Native plugins execute with the current user's OS permissions. Enabling one
+therefore requires `trust_native: true` on `plugin.link`. Omitting it or sending
+`false` may register a disabled plugin, but an enabled link and every later
+enable attempt fail with `plugin_native_trust_required`. Registry entries from
+older Nagi versions migrate to disabled and untrusted.
 
 Event hook `on` values are validated against the known Nagi event names at link time. An unrecognised name is not an error — the link still succeeds — but the returned plugin info includes a warning (e.g. `"unknown event 'worktree.craeted'"`). Check the `warnings` field in the `plugin.link` and `plugin.list` responses.
 
 Link a local plugin manifest:
 
 ```json
-{"id":"req_plugin_link","method":"plugin.link","params":{"path":"/path/to/plugin","enabled":true}}
+{"id":"req_plugin_link","method":"plugin.link","params":{"path":"/path/to/plugin","enabled":true,"trust_native":true}}
 ```
 
 `plugin.link` also accepts optional `source` metadata. The CLI uses this when it installs from GitHub so `plugin.list` can show origin, requested ref, resolved commit, and managed checkout path:
 
 ```json
-{"id":"req_plugin_link","method":"plugin.link","params":{"path":"/managed/plugin/nagi-plugin.toml","enabled":true,"source":{"kind":"github","owner":"owner","repo":"nagi-plugin","subdir":"worktree-bootstrap","requested_ref":"main","resolved_commit":"abc123","managed_path":"/data/plugins/github/<managed-checkout>","installed_unix_ms":1780000000000}}}
+{"id":"req_plugin_link","method":"plugin.link","params":{"path":"/managed/plugin/nagi-plugin.toml","enabled":true,"trust_native":true,"source":{"kind":"github","owner":"owner","repo":"nagi-plugin","subdir":"worktree-bootstrap","requested_ref":"main","resolved_commit":"abc123","managed_path":"/data/plugins/github/<managed-checkout>","installed_unix_ms":1780000000000}}}
 ```
 
 The path can be a plugin directory containing `nagi-plugin.toml` or a direct

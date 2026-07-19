@@ -143,6 +143,54 @@ Worktrees are normal Nagi workspaces with Git checkout provenance. `worktree cre
 
 `workspace close` closes Nagi state only. `worktree remove` is the explicit checkout deletion path; it runs `git worktree remove`, never deletes the branch, and requires `--force` when Git refuses a dirty checkout.
 
+A repository can declare bounded setup, checks, services, cleanup, and exact
+ignored-file copying in `.nagi/project.toml`. Detection and validation never
+execute repository code. Execution always requires `--yes`:
+
+```bash
+nagi project detect [PATH] [--json]
+nagi project validate [PATH] [--json]
+nagi project setup [PATH] --yes [--json]
+nagi project check [PATH] [--id ID] --yes [--json]
+nagi project cleanup [PATH] --yes [--json]
+nagi project services start [PATH] --mission ID --run ID --yes [--json]
+nagi project services status [PATH] --mission ID --run ID [--json]
+nagi project services stop [PATH] --mission ID --run ID --yes [--json]
+nagi project resources preview [--json]
+nagi project resources apply --digest DIGEST --yes [--json]
+```
+
+Services receive collision-free loopback ports, must pass their declared HTTP
+health check, and keep durable ownership records. A new Nagi process adopts a
+healthy service for the same mission/run instead of starting a duplicate.
+Cleanup applies only the exact digest the user previewed. Worktree creation
+copies only explicit regular files: untracked sources must be ignored by Git,
+and symlinks, globs, secret-like names, oversized files, and overwrites fail
+closed.
+
+## Missions
+
+```bash
+nagi mission list
+nagi mission get <mission_id>
+nagi mission proof <mission_id>
+nagi mission close <mission_id>
+nagi mission handoff <mission_id> --to <codex|claude-code|opencode|acp> --preview
+nagi mission handoff <mission_id> --to <provider> --start --artifact-sha256 <sha256> --generated-at-millis <timestamp>
+```
+
+The cockpit is the recommended handoff flow: open a blocked or review mission,
+press `h`, inspect the bound workspace snapshot, select the next provider, then
+confirm write scope. The CLI start form requires the exact digest and timestamp
+printed by the preview, so automation cannot continue from stale context.
+
+ACP agents are local stdio processes configured without a shell:
+
+```toml
+[providers.acp]
+command = ["my-acp-agent", "--stdio"]
+```
+
 ## Tabs
 
 ```bash
@@ -356,23 +404,33 @@ Plugin commands install and run local executable workflow plugins. A plugin is a
 Install, list, and remove plugins:
 
 ```bash
-nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]
+nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes] [--trust-native]
 nagi plugin list [--plugin ID] [--json]
 nagi plugin uninstall <plugin_id|owner/repo[/subdir...]>
 nagi plugin enable <plugin_id>
 nagi plugin disable <plugin_id>
+nagi plugin approve <plugin_id>
+nagi plugin revoke <plugin_id>
 ```
 
-`plugin install` accepts GitHub shorthand only, such as `owner/nagi-plugin/worktree-bootstrap`. It uses `git`, shows a trust preview in interactive terminals, runs supported manifest build commands, and stores GitHub installs in a Nagi-managed directory. Use `--yes` for noninteractive installs. Reinstalling a GitHub-managed plugin replaces that managed checkout. Installing over a locally linked plugin is refused. Plugin manifests must declare `min_nagi_version`; install and link fail when the plugin requires a newer Nagi binary. `plugin list` is human-readable by default; pass `--json` for the raw API response.
+`plugin install` accepts GitHub shorthand only, such as `owner/nagi-plugin/worktree-bootstrap`. It uses `git`, shows a source preview, runs supported legacy build commands, and stores GitHub installs in a Nagi-managed directory. Interactive confirmation records unrestricted trust only for legacy native plugins. Non-interactive native installs require both `--yes` and `--trust-native`; sandboxed v2 components reject `--trust-native`. A v2 component that requests capabilities installs disabled until `plugin approve` and `plugin enable` are run. Reinstalling a GitHub-managed plugin replaces that managed checkout. Installing over a locally linked plugin is refused. Plugin manifests must declare `min_nagi_version`; install and link fail when the plugin requires a newer Nagi binary. `plugin list` is human-readable by default; pass `--json` for the raw API response.
 
 Local development:
 
 ```bash
-nagi plugin link <path> [--disabled]
+nagi plugin new <path> [--id ID] [--name NAME] [--runtime wasi|native]
+nagi plugin validate <path> [--json]
+nagi plugin test <path> [--action ID] [--context-json JSON] [--stdin FILE] [--workspace PATH] [--json]
+nagi plugin pack <path> [--out PATH] [--json]
+nagi plugin dev <path> [--once] [--interval-ms N] [--disabled] [--trust-native]
+nagi plugin link <path> [--disabled] [--trust-native]
+nagi plugin inspect <plugin_id> [--json]
 nagi plugin unlink <plugin_id>
 ```
 
-`plugin link` accepts a plugin directory containing `nagi-plugin.toml` or a direct manifest path. It is still the right command while authoring or testing a plugin from a local checkout. `plugin unlink` unregisters the plugin and leaves files alone. `plugin uninstall` unregisters a plugin and also removes Nagi-managed GitHub checkout files. For GitHub installs, uninstall accepts either the plugin id or the same `owner/repo[/subdir...]` shorthand used by install. Actions, event hooks, panes, and link handlers are declared in the manifest; runtime action registration is not part of v1.
+`plugin new` scaffolds a manifest v2 WASI component by default, or an explicitly trusted native plugin. `plugin validate` checks the manifest, host capability bindings, compatibility, and component binary. `plugin test` runs the WASI component inside Nagi's real sandbox with a deterministic mission fixture; inspector actions pass only when their stdout is a bounded, host-compatible UI document. Optional JSON context and stdin files make host-facing behavior reproducible. Pass `--workspace PATH` to mount a test worktree with only the manifest's declared read/write capabilities. `plugin pack` creates a non-overwriting, self-contained bundle with a package-relative component entrypoint, SHA-256 checksums, SPDX 2.3 SBOM, and provenance. `plugin dev` links once, tails recent logs, watches source and component contents, revalidates before every reload, and keeps capability-bearing plugins disabled until approval. Use `--once` in CI or editor tasks. `plugin inspect` shows runtime, provenance, resolved commit, requested capabilities, contributions, trust, warnings, and the approved-to-current security diff for version, manifest, component, commit, and added capabilities.
+
+`plugin link` accepts a plugin directory containing `nagi-plugin.toml` or a direct manifest path. Legacy native manifests require `--trust-native` before enablement. Sandboxed manifest v2 components do not accept that flag and can link enabled when they request no capabilities. Requested capabilities require an exact, revocable grant. `plugin unlink` unregisters the plugin, removes its stored grant and leaves files alone. `plugin uninstall` also removes Nagi-managed GitHub checkout files. For GitHub installs, uninstall accepts either the plugin id or the same `owner/repo[/subdir...]` shorthand used by install.
 
 Config directory:
 

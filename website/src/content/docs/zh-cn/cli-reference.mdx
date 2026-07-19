@@ -139,6 +139,49 @@ worktree 是带有 Git 检出来源信息的普通 Nagi 工作区。`worktree cr
 
 `workspace close` 只关闭 Nagi 状态。`worktree remove` 是显式的检出删除路径;它运行 `git worktree remove`,从不删除分支,并在 Git 拒绝脏检出时要求 `--force`。
 
+仓库可以在 `.nagi/project.toml` 中声明有界的 setup、检查、服务、cleanup 和
+精确的忽略文件复制。检测和验证不会执行仓库代码，所有执行都必须显式传入 `--yes`:
+
+```bash
+nagi project detect [PATH] [--json]
+nagi project validate [PATH] [--json]
+nagi project setup [PATH] --yes [--json]
+nagi project check [PATH] [--id ID] --yes [--json]
+nagi project cleanup [PATH] --yes [--json]
+nagi project services start [PATH] --mission ID --run ID --yes [--json]
+nagi project services status [PATH] --mission ID --run ID [--json]
+nagi project services stop [PATH] --mission ID --run ID --yes [--json]
+nagi project resources preview [--json]
+nagi project resources apply --digest DIGEST --yes [--json]
+```
+
+服务获得无冲突的 loopback 端口，并必须通过声明的 HTTP 健康检查。同一 mission/run
+的健康服务会在 Nagi 重启后被接管，而不会重复启动。cleanup 只应用与用户已审核 digest
+完全一致的预览。worktree 只复制明确声明的普通文件；symlink、glob、疑似密钥名称、
+超大文件和覆盖写入都会关闭失败。
+
+## 任务
+
+```bash
+nagi mission list
+nagi mission get <mission_id>
+nagi mission proof <mission_id>
+nagi mission close <mission_id>
+nagi mission handoff <mission_id> --to <codex|claude-code|opencode|acp> --preview
+nagi mission handoff <mission_id> --to <provider> --start --artifact-sha256 <sha256> --generated-at-millis <timestamp>
+```
+
+建议在驾驶舱中执行交接: 打开处于阻塞或审核状态的任务,按 `h` 检查绑定的工作区
+快照,选择下一个提供商,然后确认写入范围。CLI 启动命令要求使用预览输出的精确摘要
+和时间戳,因此自动化无法从过期上下文继续执行。
+
+ACP 智能体是无需 shell 的本地 stdio 进程:
+
+```toml
+[providers.acp]
+command = ["my-acp-agent", "--stdio"]
+```
+
 ## 标签页
 
 ```bash

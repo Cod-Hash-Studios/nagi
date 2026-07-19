@@ -120,13 +120,19 @@ nagi pane read w1:p2 --source recent --lines 50
 | `mission.list` | なし | 永続化されたミッション概要を返します。 |
 | `mission.get` | `mission_id` | 公開ミッション投影全体を返します。 |
 | `mission.configure` | `mission_id`、`checks` | 1–32 件のコマンドまたは手動チェックを固定します。すべての受け入れ基準をカバーする必要があり、異なる再設定は拒否されます。 |
-| `mission.start` | `mission_id`、`run_id`、`provider`、`mode`。`worktree_path` は省略可能 | 正規の Git checkout を 1 つ占有し、Codex または Claude Code を管理対象の読み取り専用モードで開始します。事前に closure plan が必要です。 |
+| `mission.start` | `mission_id`、`run_id`、`provider`、`mode`。`worktree_path` と `execute_declared_checks` は省略可能 | 正規の Git checkout を 1 つ占有し、Codex、Claude Code、OpenCode、または設定済み ACP エージェントを managed モードで開始します。事前に closure plan が必要です。 |
 | `mission.respond` | `mission_id`、`run_id`、`attention_id`、`decision`。`answers` は省略可能 | 対話的な同意経路向けに予約されています。現在は常に `interactive_consent_required` を返し、プロバイダーへ応答を送りません。 |
 
-`provider` は `codex`、`claude_code`、`open_code`、`mode` は `managed` または
-`passthrough` を受け付けます。現在のビルドでは OpenCode のミッション開始とすべての
-passthrough 開始は利用不可エラーになります。管理対象の Codex と Claude Code には
-読み取り専用のワークスペースアクセスだけが与えられます。
+`execute_project_recipe` は再起動時の復旧用に永続化されますが、公開 socket からは承認できません。
+`true` を送ると `interactive_consent_required` になります。`.nagi/project.toml` の setup と
+service 実行を承認できるのは、範囲を表示するローカル mission cockpit だけです。
+
+`provider` は `codex`、`claude_code`、`open_code`、`acp`、`mode` は `managed` または
+`passthrough` を受け付けます。すべての provider が managed 開始に対応します。ACP は
+`providers.acp.command` に設定したローカル stdio コマンドを使い、ローカル cockpit で
+明示的な書き込み範囲の確認が必要です。passthrough は利用不可エラーになります。公開
+managed 開始には読み取り専用のワークスペースアクセスだけが与えられ、API から暗黙に
+書き込み権限を付与することはできません。
 
 | エラーコード | 意味 |
 | --- | --- |

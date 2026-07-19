@@ -119,12 +119,17 @@ nagi pane read w1:p2 --source recent --lines 50
 | `mission.list` | 无 | 返回持久化的任务摘要。 |
 | `mission.get` | `mission_id` | 返回完整的公开任务投影。 |
 | `mission.configure` | `mission_id`、`checks` | 固定 1–32 个命令或人工检查。每条验收标准都必须被覆盖,不同的第二次配置会被拒绝。 |
-| `mission.start` | `mission_id`、`run_id`、`provider`、`mode`;可选 `worktree_path` | 独占一个规范 Git checkout,以托管只读模式启动 Codex 或 Claude Code。必须先配置 closure plan。 |
+| `mission.start` | `mission_id`、`run_id`、`provider`、`mode`;可选 `worktree_path` 和 `execute_declared_checks` | 独占一个规范 Git checkout,以 managed 模式启动 Codex、Claude Code、OpenCode 或已配置的 ACP 智能体。必须先配置 closure plan。 |
 | `mission.respond` | `mission_id`、`run_id`、`attention_id`、`decision`;可选 `answers` | 为交互式同意流程保留。当前总是返回 `interactive_consent_required`,不会向 provider 发送响应。 |
 
-`provider` 接受 `codex`、`claude_code` 或 `open_code`;`mode` 接受 `managed`
-或 `passthrough`。当前构建中,OpenCode 任务启动和所有 passthrough 启动都会返回
-不可用错误。托管 Codex 和 Claude Code 进程只获得工作区读取权限。
+`execute_project_recipe` 会为重启恢复而持久化，但不能通过公共 socket 授权。传入 `true`
+会返回 `interactive_consent_required`。只有显示 `.nagi/project.toml` 范围的本地 mission cockpit
+可以批准 setup 和服务执行。
+
+`provider` 接受 `codex`、`claude_code`、`open_code` 或 `acp`;`mode` 接受 `managed`
+或 `passthrough`。所有 provider 都支持 managed 启动。ACP 使用
+`providers.acp.command` 配置的本地 stdio 命令,并始终要求在本地驾驶舱中明确确认写入范围。
+passthrough 会返回不可用错误。公共 managed 启动只获得工作区读取权限,API 不能暗中授予写入权限。
 
 | 错误码 | 含义 |
 | --- | --- |
