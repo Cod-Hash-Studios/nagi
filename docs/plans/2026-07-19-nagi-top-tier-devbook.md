@@ -1379,10 +1379,11 @@ Every item is mandatory. “Mostly works” is not a v1 result.
 
 ### Local evidence snapshot, 2026-07-20
 
-- First mission: a clean config, state directory, Git repository and installed
-  binary complete doctor, persistent onboarding, explicit write consent and a
-  CLI-visible mission in 2.094 seconds with a deterministic provider fixture.
-  The human-under-three-minutes gate remains open until an independent user run.
+- First mission: `cargo install --path . --locked` into a fresh temporary macOS
+  prefix produced a standalone binary that completed doctor, persistent
+  onboarding, explicit write consent and a CLI-visible mission against clean
+  config, state and Git directories in 5.077 seconds. The
+  human-under-three-minutes gate remains open until an independent user run.
 - Managed providers: adapter descriptors and `nagi doctor` now pin Codex
   `0.144.5`, Claude Code `2.1.212`, and OpenCode `1.18.3`. The shared 67-test
   provider/doctor suite passes locally, including lifecycle, attention, resume,
