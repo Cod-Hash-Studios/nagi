@@ -4,6 +4,31 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+pub(crate) const SAFE_PLUGIN_ENV_KEYS: &[&str] = &[
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "SYSTEMROOT",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+];
+pub(crate) const PLUGIN_ISOLATED_PANE_ENV_MARKER: &str = "NAGI_INTERNAL_ISOLATED_PLUGIN_PANE";
+
+/// Remove ambient credentials and restore only the minimal cross-platform
+/// environment needed to locate and launch a plugin toolchain.
+pub(crate) fn scrub_plugin_environment(command: &mut Command) {
+    command.env_clear();
+    for key in SAFE_PLUGIN_ENV_KEYS {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+}
+
 pub(crate) fn command_for_argv(program: &str, args: &[String]) -> Command {
     let mut command = command_for_program(program);
     command.args(args);
@@ -125,5 +150,19 @@ mod tests {
         assert!(is_windows_batch_file_name("script.BAT"));
         assert!(!is_windows_batch_file_name("node.exe"));
         assert!(!is_windows_batch_file_name("node"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn plugin_environment_scrub_keeps_only_the_runtime_allowlist() {
+        let mut command = Command::new("/usr/bin/env");
+        command.env("NAGI_TEST_SECRET", "must-not-leak");
+        scrub_plugin_environment(&mut command);
+
+        let output = command.output().unwrap();
+        assert!(output.status.success());
+        let output = String::from_utf8(output.stdout).unwrap();
+        assert!(!output.contains("NAGI_TEST_SECRET="));
+        assert!(output.lines().any(|line| line.starts_with("PATH=")));
     }
 }

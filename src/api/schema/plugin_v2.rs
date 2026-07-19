@@ -130,6 +130,12 @@ pub struct PluginLockEntryV1 {
     pub manifest_sha256: String,
     #[schemars(length(equal = 64), regex(pattern = r"^[0-9a-f]{64}$"))]
     pub package_sha256: String,
+    /// Stable digest of the source kind, repository identity, subdirectory,
+    /// and resolved commit. Missing on pre-v2 registry entries, which forces
+    /// one explicit re-approval instead of silently trusting a migrated lock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(length(equal = 64), regex(pattern = r"^[0-9a-f]{64}$"))]
+    pub source_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(regex(pattern = r"^[0-9a-f]{40}$"))]
     pub resolved_commit: Option<String>,

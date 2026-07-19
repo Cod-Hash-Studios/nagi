@@ -694,16 +694,14 @@ fn plugin_dev(args: &[String]) -> std::io::Result<i32> {
                 .expect("validated WASI manifest requires an entrypoint"),
         ))
         .map_err(std::io::Error::other)?;
-        if !plugin.requested_capabilities.is_empty() {
-            disabled = true;
-        }
+        disabled = true;
     }
     let link_code = plugin_link(&plugin_dev_link_args(&path, disabled, trust_native))?;
     if link_code != 0 {
         return Ok(link_code);
     }
     println!("Watching {} for plugin changes.", plugin.plugin_root);
-    if disabled && !plugin.requested_capabilities.is_empty() {
+    if disabled && plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
         println!(
             "Linked disabled. Review with `nagi plugin inspect {}` then approve and enable it.",
             plugin.plugin_id
@@ -896,6 +894,7 @@ fn plugin_security_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value
             "current": {
                 "manifest_sha256": binding.manifest_sha256,
                 "package_sha256": binding.package_sha256,
+                "source_sha256": binding.source_sha256,
                 "resolved_commit": binding.resolved_commit,
                 "capabilities": binding.capabilities,
             },
@@ -917,10 +916,12 @@ fn plugin_security_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value
     let version_changed = lock.plugin_version != binding.plugin_version;
     let manifest_changed = lock.manifest_sha256 != binding.manifest_sha256;
     let package_changed = lock.package_sha256 != binding.package_sha256;
+    let source_changed = lock.source_sha256.as_deref() != Some(binding.source_sha256.as_str());
     let commit_changed = lock.resolved_commit != binding.resolved_commit;
     let changed = version_changed
         || manifest_changed
         || package_changed
+        || source_changed
         || commit_changed
         || !added_capabilities.is_empty();
     serde_json::json!({
@@ -929,6 +930,7 @@ fn plugin_security_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value
             "version": lock.plugin_version,
             "manifest_sha256": lock.manifest_sha256,
             "package_sha256": lock.package_sha256,
+            "source_sha256": lock.source_sha256,
             "resolved_commit": lock.resolved_commit,
             "capabilities": grant.capabilities,
         },
@@ -936,6 +938,7 @@ fn plugin_security_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value
             "version": binding.plugin_version,
             "manifest_sha256": binding.manifest_sha256,
             "package_sha256": binding.package_sha256,
+            "source_sha256": binding.source_sha256,
             "resolved_commit": binding.resolved_commit,
             "capabilities": binding.capabilities,
         },
@@ -944,6 +947,7 @@ fn plugin_security_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value
             "version_changed": version_changed,
             "manifest_changed": manifest_changed,
             "package_changed": package_changed,
+            "source_changed": source_changed,
             "commit_changed": commit_changed,
             "added_capabilities": added_capabilities,
         }
@@ -1245,9 +1249,7 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
         let resolved_commit = git_output(&checkout, ["rev-parse", "HEAD"])?;
         let manifest_root = source.manifest_root(&checkout);
         let mut preview_plugin = load_cli_plugin_manifest(&manifest_root, true)?;
-        if preview_plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent
-            && !preview_plugin.requested_capabilities.is_empty()
-        {
+        if preview_plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
             preview_plugin.enabled = false;
         }
         let existing = installed_plugin_info(&preview_plugin.plugin_id)?;
@@ -1322,7 +1324,7 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
             Err(InstallFailure::KeepCheckout(err)) => return Err(err),
         };
         println!("Installed {} from {}.", plugin.plugin_id, source.display());
-        if !plugin.enabled && !plugin.requested_capabilities.is_empty() {
+        if !plugin.enabled && plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
             println!(
                 "Disabled pending review. Run `nagi plugin approve {}` then `nagi plugin enable {}`.",
                 plugin.plugin_id, plugin.plugin_id
@@ -2589,23 +2591,7 @@ fn read_tail_capped_output(mut reader: impl Read, cap: usize) -> CappedOutput {
 }
 
 fn scrub_nagi_runtime_env(command: &mut Command) {
-    for key in [
-        crate::api::SOCKET_PATH_ENV_VAR,
-        crate::server::socket_paths::CLIENT_SOCKET_PATH_ENV_VAR,
-        crate::session::SESSION_ENV_VAR,
-        "NAGI_BIN_PATH",
-        "NAGI_ENV",
-        "NAGI_WORKSPACE_ID",
-        "NAGI_TAB_ID",
-        "NAGI_PANE_ID",
-    ] {
-        command.env_remove(key);
-    }
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("NAGI_PLUGIN_") {
-            command.env_remove(key);
-        }
-    }
+    crate::plugin_command::scrub_plugin_environment(command);
 }
 
 fn build_platform_supported(

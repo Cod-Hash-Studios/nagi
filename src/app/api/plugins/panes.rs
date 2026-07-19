@@ -258,6 +258,10 @@ impl App {
                 current_exe.display().to_string(),
             ));
         }
+        env.push((
+            crate::plugin_command::PLUGIN_ISOLATED_PANE_ENV_MARKER.to_owned(),
+            "1".to_owned(),
+        ));
         Ok(env)
     }
 

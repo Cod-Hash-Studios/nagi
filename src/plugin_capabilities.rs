@@ -202,6 +202,7 @@ pub(crate) struct PluginBinding<'a> {
     pub(crate) runtime: PluginRuntimeV2,
     pub(crate) manifest_sha256: &'a str,
     pub(crate) package_sha256: &'a str,
+    pub(crate) source_sha256: &'a str,
     pub(crate) resolved_commit: Option<&'a str>,
     pub(crate) capabilities: &'a [String],
 }
@@ -213,6 +214,7 @@ pub(crate) struct OwnedPluginBinding {
     pub(crate) runtime: PluginRuntimeV2,
     pub(crate) manifest_sha256: String,
     pub(crate) package_sha256: String,
+    pub(crate) source_sha256: String,
     pub(crate) resolved_commit: Option<String>,
     pub(crate) capabilities: Vec<String>,
 }
@@ -225,6 +227,7 @@ impl OwnedPluginBinding {
             runtime: self.runtime,
             manifest_sha256: &self.manifest_sha256,
             package_sha256: &self.package_sha256,
+            source_sha256: &self.source_sha256,
             resolved_commit: self.resolved_commit.as_deref(),
             capabilities: &self.capabilities,
         }
@@ -248,6 +251,7 @@ pub(crate) fn installed_plugin_binding(
         runtime: plugin.runtime,
         manifest_sha256: sha256_hex(&manifest),
         package_sha256: sha256_hex(&package),
+        source_sha256: source_sha256(&plugin.source),
         resolved_commit: plugin.source.resolved_commit.clone(),
         capabilities: normalize_capabilities(&plugin.requested_capabilities)
             .map_err(|error| error.to_string())?,
@@ -259,6 +263,30 @@ pub(crate) fn installed_plugin_binding(
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn source_sha256(source: &crate::api::schema::PluginSourceInfo) -> String {
+    let kind = match source.kind {
+        crate::api::schema::PluginSourceKind::Local => "local",
+        crate::api::schema::PluginSourceKind::Github => "github",
+    };
+    let mut digest = Sha256::new();
+    for value in [
+        Some(kind),
+        source.owner.as_deref(),
+        source.repo.as_deref(),
+        source.subdir.as_deref(),
+        source.resolved_commit.as_deref(),
+    ] {
+        let value = value.unwrap_or_default().as_bytes();
+        digest.update((value.len() as u64).to_le_bytes());
+        digest.update(value);
+    }
+    digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 pub(crate) fn new_grant(
@@ -296,6 +324,7 @@ pub(crate) fn new_lock_entry(
         runtime: binding.runtime,
         manifest_sha256: binding.manifest_sha256.to_owned(),
         package_sha256: binding.package_sha256.to_owned(),
+        source_sha256: Some(binding.source_sha256.to_owned()),
         resolved_commit: binding.resolved_commit.map(str::to_owned),
         requested_capabilities: normalize_capabilities(binding.capabilities)
             .map_err(|error| error.to_string())?,
@@ -340,6 +369,7 @@ pub(crate) fn evaluate_security_binding(
         || lock.runtime != binding.runtime
         || lock.manifest_sha256 != binding.manifest_sha256
         || lock.package_sha256 != binding.package_sha256
+        || lock.source_sha256.as_deref() != Some(binding.source_sha256)
         || lock.resolved_commit.as_deref() != binding.resolved_commit
     {
         return Ok(GrantEvaluation::BindingChanged);
@@ -361,7 +391,10 @@ fn validate_binding(binding: &PluginBinding<'_>) -> Result<(), String> {
     if !valid_id(binding.plugin_id) || binding.plugin_version.trim().is_empty() {
         return Err("invalid plugin binding identity".to_owned());
     }
-    if !valid_sha256(binding.manifest_sha256) || !valid_sha256(binding.package_sha256) {
+    if !valid_sha256(binding.manifest_sha256)
+        || !valid_sha256(binding.package_sha256)
+        || !valid_sha256(binding.source_sha256)
+    {
         return Err("plugin binding digests must be lowercase SHA-256".to_owned());
     }
     if binding.resolved_commit.is_some_and(|commit| {
@@ -548,6 +581,7 @@ mod tests {
             runtime: PluginRuntimeV2::WasiComponent,
             manifest_sha256: &"a".repeat(64),
             package_sha256: &"b".repeat(64),
+            source_sha256: &"c".repeat(64),
             resolved_commit: Some("0123456789012345678901234567890123456789"),
             capabilities: &capabilities,
         };
@@ -576,6 +610,15 @@ mod tests {
         };
         assert_eq!(
             evaluate_grant(&grant, &changed_version).unwrap(),
+            GrantEvaluation::BindingChanged
+        );
+        let changed_source = PluginBinding {
+            source_sha256: &"d".repeat(64),
+            ..binding
+        };
+        let lock = new_lock_entry(&binding, PluginApprovalStateV1::Approved).unwrap();
+        assert_eq!(
+            evaluate_security_binding(&lock, &grant, &changed_source).unwrap(),
             GrantEvaluation::BindingChanged
         );
         let mut revoked = grant;
@@ -624,6 +667,20 @@ capabilities = ["mission.read"]
         assert_ne!(before.package_sha256, after.package_sha256);
         assert_eq!(
             evaluate_security_binding(&lock, &grant, &after.as_binding()).unwrap(),
+            GrantEvaluation::BindingChanged
+        );
+
+        std::fs::write(&package, b"first package").unwrap();
+        let mut moved_source = plugin.clone();
+        moved_source.source.kind = crate::api::schema::PluginSourceKind::Github;
+        moved_source.source.owner = Some("example".to_owned());
+        moved_source.source.repo = Some("plugin".to_owned());
+        moved_source.source.resolved_commit =
+            Some("0123456789012345678901234567890123456789".to_owned());
+        let moved_source = installed_plugin_binding(&moved_source).unwrap();
+        assert_ne!(before.source_sha256, moved_source.source_sha256);
+        assert_eq!(
+            evaluate_security_binding(&lock, &grant, &moved_source.as_binding()).unwrap(),
             GrantEvaluation::BindingChanged
         );
     }

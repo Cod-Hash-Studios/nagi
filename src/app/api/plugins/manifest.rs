@@ -274,13 +274,10 @@ fn installed_plugin_from_v2(
 ) -> Result<InstalledPluginInfo, (&'static str, String)> {
     use crate::api::schema::{PluginActionContext, PluginManifestAction, PluginRuntimeV2};
 
-    if manifest.runtime != PluginRuntimeV2::WasiComponent {
-        return Err((
-            "plugin_v2_native_runtime_unavailable",
-            "manifest v2 trusted-native plugins are not accepted; use a legacy native manifest with explicit unrestricted trust"
-                .to_owned(),
-        ));
-    }
+    let action_command = match manifest.runtime {
+        PluginRuntimeV2::WasiComponent => Vec::new(),
+        PluginRuntimeV2::TrustedNative => vec![manifest.entrypoint.clone()],
+    };
     let actions = manifest
         .contributions
         .commands
@@ -301,7 +298,7 @@ fn installed_plugin_from_v2(
                 })
                 .collect(),
             platforms: None,
-            command: Vec::new(),
+            command: action_command.clone(),
         })
         .collect();
     let inspector_tabs = manifest.contributions.inspector_tabs;
@@ -397,6 +394,15 @@ fn validate_manifest_v2(
     manifest.capabilities =
         crate::plugin_capabilities::normalize_capabilities(&manifest.capabilities)
             .map_err(|error| ("invalid_plugin_capability", error.to_string()))?;
+    if manifest.runtime == crate::api::schema::PluginRuntimeV2::TrustedNative
+        && !manifest.capabilities.is_empty()
+    {
+        return Err((
+            "plugin_v2_native_capabilities_unsupported",
+            "trusted-native plugins have unrestricted access; capability claims are not accepted"
+                .to_owned(),
+        ));
+    }
     validate_v2_contributions(&manifest.contributions, &manifest.capabilities)?;
     Ok(manifest)
 }
@@ -888,6 +894,56 @@ contexts = ["mission"]
             crate::api::schema::PluginRuntimeV2::WasiComponent
         );
         assert!(std::path::Path::new(&manifest.entrypoint).is_absolute());
+    }
+
+    #[test]
+    fn trusted_native_v2_uses_its_entrypoint_for_declared_commands() {
+        let root = tempfile::tempdir().unwrap();
+        let source = write_v2(root.path(), "")
+            .replace(
+                "runtime = \"wasi-component\"",
+                "runtime = \"trusted-native\"",
+            )
+            .replace("plugin.wasm", "plugin.sh")
+            .replace(
+                "capabilities = [\"mission.read\", \"workspace.files.read:changed\"]",
+                "capabilities = []",
+            );
+        std::fs::write(root.path().join("plugin.sh"), b"#!/bin/sh\n").unwrap();
+        std::fs::write(root.path().join("nagi-plugin.toml"), source).unwrap();
+
+        let plugin = load_plugin_manifest(&root.path().display().to_string(), false).unwrap();
+
+        assert_eq!(
+            plugin.runtime,
+            crate::api::schema::PluginRuntimeV2::TrustedNative
+        );
+        assert!(!plugin.native_trusted);
+        assert_eq!(plugin.actions.len(), 1);
+        assert_eq!(
+            plugin.actions[0].command,
+            [root
+                .path()
+                .join("plugin.sh")
+                .canonicalize()
+                .unwrap()
+                .display()
+                .to_string()]
+        );
+    }
+
+    #[test]
+    fn trusted_native_v2_rejects_capability_claims_it_cannot_enforce() {
+        let root = tempfile::tempdir().unwrap();
+        let source = write_v2(root.path(), "").replace(
+            "runtime = \"wasi-component\"",
+            "runtime = \"trusted-native\"",
+        );
+
+        assert_eq!(
+            parse_plugin_manifest(&source, root.path()).unwrap_err().0,
+            "plugin_v2_native_capabilities_unsupported"
+        );
     }
 
     #[test]

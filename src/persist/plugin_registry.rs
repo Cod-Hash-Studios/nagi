@@ -415,6 +415,7 @@ mod tests {
             runtime: crate::api::schema::PluginRuntimeV2::WasiComponent,
             manifest_sha256: "a".repeat(64),
             package_sha256: "b".repeat(64),
+            source_sha256: Some("c".repeat(64)),
             resolved_commit: None,
             requested_capabilities: vec!["mission.read".into()],
             approval: crate::api::schema::PluginApprovalStateV1::Approved,
@@ -614,6 +615,7 @@ mod tests {
             runtime: PluginRuntimeV2::WasiComponent,
             manifest_sha256: &"a".repeat(64),
             package_sha256: &"b".repeat(64),
+            source_sha256: &"c".repeat(64),
             resolved_commit: Some("0123456789012345678901234567890123456789"),
             capabilities: &capabilities,
         };

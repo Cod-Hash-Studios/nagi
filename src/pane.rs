@@ -66,6 +66,7 @@ fn apply_pane_terminal_env(cmd: &mut CommandBuilder) {
 pub(crate) struct PaneLaunchEnv {
     extra: Vec<(String, String)>,
     identity: PaneLaunchIdentity,
+    isolated: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -81,10 +82,15 @@ enum PaneLaunchIdentity {
 }
 
 impl PaneLaunchEnv {
-    pub(crate) fn from_extra(extra: Vec<(String, String)>) -> Self {
+    pub(crate) fn from_extra(mut extra: Vec<(String, String)>) -> Self {
+        let isolated = extra
+            .iter()
+            .any(|(key, _)| key == crate::plugin_command::PLUGIN_ISOLATED_PANE_ENV_MARKER);
+        extra.retain(|(key, _)| key != crate::plugin_command::PLUGIN_ISOLATED_PANE_ENV_MARKER);
         Self {
             extra,
             identity: PaneLaunchIdentity::Inherit,
+            isolated,
         }
     }
 
@@ -109,6 +115,14 @@ impl PaneLaunchEnv {
 }
 
 fn apply_pane_launch_env(cmd: &mut CommandBuilder, launch_env: &PaneLaunchEnv) {
+    if launch_env.isolated {
+        cmd.env_clear();
+        for key in crate::plugin_command::SAFE_PLUGIN_ENV_KEYS {
+            if let Some(value) = std::env::var_os(key) {
+                cmd.env(key, value);
+            }
+        }
+    }
     for (key, value) in &launch_env.extra {
         cmd.env(key, value);
     }
@@ -1582,8 +1596,8 @@ impl PaneRuntime {
             uses_windows_powershell_pane_shell(shell_config);
         let mut cmd = pane_shell_command_builder(shell_config)?;
         cmd.cwd(cwd);
-        apply_pane_terminal_env(&mut cmd);
         apply_pane_launch_env(&mut cmd, launch_env);
+        apply_pane_terminal_env(&mut cmd);
         Self::spawn_command_builder(
             pane_id,
             rows,
@@ -1622,8 +1636,8 @@ impl PaneRuntime {
     ) -> std::io::Result<Self> {
         let mut cmd = crate::platform::pane_custom_command_pty_builder(command);
         cmd.cwd(cwd);
-        apply_pane_terminal_env(&mut cmd);
         apply_pane_launch_env(&mut cmd, launch_env);
+        apply_pane_terminal_env(&mut cmd);
         Self::spawn_command_builder(
             pane_id,
             rows,
@@ -1667,8 +1681,8 @@ impl PaneRuntime {
             cmd.arg(arg);
         }
         cmd.cwd(cwd);
-        apply_pane_terminal_env(&mut cmd);
         apply_pane_launch_env(&mut cmd, launch_env);
+        apply_pane_terminal_env(&mut cmd);
         Self::spawn_command_builder(
             pane_id,
             rows,
@@ -2815,6 +2829,29 @@ impl PaneRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn isolated_plugin_pane_environment_drops_ambient_credentials() {
+        let launch_env = PaneLaunchEnv::from_extra(vec![
+            (
+                crate::plugin_command::PLUGIN_ISOLATED_PANE_ENV_MARKER.to_owned(),
+                "1".to_owned(),
+            ),
+            ("PLUGIN_VISIBLE".to_owned(), "yes".to_owned()),
+        ]);
+        let mut command = CommandBuilder::new("plugin");
+        apply_pane_launch_env(&mut command, &launch_env);
+
+        assert_eq!(
+            command.get_env("PLUGIN_VISIBLE"),
+            Some(std::ffi::OsStr::new("yes"))
+        );
+        assert_eq!(command.get_env("HOME"), None);
+        assert_eq!(
+            command.get_env(crate::plugin_command::PLUGIN_ISOLATED_PANE_ENV_MARKER),
+            None
+        );
+    }
 
     #[test]
     fn shutdown_liveness_treats_reaped_direct_child_as_gone() {

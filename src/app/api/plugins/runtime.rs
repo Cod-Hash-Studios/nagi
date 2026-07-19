@@ -13,19 +13,6 @@ const PLUGIN_COMMAND_OUTPUT_MAX_BYTES: usize = 64 * 1024;
 const PLUGIN_COMMAND_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 pub(super) const MAX_PLUGIN_COMMANDS_IN_FLIGHT: usize = 32;
 const PLUGIN_COMMAND_LOG_LIMIT: usize = 200;
-const PLUGIN_INHERITED_ENV_ALLOWLIST: &[&str] = &[
-    "PATH",
-    "LANG",
-    "LC_ALL",
-    "TMPDIR",
-    "TEMP",
-    "TMP",
-    "SYSTEMROOT",
-    "WINDIR",
-    "COMSPEC",
-    "PATHEXT",
-];
-
 impl App {
     pub(super) fn start_plugin_command(
         &mut self,
@@ -363,12 +350,7 @@ fn sandbox_workspace_mount(
 }
 
 fn isolate_plugin_environment(command: &mut Command, env: Vec<(String, String)>) {
-    command.env_clear();
-    for key in PLUGIN_INHERITED_ENV_ALLOWLIST {
-        if let Some(value) = std::env::var_os(key) {
-            command.env(key, value);
-        }
-    }
+    crate::plugin_command::scrub_plugin_environment(command);
     command.envs(env);
 }
 

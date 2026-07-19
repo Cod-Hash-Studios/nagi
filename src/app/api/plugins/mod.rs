@@ -845,9 +845,7 @@ impl App {
 pub(super) fn ensure_plugin_capabilities_approved(
     plugin: &InstalledPluginInfo,
 ) -> Result<(), (&'static str, String)> {
-    if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent
-        || plugin.requested_capabilities.is_empty()
-    {
+    if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent {
         return Ok(());
     }
     let binding = crate::plugin_capabilities::installed_plugin_binding(plugin)
@@ -858,11 +856,18 @@ pub(super) fn ensure_plugin_capabilities_approved(
     else {
         return Err((
             "plugin_capability_approval_required",
-            format!(
-                "plugin {} requests capabilities that require approval: {}",
-                plugin.plugin_id,
-                plugin.requested_capabilities.join(", ")
-            ),
+            if plugin.requested_capabilities.is_empty() {
+                format!(
+                    "plugin {} requires integrity approval before its package can run",
+                    plugin.plugin_id
+                )
+            } else {
+                format!(
+                    "plugin {} requests capabilities that require approval: {}",
+                    plugin.plugin_id,
+                    plugin.requested_capabilities.join(", ")
+                )
+            },
         ));
     };
     match crate::plugin_capabilities::evaluate_security_binding(
@@ -1178,7 +1183,7 @@ contexts = ["global"]
             )
         };
         std::fs::write(root.join("nagi-plugin.toml"), manifest("[]")).unwrap();
-        let linked = app.handle_api_request(Request {
+        let rejected_zero_cap = app.handle_api_request(Request {
             id: "link-zero-cap".into(),
             method: Method::PluginLink(PluginLinkParams {
                 path: root.display().to_string(),
@@ -1187,10 +1192,26 @@ contexts = ["global"]
                 trust_native: false,
             }),
         });
-        let ResponseResult::PluginLinked { plugin } = response_result(&linked) else {
-            panic!("expected zero-capability sandbox to link: {linked}");
+        let rejected_zero_cap: serde_json::Value =
+            serde_json::from_str(&rejected_zero_cap).unwrap();
+        assert_eq!(
+            rejected_zero_cap["error"]["code"],
+            "plugin_capability_approval_required"
+        );
+
+        let linked_zero_cap = app.handle_api_request(Request {
+            id: "link-zero-cap-disabled".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: false,
+                source: None,
+                trust_native: false,
+            }),
+        });
+        let ResponseResult::PluginLinked { plugin } = response_result(&linked_zero_cap) else {
+            panic!("expected zero-capability sandbox to link disabled: {linked_zero_cap}");
         };
-        assert!(plugin.enabled);
+        assert!(!plugin.enabled);
         assert!(!plugin.native_trusted);
 
         std::fs::write(
