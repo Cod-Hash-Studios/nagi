@@ -543,7 +543,10 @@ fn main() -> io::Result<()> {
         println!("       nagi channel set <stable|preview>");
         println!("       nagi server stop");
         println!("       nagi server reload-config");
+        println!("       nagi doctor [--json]");
         println!("       nagi api <subcommand> ...");
+        println!("       nagi mission <subcommand> ...");
+        println!("       nagi project <subcommand> ...");
         println!("       nagi completion <shell>");
         println!("       nagi config <subcommand> ...");
         println!("       nagi channel <subcommand> ...");
@@ -553,6 +556,8 @@ fn main() -> io::Result<()> {
         println!("       nagi notification <subcommand> ...");
         println!("       nagi agent <subcommand> ...");
         println!("       nagi pane <subcommand> ...");
+        println!("       nagi terminal <subcommand> ...");
+        println!("       nagi plugin <subcommand> ...");
         println!("       nagi wait <subcommand> ...");
         println!("       nagi session <subcommand> ...");
         println!("       nagi integration <subcommand> ...");
@@ -591,6 +596,18 @@ fn main() -> io::Result<()> {
                 "Inspect socket API metadata and live runtime state",
             ),
             (
+                "nagi doctor",
+                "Check the repository, providers, terminal and configuration",
+            ),
+            (
+                "nagi mission <subcommand>",
+                "Inspect missions and their verified proof",
+            ),
+            (
+                "nagi project <subcommand>",
+                "Inspect and run the current project's isolated recipe",
+            ),
+            (
                 "nagi workspace <subcommand>",
                 "Workspace helpers over the socket API",
             ),
@@ -610,6 +627,14 @@ fn main() -> io::Result<()> {
             (
                 "nagi pane <subcommand>",
                 "Pane control helpers over the socket API",
+            ),
+            (
+                "nagi terminal <subcommand>",
+                "Observe or control a terminal session over the socket API",
+            ),
+            (
+                "nagi plugin <subcommand>",
+                "Install and manage sandboxed or explicitly trusted plugins",
             ),
             (
                 "nagi wait <subcommand>",

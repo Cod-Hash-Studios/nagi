@@ -1191,6 +1191,29 @@ fn root_help_advertises_api_schema_command_group() {
 }
 
 #[test]
+fn root_help_advertises_the_first_run_and_mission_workflow() {
+    let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
+        .arg("--help")
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for command in [
+        "nagi doctor",
+        "nagi mission <subcommand>",
+        "nagi project <subcommand>",
+        "nagi plugin <subcommand>",
+        "nagi terminal <subcommand>",
+    ] {
+        assert!(
+            stdout.contains(command),
+            "root help should advertise {command}: {stdout}"
+        );
+    }
+}
+
+#[test]
 fn api_schema_default_output_is_a_short_summary() {
     let output = Command::new(env!("CARGO_BIN_EXE_nagi"))
         .args(["api", "schema"])
