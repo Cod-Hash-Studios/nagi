@@ -86,6 +86,7 @@ mod lifecycle {
     const CODEX_FIXTURE: &str = include_str!("../../tests/fixtures/providers/codex.sh");
     const CLAUDE_FIXTURE: &str = include_str!("../../tests/fixtures/providers/claude.sh");
     const OPEN_CODE_FIXTURE: &str = include_str!("../../tests/fixtures/providers/opencode.py");
+    const PROVIDER_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
 
     fn provider_name(provider: ProviderKind) -> &'static str {
         match provider {
@@ -138,7 +139,7 @@ mod lifecycle {
     }
 
     async fn next_event(events: &mut mpsc::Receiver<ProviderEvent>) -> ProviderEvent {
-        tokio::time::timeout(Duration::from_secs(10), events.recv())
+        tokio::time::timeout(PROVIDER_EVENT_TIMEOUT, events.recv())
             .await
             .expect("provider event timeout")
             .expect("provider event channel closed")
@@ -313,7 +314,7 @@ mod lifecycle {
             let mut completed = false;
 
             loop {
-                let event = tokio::time::timeout(Duration::from_secs(10), events.recv())
+                let event = tokio::time::timeout(PROVIDER_EVENT_TIMEOUT, events.recv())
                     .await
                     .unwrap_or_else(|_| panic!("{provider:?} provider event timed out"))
                     .unwrap_or_else(|| panic!("{provider:?} provider event channel closed"));

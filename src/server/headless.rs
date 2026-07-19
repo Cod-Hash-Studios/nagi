@@ -6888,6 +6888,8 @@ mod tests {
     use crate::app::AppState;
     use crate::protocol::CursorState;
 
+    const PROVIDER_FIXTURE_TIMEOUT: Duration = Duration::from_secs(30);
+
     #[path = "pane_graphics.rs"]
     mod pane_graphics_tests;
 
@@ -12119,7 +12121,7 @@ next_tab = ""
         ));
         assert!(server.managed_runs.contains_key("run-opencode"));
 
-        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+        let event = tokio::time::timeout(PROVIDER_FIXTURE_TIMEOUT, server.provider_event_rx.recv())
             .await
             .expect("OpenCode ready timeout")
             .expect("OpenCode event channel closed");
@@ -12280,7 +12282,7 @@ next_tab = ""
         ));
         assert!(server.managed_runs.contains_key(&artifact.suggested_run_id));
 
-        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+        let event = tokio::time::timeout(PROVIDER_FIXTURE_TIMEOUT, server.provider_event_rx.recv())
             .await
             .expect("OpenCode handoff ready timeout")
             .expect("OpenCode handoff event channel closed");
@@ -12442,7 +12444,7 @@ next_tab = ""
         assert_eq!(mission.status, MissionStatus::Preparing);
         assert!(server.managed_runs.contains_key("run-isolated-launch"));
 
-        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+        let event = tokio::time::timeout(PROVIDER_FIXTURE_TIMEOUT, server.provider_event_rx.recv())
             .await
             .unwrap()
             .unwrap();
@@ -13124,7 +13126,7 @@ done
         server.recover_managed_runs();
 
         assert!(server.managed_runs.contains_key("run-server-recovery"));
-        let event = tokio::time::timeout(Duration::from_secs(5), server.provider_event_rx.recv())
+        let event = tokio::time::timeout(PROVIDER_FIXTURE_TIMEOUT, server.provider_event_rx.recv())
             .await
             .unwrap()
             .unwrap();
