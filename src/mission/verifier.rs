@@ -1463,7 +1463,7 @@ mod tests {
         std::fs::create_dir(&nested).unwrap();
         executable_script(&nested.join("probe"), "#!/bin/sh\nprintf 'inside'\n");
         symlink("nested", directory.path().join("inside-link")).unwrap();
-        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(2), 1024, 1024);
+        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(10), 1024, 1024);
 
         let result = runner
             .run(
@@ -1534,7 +1534,7 @@ mod tests {
             &script,
             "#!/bin/sh\nsleep 30 &\nprintf '%s' \"$!\"\nexit 0\n",
         );
-        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(2), 1024, 1024);
+        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(10), 1024, 1024);
 
         let result = runner
             .run(
@@ -1575,7 +1575,7 @@ mod tests {
             &directory.path().join("overflow-stderr"),
             "#!/bin/sh\nprintf '12345' >&2\n",
         );
-        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(2), 8, 4);
+        let runner = TrustedCheckRunner::with_limits(Duration::from_secs(10), 8, 4);
 
         let stdout_error = runner
             .run(

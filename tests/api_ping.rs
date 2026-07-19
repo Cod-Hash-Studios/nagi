@@ -49,6 +49,23 @@ impl Drop for SpawnedNagi {
 }
 
 fn cleanup_spawned_nagi(spawned: SpawnedNagi, base: PathBuf) {
+    let socket_path = base.join("runtime/nagi.sock");
+    if let Ok(mut stream) = UnixStream::connect(&socket_path) {
+        let _ =
+            stream.write_all(b"{\"id\":\"test:stop\",\"method\":\"server.stop\",\"params\":{}}\n");
+        let _ = stream.flush();
+    }
+    if let Some(pid) = spawned.child.process_id() {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            let mut status = 0;
+            let result = unsafe { libc::waitpid(pid as libc::pid_t, &mut status, libc::WNOHANG) };
+            if result == pid as libc::pid_t || result == -1 {
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
     drop(spawned);
     cleanup_test_base(&base);
 }
