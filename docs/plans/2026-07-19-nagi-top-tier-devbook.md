@@ -1372,7 +1372,7 @@ Every item is mandatory. “Mostly works” is not a v1 result.
 
 - [x] Provenance remains explicit and correct.
 - [x] Contribution guide includes architecture boundaries and local checks.
-- [ ] At least ten issues are independently completable, with five marked good
+- [x] At least ten issues are independently completable, with five marked good
   first issue and no fake busywork.
 - [x] RFC path exists for provider, plugin and persisted-contract changes.
 - [x] Security intake, code of conduct and governance expectations are clear.
@@ -1401,8 +1401,10 @@ Every item is mandatory. “Mostly works” is not a v1 result.
   result installs on clean macOS and Linux machines.
 - Open-source policy: authority and plugin-security boundaries, contribution
   checks, RFCs, security intake, conduct, governance, and upstream provenance are
-  documented. Public issue curation and external first-run evidence remain human
-  launch tasks, not boxes to fabricate in source.
+  documented. Issues #3 through #12 are independently scoped from observed
+  product or release gaps; exactly five carry `good first issue`. External
+  first-run evidence remains a human launch task, not a box to fabricate in
+  source.
 
 ## 13. Dogfood and evidence of market fit
 
