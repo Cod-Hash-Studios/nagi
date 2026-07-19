@@ -367,24 +367,19 @@ impl HealthEndpoint {
         stream
             .set_write_timeout(Some(PROBE_TIMEOUT))
             .map_err(ServiceError::Io)?;
-        write!(
+        if write!(
             stream,
             "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
             self.path, self.authority
         )
-        .map_err(ServiceError::Io)?;
+        .is_err()
+        {
+            return Ok(false);
+        }
         let mut response = [0_u8; 64];
         let count = match stream.read(&mut response) {
             Ok(count) => count,
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) =>
-            {
-                return Ok(false);
-            }
-            Err(error) => return Err(ServiceError::Io(error)),
+            Err(_) => return Ok(false),
         };
         let status = String::from_utf8_lossy(&response[..count]);
         Ok(status.starts_with("HTTP/1.0 2") || status.starts_with("HTTP/1.1 2"))
