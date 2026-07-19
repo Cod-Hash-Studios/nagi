@@ -695,7 +695,10 @@ mod tests {
                 .unwrap(),
             )
             .unwrap();
-        assert!(server_thread.join().unwrap().is_ok());
+        server_thread
+            .join()
+            .expect("graphics stream server thread should not panic")
+            .expect("graphics stream server should close cleanly");
     }
 
     #[cfg(unix)]

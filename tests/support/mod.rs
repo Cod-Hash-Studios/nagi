@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+#[cfg(unix)]
+pub mod headless;
+
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};

@@ -1443,18 +1443,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generated_workspace_ids_are_short_base32_handles() {
+    fn generated_workspace_ids_are_monotonic_base32_handles() {
         let first = generate_workspace_id();
         let second = generate_workspace_id();
 
         assert!(first.starts_with('w'));
         assert!(second.starts_with('w'));
         assert_ne!(first, second);
-        assert!(first.len() <= 3, "unexpectedly long workspace id: {first}");
-        assert!(
-            second.len() <= 3,
-            "unexpectedly long workspace id: {second}"
-        );
+
+        let first_number = public_workspace_number(&first).expect("valid first workspace handle");
+        let second_number =
+            public_workspace_number(&second).expect("valid second workspace handle");
+        assert_eq!(second_number, first_number + 1);
     }
 
     #[test]

@@ -104,7 +104,7 @@ fn spawn_named_session_server(
     fs::create_dir_all(runtime_dir).unwrap();
     fs::write(
         config_home.join("nagi-dev/config.toml"),
-        "onboarding = false\n",
+        "onboarding = false\n[terminal]\nshell_mode = \"non_login\"\n",
     )
     .unwrap();
 
@@ -138,7 +138,7 @@ fn spawn_default_session_server(config_home: &Path, runtime_dir: &Path) -> Spawn
     fs::create_dir_all(runtime_dir).unwrap();
     fs::write(
         config_home.join("nagi-dev/config.toml"),
-        "onboarding = false\n",
+        "onboarding = false\n[terminal]\nshell_mode = \"non_login\"\n",
     )
     .unwrap();
 

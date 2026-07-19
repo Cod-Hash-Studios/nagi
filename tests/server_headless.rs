@@ -535,7 +535,7 @@ fn mission_api_create_list_get_and_restart_round_trip() {
     assert_eq!(configure["result"]["type"], "mission_configured");
     assert_eq!(configure["result"]["configured"], true);
     assert_eq!(configure["result"]["mission"]["closure_configured"], true);
-    assert_eq!(configure["result"]["mission"]["check_count"], 1);
+    assert_eq!(configure["result"]["mission"]["declared_check_count"], 1);
 
     let configure_again = api_request(
         &api_socket,
@@ -634,7 +634,7 @@ fn mission_api_create_list_get_and_restart_round_trip() {
         "Preserve the requested page after login"
     );
     assert_eq!(get["result"]["mission"]["closure_configured"], true);
-    assert_eq!(get["result"]["mission"]["check_count"], 1);
+    assert_eq!(get["result"]["mission"]["declared_check_count"], 1);
 
     drop(spawned);
     let restarted = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
