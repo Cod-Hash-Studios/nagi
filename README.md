@@ -2,7 +2,7 @@
   <img src="assets/brand/nagi-lockup.svg" alt="Nagi" width="680" />
 </p>
 
-<h3 align="center">Keep coding agents running. Keep one terminal in control.</h3>
+<h3 align="center">Keep the agents running. See the one that needs you.</h3>
 
 <p align="center">
   A fast, persistent terminal workspace for Codex, Claude Code, OpenCode, and the shells around them.
@@ -21,9 +21,10 @@
 
 <p align="center"><sub>Real Nagi build. Deterministic demo data. No mock interface.</sub></p>
 
-Nagi is a native terminal multiplexer with an agent-aware cockpit. Your panes
-keep running when the terminal disappears. Reattach locally, over SSH, or from
-a phone. Press `Ctrl+B`, then `G`, to see what needs you and jump straight to it.
+Nagi is a native terminal multiplexer built for parallel coding agents. Your
+panes keep running when the terminal disappears. Reattach locally, over SSH, or
+from a phone. Press `Ctrl+B`, then `G`, to see what needs you and jump straight
+to it.
 
 | Stay running | See attention | Automate it |
 |---|---|---|
@@ -46,26 +47,34 @@ gives them somewhere reliable to run.
 | Persistent terminal sessions, splits, tabs, mouse, SSH reattach | working |
 | Agent cockpit with search, state filters, counts, and direct switching | working |
 | CLI and Unix socket API | working |
-| Mission create, list, get, configure, journal replay, and worktree claims | working |
-| Managed Codex and Claude Code mission start | early read-only path |
-| Managed OpenCode mission start | actor tested, final wiring pending |
-| Proof execution, provider consent UI, and mission closure | in progress |
+| Guided mission creation, recovery, journal replay, and worktree claims | working |
+| Managed Codex, Claude Code, OpenCode, and local ACP launch | working |
+| Fresh proof execution, portable evidence packs, and guarded closure | working |
+| Project recipe setup/check/cleanup, port leases, health checks, restart adoption, exact cleanup, and mission wiring | working |
+| Digest-bound provider handoff with same-mission continuation | working |
+| Nagi Dawn/Night, theme files, and Ghostty theme import | working |
+| Native plugins | working; explicit unrestricted trust required before enablement |
+| Plugin v2 validation, grants, immutable locks, and WASI runtime | working for zero-capability components; requested host capabilities stay denied until approved |
+| Public plugin registry | not available yet |
 | Signed binaries and public release channel | not available yet |
 
-The cockpit is real and usable now. The deeper mission-to-proof loop is an early
-preview, and this README labels it that way on purpose.
+The end-to-end mission loop is usable on the current development branch. Nagi
+is still early access because the full plugin capability broker, distribution,
+and the public release security gates are not finished.
 
 ## Agent compatibility
 
 | Agent | Runs in Nagi | Managed mission path |
 |---|:---:|---|
-| Codex | yes | early read-only path |
-| Claude Code | yes | early read-only path |
-| OpenCode | yes | start wiring pending |
+| Codex | yes | guided local launch, read-only socket launch |
+| Claude Code | yes | guided local launch, read-only socket launch |
+| OpenCode | yes | guided local launch, read-only socket launch |
+| Any local ACP agent | yes | guided local launch after explicit write consent |
 
-Any terminal program can run in a pane. The managed mission column is narrower:
-it means Nagi understands that provider's lifecycle instead of merely hosting
-its process.
+Any terminal program can run in a pane. Managed launches add a mission contract,
+an isolated worktree, durable attention, and proof. The public socket cannot
+approve workspace writes or answer permission prompts: those decisions stay
+with the human in the local TUI.
 
 ## Build from source
 
@@ -83,6 +92,21 @@ cargo build --release --locked
 
 Nagi uses its own config, runtime paths, sockets, logs, and environment
 variables. It does not reuse an existing Herdr session.
+
+## Start a mission
+
+Check the machine, launch Nagi, then open the cockpit:
+
+```bash
+nagi doctor
+nagi
+```
+
+Press `Ctrl+B`, then `G`, then `n`. The wizard asks for one outcome, explicit
+acceptance criteria, a proof command, and a provider. Write access requires a
+local confirmation and launches the provider inside an isolated Git worktree.
+When `.nagi/project.toml` exists, the same confirmation screen lists its setup,
+services, cleanup, and explicit file-copy scope before anything executes.
 
 ## Run the cockpit demo
 
@@ -110,10 +134,36 @@ allowed.
 ```bash
 nagi api schema
 nagi api snapshot
+nagi mission list
+nagi mission get <mission-id>
+nagi mission proof <mission-id>
+nagi mission handoff <mission-id> --to claude-code --preview
+nagi mission handoff <mission-id> --to claude-code --start --artifact-sha256 <sha256> --generated-at-millis <timestamp>
+nagi mission close <mission-id>
+nagi project detect . --json
+nagi project validate .
+nagi project setup . --yes
+nagi project check . --yes
+nagi project services start . --mission <mission-id> --run <run-id> --yes
+nagi project resources preview
 ```
 
 The generated mission schema lives at
 [`docs/next/api/nagi-api.schema.json`](docs/next/api/nagi-api.schema.json).
+Closing a mission always reruns its declared checks. Stored output alone is not
+accepted as fresh proof.
+
+## Make it yours
+
+Start with Nagi Dawn or Nagi Night, load a theme file, or import colors from
+Ghostty. Plugins can add actions, hooks, panes, and link handlers. Today those
+plugins are native processes with resource limits and a scrubbed environment.
+Nagi keeps them disabled until you explicitly grant unrestricted native trust;
+legacy registry entries migrate to untrusted. Manifest v2 plugins run as WASI
+components with bounded memory, fuel, output and wall time. They receive no
+inherited filesystem, network or host environment access. Grants are
+versioned, checksum-bound and revocable; capabilities without a host binding
+remain unavailable even after approval.
 
 <details>
 <summary><strong>Architecture in 20 seconds</strong></summary>
@@ -128,7 +178,8 @@ single-writer Nagi server
       └── managed provider adapters
              ├── Codex
              ├── Claude Code
-             └── OpenCode
+             ├── OpenCode
+             └── local ACP agent
 ```
 
 The TUI is a client of the server. Mission truth stays in the durable runtime,
