@@ -24,7 +24,7 @@ The current development branch now contains a coherent first product loop:
 | Cockpit | responsive mission list, inspector, proof review, command palette, and structured questions |
 | Visual system | semantic tokens, Nagi Dawn/Night, theme files, Ghostty import, density, and compact layouts |
 | First run | environment doctor, mission-first onboarding preserved through persistent startup, and a clean-install PTY smoke |
-| Landing | proof-first story, uncropped product film, current Ratatui-generated media, responsive layout, reduced-motion handling, and browser QA live at `nagi.codhash.com` |
+| Landing | proof-first story, uncropped product film, current Ratatui-generated media, responsive layout, reduced-motion handling, and a browser-QA'd local release candidate |
 | Project isolation | strict `.nagi/project.toml`, explicit setup/check/cleanup consent, exact ignored-file copying, collision-free port leases, bounded service supervision, health checks, restart adoption, and digest-bound orphan cleanup |
 | Provider handoff | redacted Git snapshot artifact, digest binding, API, and `nagi mission handoff ... --preview` |
 | Plugin v2 runtime | strict version routing, bounded WASI components, capability grants, checksum-bound locks, revocation, fail-closed updates, and explicit native trust |
@@ -36,33 +36,31 @@ still blocked by these larger tracks:
    v1 framing and negotiation are implemented and tested, and users can expose
    a local ACP stdio endpoint through `providers.acp.command`; cross-provider
    soak evidence is still incomplete.
-2. Automatic mission recipe execution. The consent-gated CLI, allocator,
-   supervisor, restart adoption and cleanup lifecycle are real, but missions do
-   not start project services implicitly until that authority boundary is
-   represented in the persisted mission contract.
-3. The plugin capability host broker, a native-trust manager UI, signed
+2. The plugin capability host broker, a native-trust manager UI, signed
    packages and a moderated public registry. Zero-capability manifest v2
    components now run inside bounded Wasmtime/WASI isolation. Grants are
    persisted, revocable and bound to the exact manifest and package; host
    capabilities without an implemented binding remain unavailable.
-4. Independent keyboard, mouse and phone-over-SSH acceptance runs across the
+3. Independent keyboard, mouse and phone-over-SSH acceptance runs across the
    supported terminal matrix. Deterministic visual goldens, contrast
    diagnostics, performance budgets and chaos coverage are implemented.
-5. Signed macOS/Linux artifacts, provenance, installer/updater hardening, and a
+4. Signed macOS/Linux artifacts, provenance, installer/updater hardening, and a
    reproducible public release pipeline.
 
 The local verification checkpoint is green: Rust formatting, all-target check,
-warnings-as-errors lint, 3,000 deterministic Rust unit tests plus integration
-binaries, maintenance tests, integration-asset tests, marketplace tests, a
-release build, the docs build, the landing build, HTML assertions, and 20
-responsive browser contracts. The clean first-mission smoke now drives the
-actual persistent client/server TUI through onboarding, authority consent and
-mission creation in an isolated Git repository.
+warnings-as-errors lint, two consecutive 3,101-test Nextest runs across all 14
+test binaries with leaks configured as failures, the full serial Rust suite,
+maintenance tests, integration-asset tests, marketplace tests, a release build,
+the docs build, the landing build, HTML assertions, and 21 responsive browser
+contracts. The clean first-mission smoke now drives the actual persistent
+client/server TUI through onboarding, authority consent and mission creation in
+an isolated Git repository.
 The M2 Pro smoke budget also passes at 63.013 ms startup p95, 21.348 ms render
 p95, 218.913 ms warm-reattach p95, 0.008% idle CPU and 26.172 MiB process-tree
-RSS. The supported CI matrix runs nextest on Linux and macOS plus targeted
-Windows coverage. macOS still excludes the live-handoff integration binary, so
-the full cross-platform gate remains open rather than being overstated.
+RSS. The supported CI matrix is configured for Nextest on Linux and macOS plus
+targeted Windows coverage, and the macOS live-handoff binary now passes all 18
+tests locally. These local-only commits have not run in hosted CI, so the full
+supported-platform gate remains open rather than being overstated.
 
 ## 1. The decision
 
@@ -1358,7 +1356,7 @@ Every item is mandatory. “Mostly works” is not a v1 result.
 ### Quality
 
 - [ ] Full serial and nextest suites pass on supported platforms.
-- [ ] CI has no known flaky test masked by retries.
+- [x] CI has no known flaky test masked by retries.
 - [x] Performance budgets pass on named reference machines.
 - [x] Crash, disk-full, timeout and disconnect tests pass.
 - [x] Security audit has no open critical or high finding.
@@ -1385,10 +1383,11 @@ Every item is mandatory. “Mostly works” is not a v1 result.
   binary complete doctor, persistent onboarding, explicit write consent and a
   CLI-visible mission in 3.750 seconds with a deterministic provider fixture.
   The human-under-three-minutes gate remains open until an independent user run.
-- Rust suite: 3,000 unit tests plus every integration binary passed on Apple M2
-  Pro, macOS. Linux and macOS nextest plus targeted Windows checks are green in
-  CI; the macOS live-handoff exclusion keeps the full supported-platform gate
-  open.
+- Rust suite: two consecutive complete Nextest runs passed 3,101 of 3,101 tests
+  across all 14 binaries on Apple M2 Pro, macOS, with no skipped test, no retry,
+  and process leaks configured as failures. The full serial suite and all 18
+  macOS live-handoff tests also pass. The current local-only commits have not
+  run in hosted Linux/macOS CI, so the supported-platform gate remains open.
 - Visual matrix: 11 real Ratatui surfaces, four themes, and 60/80/120/200-column
   snapshots, including 1/8/50/500-session cockpit states. The same styled
   buffers now export deterministic product media for the landing.
