@@ -3,7 +3,7 @@
 # Run tests
 test:
     cargo nextest run --locked --status-level fail --final-status-level fail --failure-output final --success-output never
-    python3 -m unittest scripts.test_agent_detection_manifest_check scripts.test_brand_isolation scripts.test_changelog scripts.test_config_reference_check scripts.test_docs_translation_parity scripts.test_fork_safety scripts.test_preview scripts.test_seed_navigator_demo scripts.test_vendor_libghostty_vt scripts.test_vendor_portable_pty
+    python3 -m unittest scripts.test_agent_detection_manifest_check scripts.test_bench_render scripts.test_brand_isolation scripts.test_changelog scripts.test_config_reference_check scripts.test_docs_translation_parity scripts.test_fork_safety scripts.test_preview scripts.test_reference_plugins scripts.test_release_workflows scripts.test_seed_navigator_demo scripts.test_vendor_libghostty_vt scripts.test_vendor_portable_pty scripts.test_verify_release
     just integration-assets-test
     just plugin-marketplace-test
 
@@ -30,7 +30,7 @@ windows-lint:
 
 # Check formatting + run unit tests + Windows target lint + maintenance script tests
 check: ci windows-lint
-    python3 -m unittest scripts.test_agent_detection_manifest_check scripts.test_brand_isolation scripts.test_changelog scripts.test_config_reference_check scripts.test_docs_translation_parity scripts.test_fork_safety scripts.test_preview scripts.test_seed_navigator_demo scripts.test_vendor_libghostty_vt scripts.test_vendor_portable_pty
+    python3 -m unittest scripts.test_agent_detection_manifest_check scripts.test_bench_render scripts.test_brand_isolation scripts.test_changelog scripts.test_config_reference_check scripts.test_docs_translation_parity scripts.test_fork_safety scripts.test_preview scripts.test_reference_plugins scripts.test_release_workflows scripts.test_seed_navigator_demo scripts.test_vendor_libghostty_vt scripts.test_vendor_portable_pty scripts.test_verify_release
     @echo "docs reminder: if this changes user-facing behavior, make sure the relevant release docs are updated or called out before release."
 
 # Install repo-local git hooks
@@ -44,6 +44,38 @@ install-hooks:
 build:
     cargo build --release --locked
 
+# Build the benchmark binary separately so compilation is never timed
+bench-build:
+    cargo build --release --locked
+
+# Record the full local baseline with human-readable output
+bench: bench-build
+    sh scripts/bench_startup.sh --binary target/release/nagi --format human
+
+# Record the full local baseline as machine-readable JSON
+bench-json: bench-build
+    sh scripts/bench_startup.sh --binary target/release/nagi --format json
+
+# Fast, deliberately generous regression gate; override any NAGI_BENCH_* value to probe a ceiling
+bench-smoke: bench-build
+    @sh scripts/bench_startup.sh \
+        --binary target/release/nagi \
+        --startup-samples "${NAGI_BENCH_STARTUP_SAMPLES:-3}" \
+        --render-samples "${NAGI_BENCH_RENDER_SAMPLES:-5}" \
+        --warmups "${NAGI_BENCH_WARMUPS:-1}" \
+        --idle-settle-seconds "${NAGI_BENCH_IDLE_SETTLE_SECONDS:-2}" \
+        --idle-sample-seconds "${NAGI_BENCH_IDLE_SAMPLE_SECONDS:-2}" \
+        --timeout-seconds "${NAGI_BENCH_TIMEOUT_SECONDS:-15}" \
+        --cols "${NAGI_BENCH_COLS:-120}" \
+        --rows "${NAGI_BENCH_ROWS:-40}" \
+        --panes "${NAGI_BENCH_PANES:-1}" \
+        --startup-ceiling-ms "${NAGI_BENCH_STARTUP_CEILING_MS:-5000}" \
+        --render-ceiling-ms "${NAGI_BENCH_RENDER_CEILING_MS:-1000}" \
+        --reattach-ceiling-ms "${NAGI_BENCH_REATTACH_CEILING_MS:-5000}" \
+        --idle-cpu-ceiling-percent "${NAGI_BENCH_IDLE_CPU_CEILING_PERCENT:-25}" \
+        --rss-ceiling-mib "${NAGI_BENCH_RSS_CEILING_MIB:-1024}" \
+        --format human
+
 # Build the website and documentation
 website-build:
     cd website && bun install --frozen-lockfile && bun run build
@@ -55,6 +87,17 @@ integration-assets-test:
 # Run plugin marketplace Worker tests
 plugin-marketplace-test:
     cd workers/plugin-marketplace && bun test
+
+# Verify or intentionally regenerate deterministic Ratatui UI goldens
+ui-goldens:
+    python3 scripts/render_ui_goldens.py
+
+ui-goldens-update:
+    python3 scripts/render_ui_goldens.py --update
+
+# Exercise hard crash, provider disconnect, and hostile plugin boundaries
+chaos-test:
+    python3 scripts/chaos_runtime.py
 
 # Build the vendored libghostty-vt source dist
 build-libghostty-vt:
