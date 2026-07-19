@@ -7,7 +7,7 @@
 
 **Date:** 2026-07-19
 
-**Status:** implementation blueprint
+**Status:** living implementation and release-gate ledger
 **Target:** macOS and Linux as supported platforms, Windows as an explicitly
 labelled terminal-multiplexer beta until mission parity is proven.
 
@@ -23,8 +23,8 @@ The current development branch now contains a coherent first product loop:
 | Proof | bounded execution, fresh rerun on close, content-addressed evidence packs, API, and CLI |
 | Cockpit | responsive mission list, inspector, proof review, command palette, and structured questions |
 | Visual system | semantic tokens, Nagi Dawn/Night, theme files, Ghostty import, density, and compact layouts |
-| First run | environment doctor and mission-first onboarding |
-| Landing | product video in the hero, real product media, responsive layout, reduced-motion handling, and browser QA |
+| First run | environment doctor, mission-first onboarding preserved through persistent startup, and a clean-install PTY smoke |
+| Landing | proof-first story, uncropped product film, current Ratatui-generated media, responsive layout, reduced-motion handling, and browser QA live at `nagi.codhash.com` |
 | Project isolation | strict `.nagi/project.toml`, explicit setup/check/cleanup consent, exact ignored-file copying, collision-free port leases, bounded service supervision, health checks, restart adoption, and digest-bound orphan cleanup |
 | Provider handoff | redacted Git snapshot artifact, digest binding, API, and `nagi mission handoff ... --preview` |
 | Plugin v2 runtime | strict version routing, bounded WASI components, capability grants, checksum-bound locks, revocation, fail-closed updates, and explicit native trust |
@@ -32,9 +32,10 @@ The current development branch now contains a coherent first product loop:
 This does **not** complete the full best-in-class program below. A public v1 is
 still blocked by these larger tracks:
 
-1. Same-mission provider continuation after handoff. ACP v1 framing and
-   negotiation are implemented and tested, but the configurable ACP endpoint
-   is not yet exposed to users.
+1. Release-scale same-mission continuation across every managed provider. ACP
+   v1 framing and negotiation are implemented and tested, and users can expose
+   a local ACP stdio endpoint through `providers.acp.command`; cross-provider
+   soak evidence is still incomplete.
 2. Automatic mission recipe execution. The consent-gated CLI, allocator,
    supervisor, restart adoption and cleanup lifecycle are real, but missions do
    not start project services implicitly until that authority boundary is
@@ -44,20 +45,24 @@ still blocked by these larger tracks:
    components now run inside bounded Wasmtime/WASI isolation. Grants are
    persisted, revocable and bound to the exact manifest and package; host
    capabilities without an implemented binding remain unavailable.
-4. A visual golden matrix, contrast gates, long-session performance budgets,
-   and chaos coverage across supported terminals.
+4. Independent keyboard, mouse and phone-over-SSH acceptance runs across the
+   supported terminal matrix. Deterministic visual goldens, contrast
+   diagnostics, performance budgets and chaos coverage are implemented.
 5. Signed macOS/Linux artifacts, provenance, installer/updater hardening, and a
    reproducible public release pipeline.
 
 The local verification checkpoint is green: Rust formatting, all-target check,
-warnings-as-errors lint, 3,053 deterministic serial Rust tests, 105 maintenance
-tests, 6 integration-asset tests, 12 marketplace tests, a release build, the
-docs build, the landing build, HTML assertions, and responsive browser tests.
+warnings-as-errors lint, 3,000 deterministic Rust unit tests plus integration
+binaries, maintenance tests, integration-asset tests, marketplace tests, a
+release build, the docs build, the landing build, HTML assertions, and 20
+responsive browser contracts. The clean first-mission smoke now drives the
+actual persistent client/server TUI through onboarding, authority consent and
+mission creation in an isolated Git repository.
 The M2 Pro smoke budget also passes at 63.013 ms startup p95, 21.348 ms render
 p95, 218.913 ms warm-reattach p95, 0.008% idle CPU and 26.172 MiB process-tree
-RSS. Parallel legacy tests still
-share process-global environment state, so deterministic release verification
-uses one test thread until that isolation debt is removed.
+RSS. The supported CI matrix runs nextest on Linux and macOS plus targeted
+Windows coverage. macOS still excludes the live-handoff integration binary, so
+the full cross-platform gate remains open rather than being overstated.
 
 ## 1. The decision
 
@@ -1376,11 +1381,17 @@ Every item is mandatory. “Mostly works” is not a v1 result.
 
 ### Local evidence snapshot, 2026-07-20
 
-- Serial Rust suite: 2,997 unit tests plus every integration binary passed on
-  Apple M2 Pro, macOS. `cargo-nextest` and the other supported platforms remain
-  release blockers until CI records them.
+- First mission: a clean config, state directory, Git repository and installed
+  binary complete doctor, persistent onboarding, explicit write consent and a
+  CLI-visible mission in 3.750 seconds with a deterministic provider fixture.
+  The human-under-three-minutes gate remains open until an independent user run.
+- Rust suite: 3,000 unit tests plus every integration binary passed on Apple M2
+  Pro, macOS. Linux and macOS nextest plus targeted Windows checks are green in
+  CI; the macOS live-handoff exclusion keeps the full supported-platform gate
+  open.
 - Visual matrix: 11 real Ratatui surfaces, four themes, and 60/80/120/200-column
-  snapshots, including 1/8/50/500-session cockpit states.
+  snapshots, including 1/8/50/500-session cockpit states. The same styled
+  buffers now export deterministic product media for the landing.
 - Runtime recovery: hard kill with torn journal tail, storage exhaustion between
   journal and head writes, provider disconnect, plugin fuel exhaustion, and
   timeout paths all pass without false completion.
