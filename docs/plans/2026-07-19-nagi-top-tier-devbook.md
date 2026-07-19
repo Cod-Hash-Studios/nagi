@@ -5,8 +5,9 @@
 > milestone is not a release. Nagi v1 ships only when every release gate at the
 > end of this document is green.
 
-**Date:** 2026-07-19  
-**Status:** implementation blueprint  
+**Date:** 2026-07-19
+
+**Status:** implementation blueprint
 **Target:** macOS and Linux as supported platforms, Windows as an explicitly
 labelled terminal-multiplexer beta until mission parity is proven.
 
