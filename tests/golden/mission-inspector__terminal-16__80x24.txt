@@ -3,7 +3,7 @@
 # theme: terminal-16
 # size: 80x24
 # palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
-# style-sha256: 66e319ff3511c63c4fd0a7eae3a26db413db8b86542f18d6838d4b0aea70649b
+# style-sha256: 9ce3ff3e409187bc34b6b0ca44747324a85d35a1a8d9470c05ef3d0615b41c61
 # ---
  spaces                  │ 1       +
                          │
@@ -25,7 +25,7 @@
      |                                                                    |
      |CHECKS AND EVIDENCE  -                                              |
      | PASS     tests  required                                           |
-     |tab extensions  p proof  a attention  h handoff  j/k scroll  esc coc|
+     |tab extensions  p proof  a attention  h handoff  j/k scroll         |
      +--------------------------------------------------------------------+
                          │
                         «│

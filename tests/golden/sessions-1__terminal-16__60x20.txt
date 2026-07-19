@@ -3,7 +3,7 @@
 # theme: terminal-16
 # size: 60x20
 # palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
-# style-sha256: fc38a6df2f190417077169014450d48d420273bc1da6497c56c6ff55a1848fc3
+# style-sha256: 1abc93d58a3e988894f711fa94b2a0469f825ee17d34e50a56f8b7b6b4570e77
 # ---
  · nagi-release-with-a-deliberately-long-…  tab 1 │
  no agents                                        │ switch
@@ -20,8 +20,8 @@
    |                                                    |
    |                                                    |
    |                                                    |
-   | nagi-release-with-a-deli…ce-label | pane 1 | shell-|
-   |enter switch  tab missions  / search  b/w/i/d/a stat|
+   |. UNKNOWN  shell                                    |
+   |enter switch  tab missions  / search                |
    +----------------------------------------------------+
 
 

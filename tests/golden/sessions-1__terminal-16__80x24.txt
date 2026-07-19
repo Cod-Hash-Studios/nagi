@@ -3,7 +3,7 @@
 # theme: terminal-16
 # size: 80x24
 # palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
-# style-sha256: ad50d9a411fd246999fb8d4540bcd8c2b88f0063e7ce4464ba253d9dfaded7a1
+# style-sha256: 4fe6c76e7a08129e1595f662a9694aa48e6304fe23038c600438fe6b4b7e3519
 # ---
  spaces                  │ 1       +
                          │
@@ -23,9 +23,9 @@
      |                                                                    |
      |                                                                    |
      |+ pane 1 ----------------------------------------------------------+|
-     ||nagi-release-with-a-deliberatel…workspace-label | pane 1 | shell  ||
+     ||. UNKNOWN  shell                                                  ||
      |+------------------------------------------------------------------+|
-     |enter switch  tab missions  / search  b/w/i/d/a states  j/k move  es|
+     |enter switch  tab missions  / search  b/w/i/d/a states  j/k move    |
      +--------------------------------------------------------------------+
                          │
                         «│

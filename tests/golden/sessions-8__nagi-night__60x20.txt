@@ -3,7 +3,7 @@
 # theme: nagi-night
 # size: 60x20
 # palette: Palette { accent: Rgb(121, 167, 216), panel_bg: Rgb(16, 22, 31), surface0: Rgb(25, 36, 52), surface1: Rgb(43, 58, 78), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(243, 235, 221), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(126, 185, 154), yellow: Rgb(212, 180, 106), red: Rgb(230, 101, 90), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
-# style-sha256: 88e04062a6c11c5b879bba092ab59b20a1d8a5db5fea05d39fa517f55aa94cdb
+# style-sha256: 46aab56fc5d3f1c271254daeb08219f195d77deac3fdab2e164863271e24c1d1
 # ---
  · nagi-release-with-a-deliberately-long-…  tab 1 │
  no agents                                        │ switch
@@ -20,8 +20,8 @@
    │   ├─     ○ pane 1                     shell       ▕│
    │ ▾     ○ mission-003 (1)                           ▕│
    │   ├─     ○ pane 1                     shell       ▕│
-   │ nagi-release-with-a-deli…ce-label · pane 1 · shell─│
-   │enter switch  tab missions  / search  b/w/i/d/a stat│
+   │○ UNKNOWN  shell                                    │
+   │enter switch  tab missions  / search                │
    ╰────────────────────────────────────────────────────╯
 
 

@@ -3,7 +3,7 @@
 # theme: custom-ume
 # size: 80x24
 # palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
-# style-sha256: 55d0825290665d4457ef15ec859881bb72cb37d4672401a781fd051ca8650d5f
+# style-sha256: 8a54018e98799f72e5fc628d6aa473e2366fa941a5457782f7c8ff0e4f2849cd
 # ---
  spaces                  │ 1       +
                          │
@@ -25,7 +25,7 @@
      │                                                                    │
      │CHECKS AND EVIDENCE  ─                                              │
      │ PASS     tests  required                                           │
-     │tab extensions  p proof  a attention  h handoff  j/k scroll  esc coc│
+     │tab extensions  p proof  a attention  h handoff  j/k scroll         │
      ╰────────────────────────────────────────────────────────────────────╯
                          │
                         «│

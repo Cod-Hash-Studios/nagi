@@ -23,7 +23,7 @@ use super::{
     },
     scrollbar::{render_scrollbar, should_show_scrollbar},
     status::{agent_icon_with_set, state_label_color},
-    text::{display_width_u16, middle_elide, truncate_end},
+    text::{display_width_u16, truncate_end},
     widgets::render_panel_shell_with_border_set,
 };
 use crate::app::state::{
@@ -508,15 +508,16 @@ fn render_detail(
             .map(|row| row.label.as_str())
             .unwrap_or("Selection");
         let tokens = UiTokens::from(&app.palette);
+        let body = row
+            .as_ref()
+            .map(|row| compact_detail_line(app, row, area.width.saturating_sub(4)))
+            .unwrap_or_default();
         card::render(
             frame,
             area,
             Card {
                 title,
-                body: vec![Line::from(Span::styled(
-                    middle_elide(&detail, area.width.saturating_sub(4) as usize),
-                    Style::default().fg(tokens.text_muted),
-                ))],
+                body: vec![body],
                 selected: true,
             },
             tokens,
@@ -524,13 +525,96 @@ fn render_detail(
         );
         return;
     }
-    render_separator(frame, area, app);
-    let text = middle_elide(&detail, area.width.saturating_sub(2) as usize);
+    let tokens = UiTokens::from(&app.palette);
+    let row = selected_navigator_row(app, terminal_runtimes);
+    let line = row
+        .as_ref()
+        .map(|row| compact_detail_line(app, row, area.width.saturating_sub(2)))
+        .unwrap_or_default();
+    frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(format!(" {text}"))
-            .style(Style::default().fg(UiTokens::from(&app.palette).text_muted)),
+        Paragraph::new(line).style(surface::style(tokens, SurfaceKind::Elevated)),
         area,
     );
+}
+
+fn compact_detail_line(app: &AppState, row: &NavigatorRow, width: u16) -> Line<'static> {
+    let tokens = UiTokens::from(&app.palette);
+    let icons = IconSet::from(app.icon_style);
+    let (mut spans, summary) = match &row.target {
+        NavigatorTarget::Mission { mission_id } => {
+            let Some(mission) = app
+                .mission_views
+                .iter()
+                .find(|mission| mission.mission_id == *mission_id)
+            else {
+                return Line::from(Span::styled(
+                    "Mission no longer exists",
+                    Style::default().fg(tokens.attention),
+                ));
+            };
+            (
+                mission_status_badge(mission.status, tokens, icons).spans,
+                mission.objective.clone(),
+            )
+        }
+        NavigatorTarget::MissionProject { repository_path } => {
+            let missions = app
+                .mission_views
+                .iter()
+                .filter(|mission| mission.repository_path == *repository_path)
+                .count();
+            let needs_you = app
+                .mission_views
+                .iter()
+                .filter(|mission| {
+                    mission.repository_path == *repository_path
+                        && mission.unresolved_attention_count > 0
+                })
+                .count();
+            (
+                vec![Span::styled(
+                    "PROJECT",
+                    Style::default()
+                        .fg(tokens.text_muted)
+                        .add_modifier(Modifier::BOLD),
+                )],
+                format!("{missions} missions · {needs_you} need you"),
+            )
+        }
+        _ => {
+            let (icon, style) =
+                agent_icon_with_set(row.status, row.seen, app.spinner_tick, &app.palette, icons);
+            (
+                vec![
+                    Span::styled(icon, style.add_modifier(Modifier::BOLD)),
+                    Span::raw(" "),
+                    Span::styled(
+                        display_state(row.status, row.seen).to_uppercase(),
+                        Style::default()
+                            .fg(state_label_color(row.status, row.seen, &app.palette))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ],
+                row.meta.clone(),
+            )
+        }
+    };
+    let used = spans
+        .iter()
+        .map(|span| display_width_u16(span.content.as_ref()))
+        .sum::<u16>();
+    if used < width {
+        spans.push(Span::raw("  "));
+        spans.push(Span::styled(
+            truncate_end(
+                &summary,
+                width.saturating_sub(used).saturating_sub(2) as usize,
+            ),
+            Style::default().fg(tokens.text_muted),
+        ));
+    }
+    Line::from(spans)
 }
 
 fn selected_navigator_row(
