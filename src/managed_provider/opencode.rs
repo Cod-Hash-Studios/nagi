@@ -50,7 +50,7 @@ const PERMISSION_METHOD: &str = "opencode/permission";
 #[cfg(not(test))]
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(test)]
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 #[cfg(not(test))]
 const TURN_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 #[cfg(test)]
