@@ -10,6 +10,8 @@ const SURFACES: &[&str] = &[
     "sessions-500",
     "mission-cockpit",
     "command-palette",
+    "new-mission",
+    "mission-handoff",
     "settings",
     "mission-inspector",
     "proof-review",

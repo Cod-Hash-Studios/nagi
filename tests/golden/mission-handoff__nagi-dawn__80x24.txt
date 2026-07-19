@@ -1,0 +1,31 @@
+# nagi-ui-golden v1
+# surface: mission-handoff
+# theme: nagi-dawn
+# size: 80x24
+# palette: Palette { accent: Rgb(23, 54, 93), panel_bg: Rgb(244, 240, 232), surface0: Rgb(236, 230, 218), surface1: Rgb(218, 210, 196), surface_dim: Rgb(239, 234, 223), overlay0: Rgb(111, 106, 98), overlay1: Rgb(95, 91, 85), text: Rgb(23, 25, 24), subtext0: Rgb(95, 91, 85), mauve: Rgb(112, 80, 124), green: Rgb(61, 122, 93), yellow: Rgb(154, 107, 31), red: Rgb(184, 56, 47), blue: Rgb(47, 111, 168), teal: Rgb(43, 125, 114), peach: Rgb(165, 102, 44) }
+# style-sha256: a0086cf557b28ca234c3ac0076ebe41b7228464b1b2cc34d945a264ab228cb1f
+# ---
+ spaces                  │ 1       +
+                         │
+ · na╭────────────────────────────────────────────────────────────────────╮
+   ma│HANDOFF  Codex  →  Claude Code                                      │
+ · mi│same mission  mission-1                                             │
+   ma│────────────────────────────────────────────────────────────────────│
+ · mi│CHOOSE THE NEXT RUNTIME  ─                                          │
+   ma│  ‹  Claude Code  ›                                                 │
+ · mi│                                                                    │
+   ma│BOUND CONTINUATION  ─                                               │
+     │Run       run-claude-18                                             │
+ new │Snapshot  dddddddd…dddddddd                                         │
+─────│Workspace 2 changed path(s)                                         │
+ agen│  · src/app/command_palette.rs                                      │
+     │  · src/ui/proof_review.rs                                          │
+     │                                                                    │
+     │[x] Allow the target provider to write in this worktree             │
+     │Proof is invalidated and rerun. Hidden provider reasoning is never  │
+     │transferred.                                                        │
+     │                                                                    │
+     │←/→ provider  space write scope  enter continue  esc back           │
+     ╰────────────────────────────────────────────────────────────────────╯
+                         │
+                        «│

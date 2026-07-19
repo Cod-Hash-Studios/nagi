@@ -1,0 +1,39 @@
+# nagi-ui-golden v1
+# surface: new-mission
+# theme: terminal-16
+# size: 120x32
+# palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
+# style-sha256: d43eefb631b2d1716db38a65f6ed2fa62fdb85e076ba0ed40f8cc2074fbb97ad
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-…▕│
+   main+--------------------------------------------------------------------------------------------------------+
+ · miss|NEW MISSION  Runtime                                                                                    |
+   main|* * * * o  step 4/5  /Users/nagi/workspaces/release-candidate                                           |
+ · miss|────────────────────────────────────────────────────────────────────────────────────────────────────────|
+   main|CHOOSE THE RUNTIME, KEEP THE WORKFLOW  -                                                                |
+ · miss|                                                                                                        |
+   main|    Codex                                                                                               |
+ · miss|  ▸ Claude Code                                                                                         |
+   main|    OpenCode                                                                                            |
+ · miss|    ACP agent                                                                                           |
+   main|                                                                                                        |
+       |Attention, evidence and proof stay provider-neutral.                                                    |
+ new   |                                                                                                        |
+───────|                                                                                                        |
+ agents|                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |                                                                                                        |
+       |←/→ provider  enter continue  esc cancel                                                                |
+       +--------------------------------------------------------------------------------------------------------+
+                         │
+                         │
+                        «│

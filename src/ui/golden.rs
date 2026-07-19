@@ -15,10 +15,15 @@ use crate::{
         AttentionDecisionV1, AttentionDeliveryStateV1, AttentionFailureCodeV1, AttentionItemV1,
         AttentionKindV1, AttentionPaneTargetV1, AttentionResponseCapabilityV1, AttentionRiskV1,
         AttentionSourceV1, AttentionStateV1, ContractVersionV1, MissionCheckStatusV1,
-        MissionProvider, MissionStatus, MissionViewV1,
+        MissionHandoffArtifactV1, MissionHandoffDiffV1, MissionProvider, MissionStatus,
+        MissionViewV1,
     },
-    app::{state::Palette, AppState, Mode},
+    app::{
+        state::{MissionHandoffDraft, NewMissionDraft, NewMissionStep, Palette},
+        AppState, Mode,
+    },
     config::{CustomThemeColors, UiIconStyleConfig},
+    project_recipe::{ProjectRecipe, RecipeConfidence},
     workspace::Workspace,
 };
 
@@ -32,6 +37,8 @@ const SURFACES: &[&str] = &[
     "sessions-500",
     "mission-cockpit",
     "command-palette",
+    "new-mission",
+    "mission-handoff",
     "settings",
     "mission-inspector",
     "proof-review",
@@ -323,13 +330,95 @@ fn fixture(surface: &str) -> AppState {
         }
         "mission-cockpit" => app.open_navigator(),
         "command-palette" => app.open_command_palette(),
+        "new-mission" => {
+            app.new_mission = Some(new_mission_fixture());
+            app.mode = Mode::NewMission;
+        }
+        "mission-handoff" => {
+            app.mission_handoff = Some(mission_handoff_fixture(&missions[0]));
+            app.mode = Mode::MissionHandoff;
+        }
         "settings" => app.mode = Mode::Settings,
         "mission-inspector" => app.mode = Mode::MissionInspector,
-        "proof-review" => app.mode = Mode::ProofReview,
+        "proof-review" => {
+            if let Some(mission) = app.mission_views.first_mut() {
+                mission.evidence_pack_digest = Some("e".repeat(64));
+                if let Some(evidence) = mission.evidence.first_mut() {
+                    evidence.recorded_at_millis = 1_784_540_540_000;
+                    evidence.duration_millis = Some(1_240);
+                    evidence.artifact_count = 2;
+                }
+            }
+            app.mode = Mode::ProofReview;
+        }
         "attention-inbox" => app.mode = Mode::AttentionInbox,
         _ => panic!("unknown golden surface: {surface}"),
     }
     app
+}
+
+fn new_mission_fixture() -> NewMissionDraft {
+    NewMissionDraft {
+        step: NewMissionStep::Provider,
+        repository_path: PathBuf::from("/Users/nagi/workspaces/release-candidate"),
+        recipe: ProjectRecipe {
+            id: "rust",
+            label: "Rust",
+            command_line: "cargo test --locked".into(),
+            confidence: RecipeConfidence::ProjectTest,
+        },
+        project_recipe_summary: Some("setup · 2 checks · 1 service".into()),
+        objective: "Ship the release cockpit without losing provider context".into(),
+        criteria: "Codex and Claude resume safely; declared proof passes".into(),
+        proof_command: "cargo test --locked".into(),
+        provider_index: 1,
+        workspace_write_confirmed: false,
+        error: None,
+    }
+}
+
+fn mission_handoff_fixture(mission: &MissionViewV1) -> MissionHandoffDraft {
+    MissionHandoffDraft {
+        mission_id: mission.mission_id.clone(),
+        source_provider: MissionProvider::Codex,
+        target_provider: MissionProvider::ClaudeCode,
+        artifact: Some(MissionHandoffArtifactV1 {
+            schema_version: ContractVersionV1,
+            artifact_sha256: "d".repeat(64),
+            generated_at_millis: 1_753_027_200_000,
+            mission_id: mission.mission_id.clone(),
+            source_run_id: "run-codex-17".into(),
+            suggested_run_id: "run-claude-18".into(),
+            source_provider: MissionProvider::Codex,
+            target_provider: MissionProvider::ClaudeCode,
+            repository_path: "/Users/nagi/workspaces/release-candidate".into(),
+            worktree_path: "/Users/nagi/workspaces/release-candidate/.worktrees/mission-1".into(),
+            base_revision: "a".repeat(40),
+            head_revision: "b".repeat(40),
+            objective: mission.objective.clone(),
+            acceptance_criteria: mission
+                .criteria
+                .iter()
+                .map(|criterion| criterion.description.clone())
+                .collect(),
+            diff: MissionHandoffDiffV1 {
+                workspace_digest: "c".repeat(64),
+                dirty: true,
+                changed_paths: vec![
+                    "src/app/command_palette.rs".into(),
+                    "src/ui/proof_review.rs".into(),
+                ],
+                stat: "2 files changed, 48 insertions(+), 7 deletions(-)".into(),
+            },
+            decisions: Vec::new(),
+            checks: mission.checks.clone(),
+            selected_logs: vec!["cargo test --locked · passed".into()],
+            warnings: Vec::new(),
+        }),
+        workspace_write_confirmed: true,
+        loading: false,
+        error: None,
+    }
 }
 
 fn mission_fixtures() -> Vec<MissionViewV1> {

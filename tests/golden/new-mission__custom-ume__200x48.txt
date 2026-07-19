@@ -1,0 +1,55 @@
+# nagi-ui-golden v1
+# surface: new-mission
+# theme: custom-ume
+# size: 200x48
+# palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
+# style-sha256: a40caa468f3483e278e854a73c2feb5940899fe2a18d4225fde7de0ec8ef9ad2
+# ---
+ spaces                  │ 1       +
+                         │
+ · nagi-release-with-a-d…│
+   main                  │
+ · mission-0╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   main     │NEW MISSION  Runtime                                                                                                                                                          │
+ · mission-0│● ● ● ● ○  step 4/5  /Users/nagi/workspaces/release-candidate                                                                                                                 │
+   main     │──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+ · mission-0│CHOOSE THE RUNTIME, KEEP THE WORKFLOW  ─                                                                                                                                      │
+   main     │                                                                                                                                                                              │
+ · mission-0│    Codex                                                                                                                                                                     │
+   main     │  ▸ Claude Code                                                                                                                                                               │
+ · mission-0│    OpenCode                                                                                                                                                                  │
+   main     │    ACP agent                                                                                                                                                                 │
+ · mission-0│                                                                                                                                                                              │
+   main     │Attention, evidence and proof stay provider-neutral.                                                                                                                          │
+ · mission-0│                                                                                                                                                                              │
+   main     │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+ new        │                                                                                                                                                                              │
+────────────│                                                                                                                                                                              │
+ agents     │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │                                                                                                                                                                              │
+            │←/→ provider  enter continue  esc cancel                                                                                                                                      │
+            ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                         │
+                         │
+                         │
+                        «│
