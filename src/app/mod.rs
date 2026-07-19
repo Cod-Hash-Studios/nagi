@@ -326,6 +326,7 @@ fn theme_runtime_config(
     let dark_name = config.theme.dark_name.clone().unwrap_or(default_dark);
     let light_name = config.theme.light_name.clone().unwrap_or(default_light);
     let mut file_palettes = std::collections::HashMap::new();
+    let mut file_components = std::collections::HashMap::new();
     let names = if config.theme.auto_switch {
         vec![
             manual_name.as_str(),
@@ -371,10 +372,14 @@ fn theme_runtime_config(
                 "theme '{name}' is dark but configured as light_name"
             ));
         }
+        file_components.insert(normalized.clone(), loaded.components);
         file_palettes.insert(normalized, loaded.palette);
     }
     let discovered = crate::theme::loader::discover();
     for (name, theme) in discovered.themes {
+        file_components
+            .entry(name.clone())
+            .or_insert(theme.components);
         file_palettes.entry(name).or_insert(theme.palette);
     }
     Ok(state::ThemeRuntimeConfig {
@@ -393,6 +398,7 @@ fn theme_runtime_config(
                 .is_none())
         .then(|| config.ui.accent.clone()),
         file_palettes,
+        file_components,
         theme_file_diagnostics: discovered.diagnostics,
     })
 }
@@ -432,7 +438,11 @@ fn resolve_palette_for_theme_name(
 fn resolve_effective_theme(
     runtime: &state::ThemeRuntimeConfig,
     appearance: Option<crate::terminal_theme::HostAppearance>,
-) -> (state::Palette, String) {
+) -> (
+    state::Palette,
+    String,
+    crate::theme::manifest::ThemeComponents,
+) {
     let (name, fallback) = if runtime.auto_switch {
         match appearance.unwrap_or(crate::terminal_theme::HostAppearance::Dark) {
             crate::terminal_theme::HostAppearance::Dark => (&runtime.dark_name, "nagi-night"),
@@ -441,9 +451,23 @@ fn resolve_effective_theme(
     } else {
         (&runtime.manual_name, "nagi-night")
     };
+    let normalized = normalize_theme_name(name);
+    let components = runtime
+        .file_components
+        .get(&normalized)
+        .copied()
+        .or_else(|| {
+            crate::theme::builtins::source(&normalized).and_then(|source| {
+                crate::theme::loader::load_manifest_str(source, &normalized)
+                    .ok()
+                    .map(|theme| theme.components)
+            })
+        })
+        .unwrap_or_default();
     (
         resolve_palette_for_theme_name(name, fallback, runtime),
         name.clone(),
+        components,
     )
 }
 
@@ -613,7 +637,8 @@ impl App {
                 (runtime, Some(diagnostic))
             }
         };
-        let (theme_palette, theme_name) = resolve_effective_theme(&theme_runtime, None);
+        let (theme_palette, theme_name, theme_components) =
+            resolve_effective_theme(&theme_runtime, None);
         let config_diagnostic = match (config_diagnostic, theme_diagnostic) {
             (Some(existing), Some(theme)) => Some(format!("{existing}; {theme}")),
             (Some(existing), None) => Some(existing),
@@ -783,6 +808,7 @@ impl App {
             spinner_tick: 0,
             palette: theme_palette,
             theme_name,
+            theme_components,
             theme_runtime,
             host_terminal_appearance: None,
             host_terminal_appearance_explicit: false,
@@ -791,6 +817,7 @@ impl App {
                 list: state::SelectionListState::new(0),
                 original_palette: None,
                 original_theme: None,
+                original_theme_components: None,
             },
             integration_recommendations: crate::integration::integration_recommendations(),
             agent_manifest_summaries,
@@ -2601,6 +2628,12 @@ attention = "attention"
 working = "working"
 proof_fresh = "fresh"
 proof_stale = "stale"
+
+[components]
+border = "plain"
+selection = "fill"
+density = "compact"
+motion = "none"
 "##
             )
         };
@@ -2615,6 +2648,15 @@ proof_stale = "stale"
         assert_eq!(
             app.state.palette.accent,
             ratatui::style::Color::Rgb(124, 168, 216)
+        );
+        assert_eq!(
+            app.state.theme_components,
+            crate::theme::manifest::ThemeComponents {
+                border: crate::theme::manifest::ThemeBorderStyle::Plain,
+                selection: crate::theme::manifest::ThemeSelectionStyle::Fill,
+                density: crate::theme::manifest::ThemeDensity::Compact,
+                motion: crate::theme::manifest::ThemeMotion::None,
+            }
         );
 
         std::fs::write(&theme_path, valid_theme("#7ca8d8", "#182431")).unwrap();

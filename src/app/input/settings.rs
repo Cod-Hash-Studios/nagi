@@ -111,6 +111,19 @@ fn preview_selected_theme(state: &mut AppState) {
         }
         state.palette = palette;
         state.theme_name.clone_from(name);
+        state.theme_components = state
+            .theme_runtime
+            .file_components
+            .get(&normalize_theme_name(name))
+            .copied()
+            .or_else(|| {
+                crate::theme::builtins::source(&normalize_theme_name(name)).and_then(|source| {
+                    crate::theme::loader::load_manifest_str(source, name)
+                        .ok()
+                        .map(|theme| theme.components)
+                })
+            })
+            .unwrap_or_default();
     }
 }
 
@@ -120,6 +133,9 @@ fn cancel_settings(state: &mut AppState) {
     }
     if let Some(theme_name) = state.settings.original_theme.take() {
         state.theme_name = theme_name;
+    }
+    if let Some(components) = state.settings.original_theme_components.take() {
+        state.theme_components = components;
     }
     super::modal::leave_modal(state);
 }
@@ -311,6 +327,7 @@ pub(crate) fn open_settings_at(state: &mut AppState, section: SettingsSection) {
     state.integration_install_messages.clear();
     state.settings.original_palette = Some(state.palette.clone());
     state.settings.original_theme = Some(state.theme_name.clone());
+    state.settings.original_theme_components = Some(state.theme_components);
     state.settings.section = section;
     state.settings.list.selected = match section {
         SettingsSection::Theme => current_theme_index(state, &state.theme_name),

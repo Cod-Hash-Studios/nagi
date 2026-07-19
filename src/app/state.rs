@@ -1140,6 +1140,7 @@ pub struct ThemeRuntimeConfig {
     pub custom: Option<crate::config::CustomThemeColors>,
     pub legacy_accent: Option<String>,
     pub file_palettes: std::collections::HashMap<String, Palette>,
+    pub file_components: std::collections::HashMap<String, crate::theme::manifest::ThemeComponents>,
     pub theme_file_diagnostics: Vec<String>,
 }
 
@@ -1152,6 +1153,8 @@ pub struct SettingsState {
     pub original_palette: Option<Palette>,
     /// The theme name before opening settings.
     pub original_theme: Option<String>,
+    /// The component preferences before opening settings.
+    pub original_theme_components: Option<crate::theme::manifest::ThemeComponents>,
 }
 
 pub(crate) enum DragTarget {
@@ -1678,6 +1681,8 @@ pub struct AppState {
     pub palette: Palette,
     /// Currently applied theme name (for settings UI).
     pub theme_name: String,
+    /// Non-color component preferences supplied by the active theme.
+    pub theme_components: crate::theme::manifest::ThemeComponents,
     /// Runtime theme configuration used to resolve manual and auto-switch palettes.
     pub theme_runtime: ThemeRuntimeConfig,
     /// Last known foreground host terminal appearance.
@@ -2124,8 +2129,10 @@ impl AppState {
                 custom: None,
                 legacy_accent: None,
                 file_palettes: std::collections::HashMap::new(),
+                file_components: std::collections::HashMap::new(),
                 theme_file_diagnostics: Vec::new(),
             },
+            theme_components: crate::theme::manifest::ThemeComponents::default(),
             host_terminal_appearance: None,
             host_terminal_appearance_explicit: false,
             settings: SettingsState {
@@ -2133,6 +2140,7 @@ impl AppState {
                 list: SelectionListState::new(0),
                 original_palette: None,
                 original_theme: None,
+                original_theme_components: None,
             },
             integration_recommendations: Vec::new(),
             agent_manifest_summaries: Vec::new(),

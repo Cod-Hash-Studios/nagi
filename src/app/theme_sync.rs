@@ -72,15 +72,19 @@ impl App {
     }
 
     pub(super) fn refresh_effective_app_theme(&mut self) -> bool {
-        let (palette, theme_name) = super::resolve_effective_theme(
+        let (palette, theme_name, theme_components) = super::resolve_effective_theme(
             &self.state.theme_runtime,
             self.state.host_terminal_appearance,
         );
-        if self.state.theme_name == theme_name && self.state.palette == palette {
+        if self.state.theme_name == theme_name
+            && self.state.palette == palette
+            && self.state.theme_components == theme_components
+        {
             return false;
         }
         self.state.theme_name = theme_name;
         self.state.palette = palette;
+        self.state.theme_components = theme_components;
         self.render_dirty.store(true, Ordering::Release);
         self.render_notify.notify_one();
         true
