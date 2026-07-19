@@ -700,7 +700,7 @@ mod tests {
             clear_title: false,
             clear_display_agent: false,
             clear_state_labels: false,
-            ttl: Some(Duration::from_millis(1)),
+            ttl: Some(Duration::from_secs(60)),
             seq: None,
         });
         let old_deadline = terminal.next_agent_metadata_expiry().unwrap();
@@ -750,7 +750,7 @@ mod tests {
             clear_title: false,
             clear_display_agent: false,
             clear_state_labels: false,
-            ttl: Some(Duration::from_millis(1)),
+            ttl: Some(Duration::from_secs(60)),
             seq: None,
         });
         let old_deadline = terminal.next_agent_metadata_expiry().unwrap();
@@ -803,7 +803,7 @@ mod tests {
             clear_title: false,
             clear_display_agent: false,
             clear_state_labels: false,
-            ttl: Some(Duration::from_millis(1)),
+            ttl: Some(Duration::from_secs(60)),
             seq: None,
         });
 
@@ -843,7 +843,7 @@ mod tests {
             clear_title: false,
             clear_display_agent: false,
             clear_state_labels: false,
-            ttl: Some(Duration::from_millis(1)),
+            ttl: Some(Duration::from_secs(60)),
             seq: None,
         });
         let deadline = terminal
@@ -891,7 +891,7 @@ mod tests {
             clear_title: false,
             clear_display_agent: false,
             clear_state_labels: false,
-            ttl: Some(Duration::from_millis(1)),
+            ttl: Some(Duration::from_secs(60)),
             seq: None,
         });
         let first_deadline = terminal.next_agent_metadata_expiry().unwrap();
@@ -905,7 +905,7 @@ mod tests {
             clear_title: false,
             clear_display_agent: false,
             clear_state_labels: false,
-            ttl: Some(Duration::from_millis(2)),
+            ttl: Some(Duration::from_secs(120)),
             seq: None,
         });
         let second_deadline = terminal

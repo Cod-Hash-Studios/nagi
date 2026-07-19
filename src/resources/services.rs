@@ -541,7 +541,7 @@ mod tests {
         let owner = PortLeaseOwner::new("mission", "run", "web").unwrap();
         let request_id = service_request_id("mission", "run", "web");
         let mut reservation = allocator.reserve(owner, &request_id, 1).unwrap();
-        let lease = reservation.prepare_service_spawn();
+        let (lease, listener) = reservation.take_fixture_listener();
         let mut service_process = Command::new("git")
             .args(["cat-file", "--batch"])
             .current_dir(repository.path())
@@ -554,7 +554,6 @@ mod tests {
             .bind_service_process(lease.lease_id(), service_process.id())
             .unwrap();
 
-        let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, lease.port())).unwrap();
         let worker = thread::spawn(move || loop {
             let (mut stream, _) = listener.accept().unwrap();
             let mut request = [0_u8; 256];

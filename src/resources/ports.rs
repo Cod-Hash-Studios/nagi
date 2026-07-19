@@ -120,6 +120,15 @@ impl PortReservation {
         self.listener.take();
         self.lease.clone()
     }
+
+    #[cfg(test)]
+    pub(crate) fn take_fixture_listener(&mut self) -> (PortLease, TcpListener) {
+        let listener = self
+            .listener
+            .take()
+            .expect("a fresh test reservation must still own its listener");
+        (self.lease.clone(), listener)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
