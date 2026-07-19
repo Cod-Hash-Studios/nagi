@@ -519,8 +519,25 @@ fn merge_read_reset_result<T>(
 ) -> std::io::Result<T> {
     match (result, reset_result) {
         (Ok(value), Ok(())) => Ok(value),
+        (Ok(value), Err(err)) if benign_read_reset_error(&err) => Ok(value),
         (Ok(_), Err(err)) => Err(err),
         (Err(err), _) => Err(err),
+    }
+}
+
+fn benign_read_reset_error(err: &io::Error) -> bool {
+    if is_connection_closed_error(err) {
+        return true;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // macOS can return EINVAL while clearing SO_RCVTIMEO after the peer
+        // closes. The completed EOF/read remains authoritative.
+        return err.kind() == io::ErrorKind::InvalidInput;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
     }
 }
 
@@ -1016,6 +1033,17 @@ mod tests {
         backoff.reset();
         assert_eq!(backoff.interval, STREAM_FALLBACK_POLL_INTERVAL);
         assert_eq!(backoff.fast_polls_remaining, STREAM_FALLBACK_FAST_POLLS);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn successful_read_survives_macos_timeout_reset_after_peer_close() {
+        let result = merge_read_reset_result(
+            Ok(Some("frame")),
+            Err(io::Error::from(io::ErrorKind::InvalidInput)),
+        );
+
+        assert_eq!(result.unwrap(), Some("frame"));
     }
 
     #[test]
