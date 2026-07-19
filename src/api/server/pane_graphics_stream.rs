@@ -338,7 +338,7 @@ fn read_line(
     idle_timeout: Duration,
     total_timeout: Duration,
 ) -> std::io::Result<Option<String>> {
-    with_timed_reads(stream, |stream, mut wait| {
+    let result = with_timed_reads(stream, |stream, mut wait| {
         let mut bytes = Vec::new();
         let mut byte = [0_u8; 1];
         let mut total_deadline = None;
@@ -387,7 +387,11 @@ fn read_line(
                 Err(err) => return Err(err),
             }
         }
-    })
+    });
+    match result {
+        Err(err) if benign_read_reset_error(&err) => Ok(None),
+        result => result,
+    }
 }
 
 fn read_exact(
@@ -398,7 +402,7 @@ fn read_exact(
     idle_timeout: Duration,
     total_timeout: Duration,
 ) -> std::io::Result<Option<Vec<u8>>> {
-    with_timed_reads(stream, |stream, mut wait| {
+    let result = with_timed_reads(stream, |stream, mut wait| {
         let mut data = Vec::new();
         let mut chunk = vec![0_u8; STREAM_FRAME_BODY_CHUNK_BYTES.min(len)];
         let total_deadline = Instant::now() + total_timeout;
@@ -444,7 +448,11 @@ fn read_exact(
         }
 
         Ok(Some(data))
-    })
+    });
+    match result {
+        Err(err) if benign_read_reset_error(&err) => Ok(None),
+        result => result,
+    }
 }
 
 #[derive(Clone, Copy)]
