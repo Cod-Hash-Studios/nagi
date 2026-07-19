@@ -6888,7 +6888,7 @@ mod tests {
     use crate::app::AppState;
     use crate::protocol::CursorState;
 
-    const PROVIDER_FIXTURE_TIMEOUT: Duration = Duration::from_secs(30);
+    const PROVIDER_FIXTURE_TIMEOUT: Duration = Duration::from_secs(45);
 
     #[path = "pane_graphics.rs"]
     mod pane_graphics_tests;

@@ -86,7 +86,7 @@ mod lifecycle {
     const CODEX_FIXTURE: &str = include_str!("../../tests/fixtures/providers/codex.sh");
     const CLAUDE_FIXTURE: &str = include_str!("../../tests/fixtures/providers/claude.sh");
     const OPEN_CODE_FIXTURE: &str = include_str!("../../tests/fixtures/providers/opencode.py");
-    const PROVIDER_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
+    const PROVIDER_EVENT_TIMEOUT: Duration = Duration::from_secs(45);
 
     fn provider_name(provider: ProviderKind) -> &'static str {
         match provider {

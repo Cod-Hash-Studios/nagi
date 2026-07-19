@@ -47,6 +47,7 @@ const MAX_IDENTIFIER_BYTES: usize = 1024;
 const MAX_ATTENTION_TEXT_BYTES: usize = 4 * 1024;
 const MAX_PERMISSION_PATTERNS: usize = 128;
 const PERMISSION_METHOD: &str = "opencode/permission";
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(not(test))]
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(test)]
@@ -425,7 +426,7 @@ impl Actor {
             tokio::spawn(drain_output(stderr));
         }
         let mut stdout = child.stdout.take().ok_or(())?;
-        let base_url = tokio::time::timeout(REQUEST_TIMEOUT, read_listening_url(&mut stdout))
+        let base_url = tokio::time::timeout(STARTUP_TIMEOUT, read_listening_url(&mut stdout))
             .await
             .map_err(|_| ())??;
         tokio::spawn(drain_output(stdout));
