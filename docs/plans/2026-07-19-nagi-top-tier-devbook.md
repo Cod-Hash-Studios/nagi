@@ -1381,14 +1381,14 @@ Every item is mandatory. “Mostly works” is not a v1 result.
 
 - First mission: a clean config, state directory, Git repository and installed
   binary complete doctor, persistent onboarding, explicit write consent and a
-  CLI-visible mission in 3.750 seconds with a deterministic provider fixture.
+  CLI-visible mission in 2.094 seconds with a deterministic provider fixture.
   The human-under-three-minutes gate remains open until an independent user run.
 - Managed providers: adapter descriptors and `nagi doctor` now pin Codex
   `0.144.5`, Claude Code `2.1.212`, and OpenCode `1.18.3`. The shared 67-test
   provider/doctor suite passes locally, including lifecycle, attention, resume,
   interrupt and disconnect behavior. The release gate remains open until all
   three exact upstream binaries pass the same live conformance run.
-- Rust suite: two consecutive complete Nextest runs passed 3,101 of 3,101 tests
+- Rust suite: two consecutive complete Nextest runs passed 3,109 of 3,109 tests
   across all 14 binaries on Apple M2 Pro, macOS, with no skipped test, no retry,
   and process leaks configured as failures. The full serial suite and all 18
   macOS live-handoff tests also pass. The current local-only commits have not
