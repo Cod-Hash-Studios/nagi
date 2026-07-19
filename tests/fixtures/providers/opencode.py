@@ -8,6 +8,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from socketserver import TCPServer
 from urllib.parse import parse_qs, urlparse
 
 
@@ -98,6 +99,13 @@ def complete_first_turn(reply):
         {"sessionID": "session-live", "status": {"type": "idle"}},
         "event-first-idle",
     )
+
+
+class FixtureServer(ThreadingHTTPServer):
+    def server_bind(self):
+        TCPServer.server_bind(self)
+        self.server_name = "127.0.0.1"
+        self.server_port = self.server_address[1]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -238,7 +246,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "--version":
     print(TESTED_VERSION)
     raise SystemExit(0)
 
-server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+server = FixtureServer(("127.0.0.1", 0), Handler)
 server.daemon_threads = True
 print(f"opencode server listening on http://127.0.0.1:{server.server_port}", flush=True)
 server.serve_forever()
