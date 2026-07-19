@@ -51,7 +51,7 @@ pub(super) fn spawn(
     });
 }
 
-fn command_arguments(
+pub(super) fn command_arguments(
     sandbox: super::SandboxAccess,
     resume_session_id: Option<&str>,
 ) -> Vec<String> {

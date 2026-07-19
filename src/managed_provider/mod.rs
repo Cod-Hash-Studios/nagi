@@ -9,6 +9,7 @@ mod adapter;
 mod claude;
 mod codex;
 mod opencode;
+mod probe;
 mod registry;
 
 #[cfg(test)]
@@ -21,6 +22,7 @@ pub(crate) use adapter::{
 pub(crate) use claude::TESTED_VERSION as CLAUDE_TESTED_VERSION;
 pub(crate) use codex::TESTED_VERSION as CODEX_TESTED_VERSION;
 pub(crate) use opencode::TESTED_VERSION as OPENCODE_TESTED_VERSION;
+pub(crate) use probe::probe_protocol;
 
 const COMMAND_CHANNEL_CAPACITY: usize = 32;
 

@@ -180,6 +180,79 @@ pub(crate) fn inspect(cwd: &Path) -> DoctorReport {
     }
 }
 
+pub(crate) fn inspect_with_provider_probe(cwd: &Path) -> DoctorReport {
+    let mut report = inspect(cwd);
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            report.checks.push(fail(
+                "provider_protocol",
+                "Provider protocol",
+                format!("probe runtime could not start: {error}"),
+                "Run `nagi doctor` without provider probing and inspect the Nagi logs",
+            ));
+            report.ready = false;
+            return report;
+        }
+    };
+
+    for (id, label, binary, provider) in [
+        (
+            "codex",
+            "Codex protocol",
+            "codex",
+            crate::mission::model::ProviderKind::Codex,
+        ),
+        (
+            "claude",
+            "Claude Code protocol",
+            "claude",
+            crate::mission::model::ProviderKind::ClaudeCode,
+        ),
+    ] {
+        let version_is_supported = report
+            .checks
+            .iter()
+            .any(|check| check.id == id && check.status == CheckStatus::Pass);
+        if !version_is_supported {
+            continue;
+        }
+        let Some(executable) = find_executable(binary) else {
+            continue;
+        };
+        let probe = runtime.block_on(crate::managed_provider::probe_protocol(
+            provider,
+            &executable,
+            cwd,
+            Duration::from_secs(5),
+        ));
+        report.checks.push(match probe {
+            Ok(()) => pass(
+                &format!("{id}_protocol"),
+                label,
+                "initialize handshake passed; no user turn was sent",
+            ),
+            Err(error) => fail(
+                &format!("{id}_protocol"),
+                label,
+                error.to_string(),
+                format!(
+                    "Reinstall the tested {label} version, then rerun `nagi doctor --probe-providers`"
+                ),
+            ),
+        });
+    }
+
+    report.ready = !report
+        .checks
+        .iter()
+        .any(|check| check.status == CheckStatus::Fail);
+    report
+}
+
 fn pass(id: &str, label: &str, detail: impl Into<String>) -> DoctorCheck {
     DoctorCheck {
         id: id.into(),

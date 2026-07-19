@@ -586,11 +586,11 @@ fn required_string(value: &Value, pointer: &str) -> Result<String, ()> {
     Ok(value.to_owned())
 }
 
-fn initialize_params() -> Value {
+pub(super) fn initialize_params() -> Value {
     json!({
         "clientInfo": {
-            "name": "muxora",
-            "title": "Muxora",
+            "name": "nagi",
+            "title": "Nagi",
             "version": env!("CARGO_PKG_VERSION")
         }
     })
@@ -813,8 +813,8 @@ mod tests {
             initialize_params(),
             json!({
                 "clientInfo": {
-                    "name": "muxora",
-                    "title": "Muxora",
+                    "name": "nagi",
+                    "title": "Nagi",
                     "version": env!("CARGO_PKG_VERSION")
                 }
             })

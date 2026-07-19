@@ -1,26 +1,39 @@
 use crate::doctor::{CheckStatus, DoctorReport};
 
 pub(super) fn run_doctor_command(args: &[String]) -> std::io::Result<i32> {
-    let json = match args {
-        [] => false,
-        [flag] if flag == "--json" => true,
-        [flag] if matches!(flag.as_str(), "help" | "--help" | "-h") => {
-            eprintln!("usage: nagi doctor [--json]");
-            return Ok(0);
-        }
-        _ => {
-            eprintln!("usage: nagi doctor [--json]");
-            return Ok(2);
-        }
+    if matches!(args, [flag] if matches!(flag.as_str(), "help" | "--help" | "-h")) {
+        eprintln!("usage: nagi doctor [--json] [--probe-providers]");
+        return Ok(0);
+    }
+    let Ok((json, probe_providers)) = parse_flags(args) else {
+        eprintln!("usage: nagi doctor [--json] [--probe-providers]");
+        return Ok(2);
     };
     let cwd = std::env::current_dir()?;
-    let report = crate::doctor::inspect(&cwd);
+    let report = if probe_providers {
+        crate::doctor::inspect_with_provider_probe(&cwd)
+    } else {
+        crate::doctor::inspect(&cwd)
+    };
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         print!("{}", format_report(&report));
     }
     Ok(if report.ready { 0 } else { 1 })
+}
+
+fn parse_flags(args: &[String]) -> Result<(bool, bool), ()> {
+    let mut json = false;
+    let mut probe_providers = false;
+    for flag in args {
+        match flag.as_str() {
+            "--json" if !json => json = true,
+            "--probe-providers" if !probe_providers => probe_providers = true,
+            _ => return Err(()),
+        }
+    }
+    Ok((json, probe_providers))
 }
 
 fn format_report(report: &DoctorReport) -> String {
@@ -54,6 +67,14 @@ fn format_report(report: &DoctorReport) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_probe_flag_is_accepted() {
+        assert_eq!(
+            parse_flags(&["--probe-providers".into(), "--json".into()]),
+            Ok((true, true))
+        );
+    }
 
     #[test]
     fn human_report_keeps_remediation_next_to_the_failure() {

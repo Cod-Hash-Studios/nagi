@@ -92,6 +92,10 @@ fn doctor_command() -> Command {
     Command::new("doctor")
         .about("Check repository, providers, terminal and configuration")
         .arg(json_flag())
+        .arg(
+            flag("probe-providers")
+                .help("Initialize Codex and Claude protocols without sending a user turn"),
+        )
 }
 
 fn config_command() -> Command {
