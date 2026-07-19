@@ -1,0 +1,24 @@
+manifest_version = 2
+id = "nagi.evidence-exporter"
+name = "Evidence Exporter"
+version = "0.1.0"
+min_nagi_version = "0.7.4"
+description = "Previews or exports the current mission proof as Markdown and JSON."
+runtime = "wasi-component"
+entrypoint = "target/wasm32-wasip2/release/nagi-evidence-exporter.wasm"
+capabilities = ["mission.read", "workspace.files.write:worktree"]
+
+[[contributions.commands]]
+id = "preview"
+title = "Preview evidence export"
+contexts = ["mission"]
+
+[[contributions.commands]]
+id = "export"
+title = "Export evidence to worktree"
+contexts = ["mission"]
+
+[[contributions.inspector_tabs]]
+id = "evidence-export"
+title = "Export"
+source = "preview"

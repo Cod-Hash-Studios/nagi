@@ -1,0 +1,19 @@
+manifest_version = 2
+id = "nagi.github-lifecycle"
+name = "GitHub PR and CI"
+version = "0.1.0"
+min_nagi_version = "0.7.4"
+description = "Turns mission checks and evidence into a concise PR and CI lifecycle view."
+runtime = "wasi-component"
+entrypoint = "target/wasm32-wasip2/release/nagi-github-lifecycle.wasm"
+capabilities = ["mission.read"]
+
+[[contributions.commands]]
+id = "inspect"
+title = "Inspect PR and CI proof"
+contexts = ["mission"]
+
+[[contributions.inspector_tabs]]
+id = "github-ci"
+title = "PR / CI"
+source = "inspect"

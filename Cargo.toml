@@ -46,6 +46,8 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicode-width = "0.2"
 schemars = { version = "1.2.1", features = ["derive"] }
+wasmtime = { version = "46.0.1", default-features = false, features = ["anyhow", "component-model", "cranelift", "runtime", "std"] }
+wasmtime-wasi = { version = "46.0.1", default-features = false, features = ["p2"] }
 
 [patch.crates-io]
 portable-pty = { path = "vendor/portable-pty" }
@@ -71,3 +73,4 @@ windows-sys = { version = "0.61.2", features = [
 [dev-dependencies]
 proptest = "1.11.0"
 tempfile = "3.27.0"
+wat = "1.251.0"

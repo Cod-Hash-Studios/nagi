@@ -1,0 +1,19 @@
+manifest_version = 2
+id = "nagi.dev-services"
+name = "Local Dev Services"
+version = "0.1.0"
+min_nagi_version = "0.7.4"
+description = "Shows declared local services and preview URLs without starting unapproved processes."
+runtime = "wasi-component"
+entrypoint = "target/wasm32-wasip2/release/nagi-dev-services.wasm"
+capabilities = ["mission.read", "workspace.files.read:worktree"]
+
+[[contributions.commands]]
+id = "inspect"
+title = "Inspect local services"
+contexts = ["mission", "workspace"]
+
+[[contributions.inspector_tabs]]
+id = "services"
+title = "Services"
+source = "inspect"

@@ -1,0 +1,20 @@
+manifest_version = 2
+id = "{PLUGIN_ID}"
+name = "{PLUGIN_NAME}"
+version = "0.1.0"
+min_nagi_version = "{NAGI_VERSION}"
+description = "A sandboxed Nagi inspector contribution."
+runtime = "wasi-component"
+entrypoint = "target/wasm32-wasip2/release/{PLUGIN_PACKAGE}.wasm"
+capabilities = ["mission.read"]
+
+[[contributions.commands]]
+id = "inspect"
+title = "Refresh {PLUGIN_NAME}"
+contexts = ["mission"]
+
+[[contributions.inspector_tabs]]
+id = "overview"
+title = "{PLUGIN_NAME}"
+source = "inspect"
+

@@ -1,16 +1,18 @@
 mod context;
+mod contributions;
 mod env;
 mod manifest;
 mod panes;
 mod runtime;
+pub(crate) mod sandbox;
 
 use super::responses::{encode_error, encode_success};
 use crate::api::schema::{
     InstalledPluginInfo, PluginActionInfo, PluginActionInvokeParams, PluginActionListParams,
-    PluginLinkParams, PluginListParams, PluginLogListParams, PluginManifestAction,
-    PluginManifestLinkHandler, PluginPaneCloseParams, PluginPaneFocusParams, PluginPaneInfo,
-    PluginPaneOpenParams, PluginPanePlacement, PluginSetEnabledParams, PluginUnlinkParams,
-    ResponseResult,
+    PluginCapabilityApproveParams, PluginLinkParams, PluginListParams, PluginLogListParams,
+    PluginManifestAction, PluginManifestLinkHandler, PluginPaneCloseParams, PluginPaneFocusParams,
+    PluginPaneInfo, PluginPaneOpenParams, PluginPanePlacement, PluginSetEnabledParams,
+    PluginUnlinkParams, ResponseResult,
 };
 use crate::app::App;
 use manifest::{
@@ -20,9 +22,51 @@ use manifest::{
 
 #[cfg(test)]
 use crate::api::schema::{PluginCommandStatus, PluginInvocationContext};
+pub(crate) use contributions::parse_plugin_ui_document;
 pub(crate) use manifest::load_plugin_manifest;
 #[cfg(test)]
 use runtime::{read_capped_plugin_output, MAX_PLUGIN_COMMANDS_IN_FLIGHT};
+
+#[derive(Debug)]
+pub(crate) struct PluginComponentTestResult {
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
+    pub(crate) error: Option<String>,
+}
+
+pub(crate) fn test_component_fixture(
+    component_path: &std::path::Path,
+    plugin_id: &str,
+    action_id: Option<&str>,
+    context_json: &str,
+    stdin: &[u8],
+    workspace_path: Option<&std::path::Path>,
+    workspace_readable: bool,
+    workspace_writable: bool,
+) -> PluginComponentTestResult {
+    let execution = sandbox::execute(
+        sandbox::SandboxInvocation {
+            component_path,
+            plugin_id,
+            action_id,
+            context_json,
+            stdin,
+            workspace: workspace_path.map(|host_path| sandbox::SandboxWorkspaceMount {
+                host_path,
+                readable: workspace_readable,
+                writable: workspace_writable,
+            }),
+        },
+        std::time::Duration::from_secs(10),
+    );
+    PluginComponentTestResult {
+        exit_code: execution.exit_code,
+        stdout: execution.stdout,
+        stderr: execution.stderr,
+        error: execution.error,
+    }
+}
 
 impl App {
     pub(super) fn handle_plugin_link(&mut self, id: String, params: PluginLinkParams) -> String {
@@ -34,6 +78,32 @@ impl App {
             match normalize_plugin_source(&plugin, source) {
                 Ok(source) => plugin.source = source,
                 Err((code, message)) => return encode_error(id, code, message),
+            }
+        }
+        match plugin.runtime {
+            crate::api::schema::PluginRuntimeV2::TrustedNative => {
+                if params.enabled && !params.trust_native {
+                    return encode_error(
+                        id,
+                        "plugin_native_trust_required",
+                        "native plugins execute with your OS permissions; link disabled or grant explicit native trust",
+                    );
+                }
+                plugin.native_trusted = params.trust_native;
+            }
+            crate::api::schema::PluginRuntimeV2::WasiComponent => {
+                if params.trust_native {
+                    return encode_error(
+                        id,
+                        "invalid_plugin_trust_mode",
+                        "sandboxed components do not accept unrestricted native trust",
+                    );
+                }
+                if params.enabled {
+                    if let Err((code, message)) = ensure_plugin_capabilities_approved(&plugin) {
+                        return encode_error(id, code, message);
+                    }
+                }
             }
         }
         if let Err(err) = env::ensure_plugin_user_dirs(&plugin) {
@@ -130,6 +200,118 @@ impl App {
         self.set_plugin_enabled(id, params.plugin_id, false)
     }
 
+    pub(super) fn handle_plugin_capability_approve(
+        &mut self,
+        id: String,
+        params: PluginCapabilityApproveParams,
+    ) -> String {
+        let Some(plugin_id) = normalize_plugin_id(&params.plugin_id) else {
+            return invalid_plugin_id(id);
+        };
+        let Some(plugin) = self.state.installed_plugins.get(&plugin_id).cloned() else {
+            return encode_error(id, "plugin_not_found", "plugin not found");
+        };
+        if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent {
+            return encode_error(
+                id,
+                "invalid_plugin_trust_mode",
+                "native plugins use explicit unrestricted trust, not capability grants",
+            );
+        }
+        let binding = match crate::plugin_capabilities::installed_plugin_binding(&plugin) {
+            Ok(binding) => binding,
+            Err(message) => return encode_error(id, "plugin_security_binding_failed", message),
+        };
+        if let Err(error) =
+            crate::plugin_capabilities::ensure_runtime_bindings_available(&binding.capabilities)
+        {
+            return encode_error(id, "plugin_capability_unavailable", error.to_string());
+        }
+        let approved_at_millis = current_unix_millis();
+        let grant = match crate::plugin_capabilities::new_grant(
+            &binding.as_binding(),
+            "local-user",
+            approved_at_millis,
+        ) {
+            Ok(grant) => grant,
+            Err(message) => return encode_error(id, "plugin_capability_grant_failed", message),
+        };
+        let lock = match crate::plugin_capabilities::new_lock_entry(
+            &binding.as_binding(),
+            crate::api::schema::PluginApprovalStateV1::Approved,
+        ) {
+            Ok(lock) => lock,
+            Err(message) => return encode_error(id, "plugin_capability_grant_failed", message),
+        };
+        if self.no_session {
+            return encode_error(
+                id,
+                "plugin_registry_unavailable",
+                "capability grants require a persistent Nagi session",
+            );
+        }
+        if let Err(error) =
+            crate::persist::plugin_registry::save_security_binding(lock, grant.clone())
+        {
+            return encode_error(id, "plugin_registry_save_failed", error.to_string());
+        }
+        encode_success(
+            id,
+            ResponseResult::PluginCapabilitiesApproved { plugin, grant },
+        )
+    }
+
+    pub(super) fn handle_plugin_capability_revoke(
+        &mut self,
+        id: String,
+        params: PluginSetEnabledParams,
+    ) -> String {
+        let Some(plugin_id) = normalize_plugin_id(&params.plugin_id) else {
+            return invalid_plugin_id(id);
+        };
+        let Some(plugin) = self.state.installed_plugins.get_mut(&plugin_id) else {
+            return encode_error(id, "plugin_not_found", "plugin not found");
+        };
+        if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent {
+            return encode_error(
+                id,
+                "invalid_plugin_trust_mode",
+                "native plugins do not have revocable capability grants",
+            );
+        }
+        let previous_enabled = plugin.enabled;
+        plugin.enabled = false;
+        if let Err(error) = self.save_plugin_registry() {
+            if let Some(plugin) = self.state.installed_plugins.get_mut(&plugin_id) {
+                plugin.enabled = previous_enabled;
+            }
+            return encode_error(id, "plugin_registry_save_failed", error.to_string());
+        }
+        let revoked = match crate::persist::plugin_registry::revoke_security_binding(
+            &plugin_id,
+            current_unix_millis(),
+        ) {
+            Ok(revoked) => revoked,
+            Err(error) => {
+                if let Some(plugin) = self.state.installed_plugins.get_mut(&plugin_id) {
+                    plugin.enabled = previous_enabled;
+                }
+                let _ = self.save_plugin_registry();
+                return encode_error(id, "plugin_registry_save_failed", error.to_string());
+            }
+        };
+        let plugin = self
+            .state
+            .installed_plugins
+            .get(&plugin_id)
+            .cloned()
+            .expect("plugin remained installed while revoking its grant");
+        encode_success(
+            id,
+            ResponseResult::PluginCapabilitiesRevoked { plugin, revoked },
+        )
+    }
+
     pub(super) fn handle_plugin_action_list(
         &mut self,
         id: String,
@@ -165,6 +347,18 @@ impl App {
                 id,
                 "plugin_disabled",
                 format!("plugin {} is disabled", plugin.plugin_id),
+            );
+        }
+        if plugin.runtime == crate::api::schema::PluginRuntimeV2::TrustedNative
+            && !plugin.native_trusted
+        {
+            return encode_error(
+                id,
+                "plugin_native_trust_required",
+                format!(
+                    "plugin {} has not been granted native trust",
+                    plugin.plugin_id
+                ),
             );
         }
         if let Err((code, message)) = ensure_platform_supported(
@@ -204,6 +398,14 @@ impl App {
             .map_err(|(_, message)| message)?;
         if !plugin.enabled {
             return Err(format!("plugin {} is disabled", plugin.plugin_id));
+        }
+        if plugin.runtime == crate::api::schema::PluginRuntimeV2::TrustedNative
+            && !plugin.native_trusted
+        {
+            return Err(format!(
+                "plugin {} has not been granted native trust",
+                plugin.plugin_id
+            ));
         }
         ensure_platform_supported(
             effective_platforms(&action.platforms, &plugin.platforms),
@@ -325,6 +527,15 @@ impl App {
                 id,
                 "plugin_disabled",
                 format!("plugin {plugin_id} is disabled"),
+            );
+        }
+        if plugin.runtime == crate::api::schema::PluginRuntimeV2::TrustedNative
+            && !plugin.native_trusted
+        {
+            return encode_error(
+                id,
+                "plugin_native_trust_required",
+                format!("plugin {plugin_id} has not been granted native trust"),
             );
         }
         let Some(entrypoint) = normalize_action_id(&params.entrypoint) else {
@@ -582,6 +793,23 @@ impl App {
         let Some(plugin) = self.state.installed_plugins.get_mut(&plugin_id) else {
             return encode_error(id, "plugin_not_found", "plugin not found");
         };
+        if enabled {
+            match plugin.runtime {
+                crate::api::schema::PluginRuntimeV2::TrustedNative if !plugin.native_trusted => {
+                    return encode_error(
+                        id,
+                        "plugin_native_trust_required",
+                        format!("plugin {plugin_id} has not been granted native trust"),
+                    )
+                }
+                crate::api::schema::PluginRuntimeV2::WasiComponent => {
+                    if let Err((code, message)) = ensure_plugin_capabilities_approved(plugin) {
+                        return encode_error(id, code, message);
+                    }
+                }
+                _ => {}
+            }
+        }
         let previous_enabled = plugin.enabled;
         plugin.enabled = enabled;
         if let Err(err) = self.save_plugin_registry() {
@@ -612,6 +840,70 @@ impl App {
             .collect::<Vec<_>>();
         crate::persist::plugin_registry::save(&plugins)
     }
+}
+
+pub(super) fn ensure_plugin_capabilities_approved(
+    plugin: &InstalledPluginInfo,
+) -> Result<(), (&'static str, String)> {
+    if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent
+        || plugin.requested_capabilities.is_empty()
+    {
+        return Ok(());
+    }
+    let binding = crate::plugin_capabilities::installed_plugin_binding(plugin)
+        .map_err(|message| ("plugin_security_binding_failed", message))?;
+    let Some((lock, grant)) =
+        crate::persist::plugin_registry::load_security_binding(&plugin.plugin_id)
+            .map_err(|error| ("plugin_registry_read_failed", error.to_string()))?
+    else {
+        return Err((
+            "plugin_capability_approval_required",
+            format!(
+                "plugin {} requests capabilities that require approval: {}",
+                plugin.plugin_id,
+                plugin.requested_capabilities.join(", ")
+            ),
+        ));
+    };
+    match crate::plugin_capabilities::evaluate_security_binding(
+        &lock,
+        &grant,
+        &binding.as_binding(),
+    )
+    .map_err(|message| ("plugin_security_binding_failed", message))?
+    {
+        crate::plugin_capabilities::GrantEvaluation::Allowed => Ok(()),
+        crate::plugin_capabilities::GrantEvaluation::ApprovalRequired { added_capabilities } => {
+            Err((
+                "plugin_capability_approval_required",
+                format!(
+                    "plugin {} requires approval for: {}",
+                    plugin.plugin_id,
+                    added_capabilities.join(", ")
+                ),
+            ))
+        }
+        crate::plugin_capabilities::GrantEvaluation::BindingChanged => Err((
+            "plugin_capability_binding_changed",
+            format!(
+                "plugin {} changed version, source, manifest, or package; review and approve it again",
+                plugin.plugin_id
+            ),
+        )),
+        crate::plugin_capabilities::GrantEvaluation::Revoked => Err((
+            "plugin_capability_grant_revoked",
+            format!("plugin {} capability grant was revoked", plugin.plugin_id),
+        )),
+    }
+}
+
+fn current_unix_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX)
 }
 
 fn invalid_plugin_id(id: String) -> String {
@@ -790,12 +1082,177 @@ action = "bootstrap"
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         assert!(
             result.contains("plugin_linked"),
             "expected plugin_linked: {result}"
         );
+    }
+
+    #[test]
+    fn native_plugin_requires_explicit_trust_before_enablement() {
+        let mut app = test_app();
+        let root = unique_temp_path("plugin-native-trust");
+        write_manifest(&root);
+
+        let rejected = app.handle_api_request(Request {
+            id: "link-untrusted-enabled".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: true,
+                source: None,
+                trust_native: false,
+            }),
+        });
+        let rejected: serde_json::Value = serde_json::from_str(&rejected).unwrap();
+        assert_eq!(rejected["error"]["code"], "plugin_native_trust_required");
+
+        let linked = app.handle_api_request(Request {
+            id: "link-untrusted-disabled".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: false,
+                source: None,
+                trust_native: false,
+            }),
+        });
+        let ResponseResult::PluginLinked { plugin } = response_result(&linked) else {
+            panic!("expected disabled plugin to link: {linked}");
+        };
+        assert!(!plugin.enabled);
+        assert!(!plugin.native_trusted);
+
+        let enable = app.handle_api_request(Request {
+            id: "enable-untrusted".into(),
+            method: Method::PluginEnable(PluginSetEnabledParams {
+                plugin_id: plugin.plugin_id,
+            }),
+        });
+        let enable: serde_json::Value = serde_json::from_str(&enable).unwrap();
+        assert_eq!(enable["error"]["code"], "plugin_native_trust_required");
+
+        let trusted = app.handle_api_request(Request {
+            id: "relink-trusted".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: true,
+                source: None,
+                trust_native: true,
+            }),
+        });
+        let ResponseResult::PluginLinked { plugin } = response_result(&trusted) else {
+            panic!("expected trusted plugin to link: {trusted}");
+        };
+        assert!(plugin.enabled);
+        assert!(plugin.native_trusted);
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn sandboxed_v2_links_without_native_trust_and_capabilities_fail_closed() {
+        let mut app = test_app();
+        let root = unique_temp_path("plugin-v2-link");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("plugin.wasm"), b"component").unwrap();
+        let manifest = |capabilities: &str| {
+            format!(
+                r#"
+manifest_version = 2
+id = "example.v2-link"
+name = "V2 link"
+version = "1.0.0"
+min_nagi_version = "{}"
+runtime = "wasi-component"
+entrypoint = "plugin.wasm"
+capabilities = {capabilities}
+
+[[contributions.commands]]
+id = "run"
+title = "Run"
+contexts = ["global"]
+"#,
+                crate::build_info::BASE_VERSION
+            )
+        };
+        std::fs::write(root.join("nagi-plugin.toml"), manifest("[]")).unwrap();
+        let linked = app.handle_api_request(Request {
+            id: "link-zero-cap".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: true,
+                source: None,
+                trust_native: false,
+            }),
+        });
+        let ResponseResult::PluginLinked { plugin } = response_result(&linked) else {
+            panic!("expected zero-capability sandbox to link: {linked}");
+        };
+        assert!(plugin.enabled);
+        assert!(!plugin.native_trusted);
+
+        std::fs::write(
+            root.join("nagi-plugin.toml"),
+            manifest("[\"mission.read\"]"),
+        )
+        .unwrap();
+        let rejected = app.handle_api_request(Request {
+            id: "link-capability".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: true,
+                source: None,
+                trust_native: false,
+            }),
+        });
+        let rejected: serde_json::Value = serde_json::from_str(&rejected).unwrap();
+        assert_eq!(
+            rejected["error"]["code"],
+            "plugin_capability_approval_required"
+        );
+
+        let linked_disabled = app.handle_api_request(Request {
+            id: "link-capability-disabled".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: false,
+                source: None,
+                trust_native: false,
+            }),
+        });
+        let ResponseResult::PluginLinked { plugin } = response_result(&linked_disabled) else {
+            panic!("expected capability plugin to link disabled: {linked_disabled}");
+        };
+        assert!(!plugin.enabled);
+        assert_eq!(plugin.requested_capabilities, ["mission.read"]);
+
+        let unavailable = app.handle_api_request(Request {
+            id: "approve-unbound-capability".into(),
+            method: Method::PluginCapabilityApprove(PluginCapabilityApproveParams {
+                plugin_id: "example.v2-link".into(),
+            }),
+        });
+        let unavailable: serde_json::Value = serde_json::from_str(&unavailable).unwrap();
+        assert_eq!(unavailable["error"]["code"], "plugin_registry_unavailable");
+        assert!(unavailable["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("persistent Nagi session")));
+
+        let invalid_trust = app.handle_api_request(Request {
+            id: "link-native-trust".into(),
+            method: Method::PluginLink(PluginLinkParams {
+                path: root.display().to_string(),
+                enabled: false,
+                source: None,
+                trust_native: true,
+            }),
+        });
+        let invalid_trust: serde_json::Value = serde_json::from_str(&invalid_trust).unwrap();
+        assert_eq!(invalid_trust["error"]["code"], "invalid_plugin_trust_mode");
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
@@ -877,6 +1334,7 @@ platforms = ["linux", "macos", "windows"]
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         let ResponseResult::PluginLinked { plugin } = response_result(&link) else {
@@ -958,6 +1416,7 @@ platforms = ["linux", "macos", "windows"]
                     managed_path: Some(root.display().to_string()),
                     installed_unix_ms: Some(42),
                 }),
+                trust_native: true,
             }),
         });
         let value: serde_json::Value = serde_json::from_str(&response).unwrap();
@@ -1879,8 +2338,8 @@ command = ["sh", "-c", "printf %s ${{NAGI_PANE_ID-unset}} > '{}'; sleep 1"]
                 action_id: "bootstrap".into(),
                 context: Some(PluginInvocationContext {
                     workspace_id: Some("1".into()),
-                    workspace_label: None,
-                    workspace_cwd: None,
+                    workspace_label: Some("forged label".into()),
+                    workspace_cwd: Some("/private/forged".into()),
                     worktree: None,
                     tab_id: None,
                     tab_label: None,
@@ -1890,7 +2349,7 @@ command = ["sh", "-c", "printf %s ${{NAGI_PANE_ID-unset}} > '{}'; sleep 1"]
                     focused_pane_status: None,
                     selected_text: None,
                     invocation_source: Some("test".into()),
-                    correlation_id: Some("external-correlation".into()),
+                    correlation_id: Some("forged-correlation".into()),
                     clicked_url: None,
                     link_handler_id: None,
                 }),
@@ -1911,12 +2370,11 @@ command = ["sh", "-c", "printf %s ${{NAGI_PANE_ID-unset}} > '{}'; sleep 1"]
         assert_eq!(action.command, ["bun", "run", "bootstrap.ts"]);
         assert_eq!(log.plugin_id, "example.worktree-bootstrap");
         assert_eq!(log.action_id.as_deref(), Some("bootstrap"));
-        assert_eq!(context.workspace_id.as_deref(), Some("1"));
+        assert_eq!(context.workspace_id, None);
+        assert_ne!(context.workspace_label.as_deref(), Some("forged label"));
+        assert_ne!(context.workspace_cwd.as_deref(), Some("/private/forged"));
         assert_eq!(context.invocation_source.as_deref(), Some("test"));
-        assert_eq!(
-            context.correlation_id.as_deref(),
-            Some("external-correlation")
-        );
+        assert_eq!(context.correlation_id.as_deref(), Some("invoke"));
 
         let _ = std::fs::remove_dir_all(root);
     }
@@ -2140,6 +2598,81 @@ command = ["sh", "-c", "printf '%s\n%s\n%s' \"$NAGI_PLUGIN_ROOT\" \"$NAGI_PLUGIN
                     .as_str()
             )
         );
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn manifest_action_invoke_does_not_inherit_ambient_environment() {
+        let mut app = test_app();
+        let root = unique_temp_path("plugin-action-env-isolation");
+        write_manifest_content(
+            &root,
+            r#"
+id = "example.env-isolation"
+name = "Environment Isolation"
+version = "0.1.0"
+min_nagi_version = "0.6.10"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "run"
+title = "Run"
+command = ["/usr/bin/env"]
+"#,
+        );
+        link_manifest(&mut app, &root);
+
+        let invoke = app.handle_api_request(Request {
+            id: "invoke-env-isolation".into(),
+            method: Method::PluginActionInvoke(PluginActionInvokeParams {
+                plugin_id: Some("example.env-isolation".into()),
+                action_id: "run".into(),
+                context: None,
+            }),
+        });
+        let ResponseResult::PluginActionInvoked { log, .. } = response_result(&invoke) else {
+            panic!("expected plugin action invocation: {invoke}");
+        };
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while std::time::Instant::now() < deadline {
+            app.drain_all_internal_events();
+            if app.state.plugin_command_logs.iter().any(|entry| {
+                entry.log_id == log.log_id && entry.status != PluginCommandStatus::Running
+            }) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        let finished = app
+            .state
+            .plugin_command_logs
+            .iter()
+            .find(|entry| entry.log_id == log.log_id)
+            .expect("log should exist");
+        assert_eq!(finished.status, PluginCommandStatus::Succeeded);
+        let inherited_allowlist = [
+            "PATH",
+            "LANG",
+            "LC_ALL",
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+            "SYSTEMROOT",
+            "WINDIR",
+            "COMSPEC",
+            "PATHEXT",
+        ];
+        for line in finished.stdout.as_deref().unwrap_or_default().lines() {
+            let key = line.split_once('=').map_or(line, |(key, _)| key);
+            assert!(
+                key.starts_with("NAGI_") || inherited_allowlist.contains(&key),
+                "plugin inherited ambient environment variable {key}"
+            );
+        }
 
         let _ = std::fs::remove_dir_all(root);
     }
@@ -2544,6 +3077,7 @@ action = "open"
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         let value: serde_json::Value = serde_json::from_str(&response).unwrap();
@@ -2587,6 +3121,7 @@ action = "missing"
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         let value: serde_json::Value = serde_json::from_str(&response).unwrap();
@@ -2705,6 +3240,7 @@ command = ["show-ctx"]
                 path: root.display().to_string(),
                 enabled: false,
                 source: None,
+                trust_native: true,
             }),
         });
         assert!(
@@ -2766,6 +3302,7 @@ command = ["sh", "-c", "echo ok"]
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
 
@@ -3120,6 +3657,7 @@ command = ["act"]
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         assert!(link.contains("plugin_linked"), "link failed: {link}");
@@ -3186,6 +3724,7 @@ command = ["act"]
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         assert!(link.contains("plugin_linked"), "link failed: {link}");
@@ -3234,6 +3773,7 @@ command = ["act"]
                 path: root.display().to_string(),
                 enabled: true,
                 source: None,
+                trust_native: true,
             }),
         });
         let ResponseResult::PluginLinked { plugin } = response_result(&link) else {

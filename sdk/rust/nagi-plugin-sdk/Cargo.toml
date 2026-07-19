@@ -1,0 +1,11 @@
+[package]
+name = "nagi-plugin-sdk"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Guest SDK for Nagi manifest v2 plugins"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+

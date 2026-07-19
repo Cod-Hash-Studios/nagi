@@ -1,0 +1,14 @@
+manifest_version = 1
+id = "{PLUGIN_ID}"
+name = "{PLUGIN_NAME}"
+version = "0.1.0"
+min_nagi_version = "{NAGI_VERSION}"
+description = "An explicitly trusted native Nagi plugin."
+platforms = ["linux", "macos", "windows"]
+
+[[actions]]
+id = "hello"
+title = "Hello from {PLUGIN_NAME}"
+contexts = ["global"]
+command = ["python3", "plugin.py"]
+

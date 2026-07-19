@@ -15,6 +15,11 @@ pub struct PluginLinkParams {
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<PluginSourceInfo>,
+    /// Explicit acknowledgement that a legacy native plugin executes with the
+    /// current user's OS permissions. Defaults to false for every migrated or
+    /// remote request.
+    #[serde(default)]
+    pub trust_native: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
@@ -34,7 +39,15 @@ pub struct PluginSetEnabledParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginCapabilityApproveParams {
+    pub plugin_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct InstalledPluginInfo {
+    /// Legacy manifests migrate to version 1.
+    #[serde(default = "default_plugin_manifest_version")]
+    pub manifest_version: u16,
     pub plugin_id: String,
     pub name: String,
     pub version: String,
@@ -45,6 +58,16 @@ pub struct InstalledPluginInfo {
     pub manifest_path: String,
     pub plugin_root: String,
     pub enabled: bool,
+    #[serde(default)]
+    pub runtime: super::PluginRuntimeV2,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entrypoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requested_capabilities: Vec<String>,
+    /// Native plugins are executable only after a user explicitly grants
+    /// unrestricted trust. Legacy registry entries migrate to false.
+    #[serde(default)]
+    pub native_trusted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platforms: Option<Vec<PluginPlatform>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -57,12 +80,18 @@ pub struct InstalledPluginInfo {
     pub panes: Vec<PluginManifestPane>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub link_handlers: Vec<PluginManifestLinkHandler>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inspector_tabs: Vec<super::PluginInspectorTabContributionV2>,
     #[serde(default)]
     pub source: PluginSourceInfo,
     /// Warnings collected at link time or on registry load (e.g. unknown event names,
     /// missing manifest file). Non-fatal — the entry is kept and surfaced by plugin.list.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+}
+
+const fn default_plugin_manifest_version() -> u16 {
+    1
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -345,6 +374,7 @@ pub enum PluginPlatform {
 #[serde(rename_all = "snake_case")]
 pub enum PluginActionContext {
     Global,
+    Mission,
     Workspace,
     Tab,
     Pane,

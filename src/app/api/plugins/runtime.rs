@@ -1,5 +1,6 @@
 use std::io::Read;
-use std::process::Stdio;
+use std::process::{Command, Stdio};
+use std::time::Duration;
 
 use super::manifest::{effective_platforms, ensure_platform_supported};
 use super::plugin_manifest_available;
@@ -9,8 +10,21 @@ use crate::api::schema::{
 use crate::app::App;
 
 const PLUGIN_COMMAND_OUTPUT_MAX_BYTES: usize = 64 * 1024;
+const PLUGIN_COMMAND_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 pub(super) const MAX_PLUGIN_COMMANDS_IN_FLIGHT: usize = 32;
 const PLUGIN_COMMAND_LOG_LIMIT: usize = 200;
+const PLUGIN_INHERITED_ENV_ALLOWLIST: &[&str] = &[
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "SYSTEMROOT",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+];
 
 impl App {
     pub(super) fn start_plugin_command(
@@ -22,6 +36,18 @@ impl App {
         context: &PluginInvocationContext,
         event_json: Option<String>,
     ) -> Result<PluginCommandLogInfo, (&'static str, String)> {
+        if plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
+            return self.start_sandbox_component(plugin, action_id, event, context, event_json);
+        }
+        if !plugin.native_trusted {
+            return Err((
+                "plugin_native_trust_required",
+                format!(
+                    "plugin {} has not been granted native trust",
+                    plugin.plugin_id
+                ),
+            ));
+        }
         let Some(program) = command.first().cloned() else {
             return Err((
                 "invalid_plugin_command",
@@ -119,61 +145,96 @@ impl App {
         self.state.plugin_commands_in_flight += 1;
         let event_tx = self.event_tx.clone();
         std::thread::spawn(move || {
-            let child = crate::plugin_command::command_for_argv(&program, &args)
-                .current_dir(plugin_root)
-                .envs(env)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn();
-            let finished = match child {
-                Ok(mut child) => {
-                    let stdout = child.stdout.take();
-                    let stderr = child.stderr.take();
-                    let stdout_reader = stdout.map(|stdout| {
-                        std::thread::spawn(move || {
-                            read_capped_plugin_output(stdout, PLUGIN_COMMAND_OUTPUT_MAX_BYTES)
-                        })
-                    });
-                    let stderr_reader = stderr.map(|stderr| {
-                        std::thread::spawn(move || {
-                            read_capped_plugin_output(stderr, PLUGIN_COMMAND_OUTPUT_MAX_BYTES)
-                        })
-                    });
-                    match child.wait() {
-                        Ok(status) => crate::events::AppEvent::PluginCommandFinished {
-                            log_id,
-                            finished_unix_ms: current_unix_ms(),
-                            exit_code: status.code(),
-                            stdout: stdout_reader
-                                .and_then(|reader| reader.join().ok())
-                                .unwrap_or_default(),
-                            stderr: stderr_reader
-                                .and_then(|reader| reader.join().ok())
-                                .unwrap_or_default(),
-                            error: None,
-                        },
-                        Err(err) => crate::events::AppEvent::PluginCommandFinished {
-                            log_id,
-                            finished_unix_ms: current_unix_ms(),
-                            exit_code: None,
-                            stdout: stdout_reader
-                                .and_then(|reader| reader.join().ok())
-                                .unwrap_or_default(),
-                            stderr: stderr_reader
-                                .and_then(|reader| reader.join().ok())
-                                .unwrap_or_default(),
-                            error: Some(err.to_string()),
-                        },
-                    }
-                }
-                Err(err) => crate::events::AppEvent::PluginCommandFinished {
-                    log_id,
-                    finished_unix_ms: current_unix_ms(),
-                    exit_code: None,
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    error: Some(err.to_string()),
+            let result =
+                execute_plugin_command(&program, &args, &plugin_root, env, PLUGIN_COMMAND_TIMEOUT);
+            let finished = crate::events::AppEvent::PluginCommandFinished {
+                log_id,
+                finished_unix_ms: current_unix_ms(),
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                error: result.error,
+            };
+            let _ = event_tx.blocking_send(finished);
+        });
+        Ok(log)
+    }
+
+    fn start_sandbox_component(
+        &mut self,
+        plugin: &InstalledPluginInfo,
+        action_id: Option<String>,
+        event: Option<String>,
+        context: &PluginInvocationContext,
+        event_json: Option<String>,
+    ) -> Result<PluginCommandLogInfo, (&'static str, String)> {
+        super::ensure_plugin_capabilities_approved(plugin)?;
+        let workspace_mount = sandbox_workspace_mount(&plugin.requested_capabilities, context)?;
+        let entrypoint = plugin.entrypoint.as_ref().ok_or_else(|| {
+            (
+                "plugin_v2_entrypoint_missing",
+                format!("plugin {} has no sandbox entrypoint", plugin.plugin_id),
+            )
+        })?;
+        let context_json = serde_json::to_string(context)
+            .map_err(|error| ("invalid_plugin_context", error.to_string()))?;
+        if self.state.plugin_commands_in_flight >= MAX_PLUGIN_COMMANDS_IN_FLIGHT {
+            return Err((
+                "plugin_command_limit_reached",
+                format!(
+                    "maximum concurrent plugin commands reached ({MAX_PLUGIN_COMMANDS_IN_FLIGHT})"
+                ),
+            ));
+        }
+        let log_id = format!("plugin-log-{}", self.state.next_plugin_command_log_id);
+        self.state.next_plugin_command_log_id += 1;
+        let started_unix_ms = current_unix_ms();
+        let command = vec!["wasi-component".to_owned(), entrypoint.clone()];
+        let log = PluginCommandLogInfo {
+            log_id: log_id.clone(),
+            plugin_id: plugin.plugin_id.clone(),
+            action_id: action_id.clone(),
+            event: event.clone(),
+            command,
+            status: PluginCommandStatus::Running,
+            started_unix_ms,
+            finished_unix_ms: None,
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+            error: None,
+        };
+        self.push_plugin_command_log(log.clone());
+        self.state.plugin_commands_in_flight += 1;
+        let event_tx = self.event_tx.clone();
+        let component_path = std::path::PathBuf::from(entrypoint);
+        let plugin_id = plugin.plugin_id.clone();
+        let stdin = event_json.unwrap_or_default().into_bytes();
+        std::thread::spawn(move || {
+            let execution = super::sandbox::execute(
+                super::sandbox::SandboxInvocation {
+                    component_path: &component_path,
+                    plugin_id: &plugin_id,
+                    action_id: action_id.as_deref(),
+                    context_json: &context_json,
+                    stdin: &stdin,
+                    workspace: workspace_mount.as_ref().map(|mount| {
+                        super::sandbox::SandboxWorkspaceMount {
+                            host_path: &mount.path,
+                            readable: mount.readable,
+                            writable: mount.writable,
+                        }
+                    }),
                 },
+                super::sandbox::SANDBOX_TIMEOUT,
+            );
+            let finished = crate::events::AppEvent::PluginCommandFinished {
+                log_id,
+                finished_unix_ms: current_unix_ms(),
+                exit_code: execution.exit_code,
+                stdout: execution.stdout,
+                stderr: execution.stderr,
+                error: execution.error,
             };
             let _ = event_tx.blocking_send(finished);
         });
@@ -235,6 +296,208 @@ impl App {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SandboxWorkspaceAccess {
+    path: std::path::PathBuf,
+    readable: bool,
+    writable: bool,
+}
+
+fn sandbox_workspace_mount(
+    requested_capabilities: &[String],
+    context: &PluginInvocationContext,
+) -> Result<Option<SandboxWorkspaceAccess>, (&'static str, String)> {
+    use crate::plugin_capabilities::{PluginCapability, WorkspaceScope};
+
+    crate::plugin_capabilities::ensure_runtime_bindings_available(requested_capabilities)
+        .map_err(|error| ("plugin_capability_unavailable", error.to_string()))?;
+    let capabilities = crate::plugin_capabilities::normalize_capabilities(requested_capabilities)
+        .map_err(|error| ("invalid_plugin_capability", error.to_string()))?;
+    let mut readable = false;
+    let mut writable = false;
+    for raw in capabilities {
+        match PluginCapability::parse(&raw)
+            .map_err(|error| ("invalid_plugin_capability", error.to_string()))?
+        {
+            PluginCapability::WorkspaceFilesRead(WorkspaceScope::Worktree) => readable = true,
+            PluginCapability::WorkspaceFilesWrite(WorkspaceScope::Worktree) => writable = true,
+            PluginCapability::MissionRead => {}
+            PluginCapability::WorkspaceFilesRead(WorkspaceScope::Changed)
+            | PluginCapability::WorkspaceFilesWrite(WorkspaceScope::Changed) => {
+                unreachable!("unavailable changed-file capability passed host binding gate")
+            }
+            _ => unreachable!("unavailable capability passed host binding gate"),
+        }
+    }
+    if !readable && !writable {
+        return Ok(None);
+    }
+    let raw_path = context
+        .worktree
+        .as_ref()
+        .map(|worktree| worktree.checkout_path.as_str())
+        .or(context.workspace_cwd.as_deref())
+        .ok_or_else(|| {
+            (
+                "plugin_workspace_unavailable",
+                "this plugin action requires a workspace context".into(),
+            )
+        })?;
+    let path = std::fs::canonicalize(raw_path).map_err(|error| {
+        (
+            "plugin_workspace_unavailable",
+            format!("plugin workspace is unavailable: {error}"),
+        )
+    })?;
+    if !path.is_dir() {
+        return Err((
+            "plugin_workspace_unavailable",
+            "plugin workspace is not a directory".into(),
+        ));
+    }
+    Ok(Some(SandboxWorkspaceAccess {
+        path,
+        readable,
+        writable,
+    }))
+}
+
+fn isolate_plugin_environment(command: &mut Command, env: Vec<(String, String)>) {
+    command.env_clear();
+    for key in PLUGIN_INHERITED_ENV_ALLOWLIST {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+    command.envs(env);
+}
+
+#[derive(Debug)]
+struct PluginCommandExecution {
+    exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+    error: Option<String>,
+}
+
+fn execute_plugin_command(
+    program: &str,
+    args: &[String],
+    plugin_root: &std::path::Path,
+    env: Vec<(String, String)>,
+    timeout: Duration,
+) -> PluginCommandExecution {
+    let mut command = crate::plugin_command::command_for_argv(program, args);
+    isolate_plugin_environment(&mut command, env);
+    command
+        .current_dir(plugin_root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt as _;
+        command.process_group(0);
+    }
+
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return PluginCommandExecution {
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                error: Some(error.to_string()),
+            };
+        }
+    };
+    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
+        terminate_plugin_process_group(&mut child);
+        let _ = child.wait();
+        return PluginCommandExecution {
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            error: Some("plugin command output pipe is unavailable".to_string()),
+        };
+    };
+    let stdout_reader = std::thread::spawn(move || {
+        read_capped_plugin_output(stdout, PLUGIN_COMMAND_OUTPUT_MAX_BYTES)
+    });
+    let stderr_reader = std::thread::spawn(move || {
+        read_capped_plugin_output(stderr, PLUGIN_COMMAND_OUTPUT_MAX_BYTES)
+    });
+
+    let deadline = std::time::Instant::now() + timeout;
+    let (exit_code, error) = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                terminate_plugin_process_group(&mut child);
+                break (status.code(), None);
+            }
+            Ok(None) if std::time::Instant::now() < deadline => {
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                std::thread::sleep(remaining.min(Duration::from_millis(10)));
+            }
+            Ok(None) => {
+                terminate_plugin_process_group(&mut child);
+                let _ = child.wait();
+                break (
+                    None,
+                    Some(format!(
+                        "plugin command timed out after {}ms",
+                        timeout.as_millis()
+                    )),
+                );
+            }
+            Err(_) => {
+                terminate_plugin_process_group(&mut child);
+                let _ = child.wait();
+                break (None, Some("plugin command wait failed".to_string()));
+            }
+        }
+    };
+
+    PluginCommandExecution {
+        exit_code,
+        stdout: stdout_reader.join().unwrap_or_default(),
+        stderr: stderr_reader.join().unwrap_or_default(),
+        error,
+    }
+}
+
+#[cfg(unix)]
+fn terminate_plugin_process_group(child: &mut std::process::Child) {
+    if let Ok(pid) = i32::try_from(child.id()) {
+        // SAFETY: the plugin process is spawned into a fresh process group
+        // whose id is its child pid, and the negative id targets that group.
+        unsafe {
+            libc::kill(-pid, libc::SIGKILL);
+        }
+    }
+    let _ = child.kill();
+}
+
+#[cfg(not(unix))]
+fn terminate_plugin_process_group(child: &mut std::process::Child) {
+    #[cfg(windows)]
+    {
+        let pid = child.id().to_string();
+        let taskkill = std::env::var_os("SystemRoot")
+            .map(std::path::PathBuf::from)
+            .map(|root| root.join("System32").join("taskkill.exe"))
+            .filter(|path| path.is_file())
+            .unwrap_or_else(|| std::path::PathBuf::from("taskkill.exe"));
+        let _ = Command::new(taskkill)
+            .args(["/PID", &pid, "/T", "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    let _ = child.kill();
+}
+
 fn current_unix_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -269,4 +532,72 @@ pub(super) fn read_capped_plugin_output(mut reader: impl Read, cap: usize) -> St
         ));
     }
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn timed_out_plugin_command_terminates_its_process_group() {
+        let root = tempfile::tempdir().unwrap();
+        let marker = root.path().join("descendant-survived");
+        let script = format!(
+            "(sleep 0.25; printf survived > '{}') & wait",
+            marker.display()
+        );
+        let started = std::time::Instant::now();
+
+        let result = execute_plugin_command(
+            "/bin/sh",
+            &["-c".to_string(), script],
+            root.path(),
+            Vec::new(),
+            std::time::Duration::from_millis(50),
+        );
+
+        assert!(
+            result
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("timed out")),
+            "unexpected plugin result: {result:?}"
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_millis(350));
+        assert!(
+            !marker.exists(),
+            "timed-out plugin descendant escaped process cleanup"
+        );
+    }
+
+    #[test]
+    fn sandbox_workspace_mount_is_exact_and_rejects_unbound_capabilities() {
+        let workspace = tempfile::tempdir().unwrap();
+        let context: PluginInvocationContext = serde_json::from_value(serde_json::json!({
+            "workspace_cwd": workspace.path().to_string_lossy()
+        }))
+        .unwrap();
+        let mount = sandbox_workspace_mount(
+            &[
+                "workspace.files.read:worktree".into(),
+                "workspace.files.write:worktree".into(),
+            ],
+            &context,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(mount.path, workspace.path().canonicalize().unwrap());
+        assert!(mount.readable);
+        assert!(mount.writable);
+
+        let changed = sandbox_workspace_mount(&["workspace.files.read:changed".into()], &context)
+            .unwrap_err();
+        assert_eq!(changed.0, "plugin_capability_unavailable");
+
+        let network =
+            sandbox_workspace_mount(&["network:https://example.com".into()], &context).unwrap_err();
+        assert_eq!(network.0, "plugin_capability_unavailable");
+    }
 }

@@ -7,25 +7,35 @@ impl App {
         provided: Option<PluginInvocationContext>,
         correlation_id: &str,
     ) -> PluginInvocationContext {
-        let mut context = self.current_plugin_context(correlation_id);
+        // Public callers may select an existing workspace or pane, but every
+        // path and piece of runtime metadata is reconstructed from App state.
+        // Trusting caller-supplied cwd/worktree fields here would let a socket
+        // request redirect a sandbox preopen outside the selected workspace.
+        let mut context = provided
+            .as_ref()
+            .and_then(|provided| {
+                provided
+                    .focused_pane_id
+                    .as_deref()
+                    .and_then(|pane_id| {
+                        self.plugin_context_for_public_pane_id(pane_id, correlation_id)
+                    })
+                    .or_else(|| {
+                        provided.workspace_id.as_deref().and_then(|workspace_id| {
+                            self.plugin_context_for_workspace_id(workspace_id, correlation_id)
+                        })
+                    })
+            })
+            .unwrap_or_else(|| self.current_plugin_context(correlation_id));
         if let Some(provided) = provided {
-            context.workspace_id = provided.workspace_id.or(context.workspace_id);
-            context.workspace_label = provided.workspace_label.or(context.workspace_label);
-            context.workspace_cwd = provided.workspace_cwd.or(context.workspace_cwd);
-            context.worktree = provided.worktree.or(context.worktree);
-            context.tab_id = provided.tab_id.or(context.tab_id);
-            context.tab_label = provided.tab_label.or(context.tab_label);
-            context.focused_pane_id = provided.focused_pane_id.or(context.focused_pane_id);
-            context.focused_pane_cwd = provided.focused_pane_cwd.or(context.focused_pane_cwd);
-            context.focused_pane_agent = provided.focused_pane_agent.or(context.focused_pane_agent);
-            context.focused_pane_status =
-                provided.focused_pane_status.or(context.focused_pane_status);
-            context.selected_text = provided.selected_text.or(context.selected_text);
-            context.invocation_source = provided.invocation_source.or(context.invocation_source);
-            context.correlation_id = provided.correlation_id.or(context.correlation_id);
-            context.clicked_url = provided.clicked_url.or(context.clicked_url);
-            context.link_handler_id = provided.link_handler_id.or(context.link_handler_id);
+            context.invocation_source = provided
+                .invocation_source
+                .filter(|source| !source.is_empty() && source.len() <= 64)
+                .or(context.invocation_source);
         }
+        context.correlation_id = Some(correlation_id.to_owned());
+        context.clicked_url = None;
+        context.link_handler_id = None;
         context
     }
 

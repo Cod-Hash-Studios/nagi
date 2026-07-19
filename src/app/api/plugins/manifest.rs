@@ -8,7 +8,8 @@ use crate::popup_size::PopupSize;
 const PLUGIN_ID_MAX_CHARS: usize = 120;
 const PLUGIN_ACTION_ID_MAX_CHARS: usize = 120;
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawPluginManifest {
     id: String,
     name: String,
@@ -31,14 +32,16 @@ struct RawPluginManifest {
     link_handlers: Vec<RawPluginManifestLinkHandler>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawPluginManifestBuild {
     #[serde(default)]
     platforms: Option<Vec<RawPlatform>>,
     command: Vec<String>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawPluginManifestAction {
     id: String,
     title: String,
@@ -51,7 +54,8 @@ struct RawPluginManifestAction {
     command: Vec<String>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawPluginManifestEventHook {
     on: String,
     #[serde(default)]
@@ -59,7 +63,8 @@ struct RawPluginManifestEventHook {
     command: Vec<String>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawPluginManifestPane {
     id: String,
     title: String,
@@ -76,7 +81,8 @@ struct RawPluginManifestPane {
     command: Vec<String>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawPluginManifestLinkHandler {
     id: String,
     title: String,
@@ -87,7 +93,7 @@ struct RawPluginManifestLinkHandler {
 }
 
 /// Raw string platform value from the manifest, validated before conversion.
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(try_from = "String")]
 struct RawPlatform(PluginPlatform);
 
@@ -130,8 +136,12 @@ pub(crate) fn load_plugin_manifest(
         .to_path_buf();
     let content = std::fs::read_to_string(&manifest_path)
         .map_err(|err| ("plugin_manifest_read_failed", err.to_string()))?;
-    let raw: RawPluginManifest = toml::from_str(&content)
-        .map_err(|err| ("plugin_manifest_parse_failed", err.to_string()))?;
+    let raw = match parse_plugin_manifest(&content, &plugin_root)? {
+        ParsedPluginManifest::Legacy(raw) => raw,
+        ParsedPluginManifest::V2(manifest) => {
+            return installed_plugin_from_v2(manifest, &manifest_path, &plugin_root, enabled)
+        }
+    };
     let plugin_id = normalize_plugin_id(&raw.id)
         .ok_or_else(|| ("invalid_plugin_id", "invalid plugin id".to_string()))?;
     let name = non_empty_trimmed(&raw.name, "invalid_plugin_name", "plugin name is required")?;
@@ -185,6 +195,7 @@ pub(crate) fn load_plugin_manifest(
     }
 
     Ok(InstalledPluginInfo {
+        manifest_version: 1,
         plugin_id,
         name,
         version,
@@ -193,15 +204,263 @@ pub(crate) fn load_plugin_manifest(
         manifest_path: manifest_path.display().to_string(),
         plugin_root: plugin_root.display().to_string(),
         enabled,
+        runtime: crate::api::schema::PluginRuntimeV2::TrustedNative,
+        entrypoint: None,
+        requested_capabilities: Vec::new(),
+        native_trusted: false,
         platforms,
         build,
         actions,
         events,
         panes,
         link_handlers,
+        inspector_tabs: Vec::new(),
         source: Default::default(),
         warnings,
     })
+}
+
+#[derive(Debug)]
+enum ParsedPluginManifest {
+    Legacy(RawPluginManifest),
+    V2(crate::api::schema::PluginManifestV2),
+}
+
+fn parse_plugin_manifest(
+    content: &str,
+    plugin_root: &std::path::Path,
+) -> Result<ParsedPluginManifest, (&'static str, String)> {
+    let mut value = toml::from_str::<toml::Value>(content)
+        .map_err(|error| ("plugin_manifest_parse_failed", error.to_string()))?;
+    let declared_version = value.get("manifest_version").map(|version| {
+        version.as_integer().ok_or_else(|| {
+            (
+                "invalid_plugin_manifest_version",
+                "manifest_version must be the integer 1 or 2".to_owned(),
+            )
+        })
+    });
+    match declared_version.transpose()? {
+        None => toml::from_str(content)
+            .map(ParsedPluginManifest::Legacy)
+            .map_err(|error| ("plugin_manifest_parse_failed", error.to_string())),
+        Some(1) => {
+            value
+                .as_table_mut()
+                .expect("a TOML document root is always a table")
+                .remove("manifest_version");
+            value
+                .try_into::<RawPluginManifest>()
+                .map(ParsedPluginManifest::Legacy)
+                .map_err(|error| ("plugin_manifest_parse_failed", error.to_string()))
+        }
+        Some(2) => {
+            let manifest = toml::from_str::<crate::api::schema::PluginManifestV2>(content)
+                .map_err(|error| ("plugin_manifest_v2_parse_failed", error.to_string()))?;
+            validate_manifest_v2(manifest, plugin_root).map(ParsedPluginManifest::V2)
+        }
+        Some(version) => Err((
+            "unsupported_plugin_manifest_version",
+            format!("unsupported plugin manifest version {version}; supported versions are legacy v1 and 2"),
+        )),
+    }
+}
+
+fn installed_plugin_from_v2(
+    manifest: crate::api::schema::PluginManifestV2,
+    manifest_path: &std::path::Path,
+    plugin_root: &std::path::Path,
+    enabled: bool,
+) -> Result<InstalledPluginInfo, (&'static str, String)> {
+    use crate::api::schema::{PluginActionContext, PluginManifestAction, PluginRuntimeV2};
+
+    if manifest.runtime != PluginRuntimeV2::WasiComponent {
+        return Err((
+            "plugin_v2_native_runtime_unavailable",
+            "manifest v2 trusted-native plugins are not accepted; use a legacy native manifest with explicit unrestricted trust"
+                .to_owned(),
+        ));
+    }
+    let actions = manifest
+        .contributions
+        .commands
+        .iter()
+        .map(|command| PluginManifestAction {
+            id: command.id.clone(),
+            title: command.title.trim().to_owned(),
+            description: None,
+            contexts: command
+                .contexts
+                .iter()
+                .map(|context| match context.as_str() {
+                    "global" => PluginActionContext::Global,
+                    "mission" => PluginActionContext::Mission,
+                    "pane" => PluginActionContext::Pane,
+                    "workspace" => PluginActionContext::Workspace,
+                    _ => unreachable!("v2 contribution contexts were validated"),
+                })
+                .collect(),
+            platforms: None,
+            command: Vec::new(),
+        })
+        .collect();
+    let inspector_tabs = manifest.contributions.inspector_tabs;
+    Ok(InstalledPluginInfo {
+        manifest_version: 2,
+        plugin_id: manifest.id,
+        name: manifest.name,
+        version: manifest.version,
+        min_nagi_version: manifest.min_nagi_version,
+        description: manifest.description,
+        manifest_path: manifest_path.display().to_string(),
+        plugin_root: plugin_root.display().to_string(),
+        enabled,
+        runtime: manifest.runtime,
+        entrypoint: Some(manifest.entrypoint),
+        requested_capabilities: manifest.capabilities,
+        native_trusted: false,
+        platforms: None,
+        build: Vec::new(),
+        actions,
+        events: Vec::new(),
+        panes: Vec::new(),
+        link_handlers: Vec::new(),
+        inspector_tabs,
+        source: Default::default(),
+        warnings: Vec::new(),
+    })
+}
+
+fn validate_manifest_v2(
+    mut manifest: crate::api::schema::PluginManifestV2,
+    plugin_root: &std::path::Path,
+) -> Result<crate::api::schema::PluginManifestV2, (&'static str, String)> {
+    use std::path::Component;
+
+    let plugin_root = plugin_root.canonicalize().map_err(|error| {
+        (
+            "invalid_plugin_manifest_path",
+            format!("plugin root is unavailable: {error}"),
+        )
+    })?;
+
+    manifest.id = normalize_plugin_id(&manifest.id)
+        .ok_or_else(|| ("invalid_plugin_id", "invalid plugin id".to_owned()))?;
+    manifest.name = non_empty_trimmed(
+        &manifest.name,
+        "invalid_plugin_name",
+        "plugin name is required",
+    )?;
+    manifest.version = non_empty_trimmed(
+        &manifest.version,
+        "invalid_plugin_version",
+        "plugin version is required",
+    )?;
+    if crate::update::Version::parse(&manifest.version).is_none() {
+        return Err((
+            "invalid_plugin_version",
+            "plugin v2 version must be semantic".to_owned(),
+        ));
+    }
+    manifest.min_nagi_version = validate_min_nagi_version(Some(&manifest.min_nagi_version))?;
+    manifest.description = manifest
+        .description
+        .map(|description| description.trim().to_owned())
+        .filter(|description| !description.is_empty());
+    let entrypoint = std::path::Path::new(&manifest.entrypoint);
+    if manifest.entrypoint.is_empty()
+        || manifest.entrypoint.len() > 4_096
+        || entrypoint.is_absolute()
+        || entrypoint
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err((
+            "invalid_plugin_v2_entrypoint",
+            "plugin v2 entrypoint must be one exact relative path".to_owned(),
+        ));
+    }
+    let entrypoint = plugin_root.join(entrypoint);
+    let entrypoint = entrypoint.canonicalize().map_err(|error| {
+        (
+            "plugin_v2_entrypoint_not_found",
+            format!("plugin v2 entrypoint is unavailable: {error}"),
+        )
+    })?;
+    if !entrypoint.is_file() || !entrypoint.starts_with(&plugin_root) {
+        return Err((
+            "invalid_plugin_v2_entrypoint",
+            "plugin v2 entrypoint must be a file inside the plugin root".to_owned(),
+        ));
+    }
+    manifest.entrypoint = entrypoint.to_string_lossy().into_owned();
+    manifest.capabilities =
+        crate::plugin_capabilities::normalize_capabilities(&manifest.capabilities)
+            .map_err(|error| ("invalid_plugin_capability", error.to_string()))?;
+    validate_v2_contributions(&manifest.contributions, &manifest.capabilities)?;
+    Ok(manifest)
+}
+
+fn validate_v2_contributions(
+    contributions: &crate::api::schema::PluginContributionsV2,
+    capabilities: &[String],
+) -> Result<(), (&'static str, String)> {
+    let mut command_ids = std::collections::BTreeSet::new();
+    for command in &contributions.commands {
+        if normalize_action_id(&command.id).as_deref() != Some(command.id.trim())
+            || command.title.trim().is_empty()
+            || command.title.len() > 160
+            || !command_ids.insert(command.id.as_str())
+            || command.contexts.iter().any(|context| {
+                !matches!(
+                    context.as_str(),
+                    "global" | "mission" | "pane" | "workspace"
+                )
+            })
+        {
+            return Err((
+                "invalid_plugin_v2_command",
+                format!(
+                    "invalid or duplicate v2 command contribution '{}'",
+                    command.id
+                ),
+            ));
+        }
+    }
+    let mut inspector_ids = std::collections::BTreeSet::new();
+    for tab in &contributions.inspector_tabs {
+        if normalize_action_id(&tab.id).as_deref() != Some(tab.id.trim())
+            || normalize_action_id(&tab.source).as_deref() != Some(tab.source.trim())
+            || tab.title.trim().is_empty()
+            || tab.title.len() > 160
+            || !inspector_ids.insert(tab.id.as_str())
+        {
+            return Err((
+                "invalid_plugin_v2_inspector_tab",
+                format!("invalid or duplicate inspector tab '{}'", tab.id),
+            ));
+        }
+        if !command_ids.contains(tab.source.as_str()) {
+            return Err((
+                "invalid_plugin_v2_inspector_tab",
+                format!(
+                    "inspector tab '{}' references missing command source '{}'",
+                    tab.id, tab.source
+                ),
+            ));
+        }
+    }
+    if !contributions.inspector_tabs.is_empty()
+        && !capabilities
+            .iter()
+            .any(|capability| capability == "mission.read")
+    {
+        return Err((
+            "plugin_inspector_capability_required",
+            "inspector tab contributions require the mission.read capability".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_min_nagi_version(value: Option<&str>) -> Result<String, (&'static str, String)> {
@@ -560,7 +819,7 @@ fn non_empty_trimmed(
     }
 }
 
-pub(super) fn normalize_plugin_id(value: &str) -> Option<String> {
+pub(crate) fn normalize_plugin_id(value: &str) -> Option<String> {
     normalize_identifier(value, PLUGIN_ID_MAX_CHARS)
 }
 
@@ -586,4 +845,150 @@ fn normalize_local_identifier(value: &str, max_chars: usize) -> Option<String> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'_' | b'-')))
     .then(|| value.to_string())
+}
+
+#[cfg(test)]
+mod versioned_manifest_tests {
+    use super::*;
+
+    fn write_v2(root: &std::path::Path, extra: &str) -> String {
+        std::fs::write(root.join("plugin.wasm"), b"component").unwrap();
+        format!(
+            r#"
+manifest_version = 2
+id = "example.review"
+name = "Review"
+version = "1.2.0"
+min_nagi_version = "{}"
+runtime = "wasi-component"
+entrypoint = "plugin.wasm"
+capabilities = ["mission.read", "workspace.files.read:changed"]
+{extra}
+
+[[contributions.commands]]
+id = "review-current"
+title = "Review current mission"
+contexts = ["mission"]
+"#,
+            crate::build_info::BASE_VERSION
+        )
+    }
+
+    #[test]
+    fn valid_v2_is_parsed_as_a_sandboxed_component() {
+        let root = tempfile::tempdir().unwrap();
+        let source = write_v2(root.path(), "");
+        let ParsedPluginManifest::V2(manifest) =
+            parse_plugin_manifest(&source, root.path()).unwrap()
+        else {
+            panic!("valid v2 manifest was downgraded to legacy")
+        };
+        assert_eq!(
+            manifest.runtime,
+            crate::api::schema::PluginRuntimeV2::WasiComponent
+        );
+        assert!(std::path::Path::new(&manifest.entrypoint).is_absolute());
+    }
+
+    #[test]
+    fn unknown_versions_and_v2_fields_fail_closed() {
+        let root = tempfile::tempdir().unwrap();
+        let unknown_version =
+            write_v2(root.path(), "").replace("manifest_version = 2", "manifest_version = 99");
+        assert_eq!(
+            parse_plugin_manifest(&unknown_version, root.path())
+                .unwrap_err()
+                .0,
+            "unsupported_plugin_manifest_version"
+        );
+        let unknown_field = write_v2(root.path(), "pretend_sandboxed = true");
+        assert_eq!(
+            parse_plugin_manifest(&unknown_field, root.path())
+                .unwrap_err()
+                .0,
+            "plugin_manifest_v2_parse_failed"
+        );
+    }
+
+    #[test]
+    fn legacy_v1_can_declare_version_one_but_cannot_smuggle_security_fields() {
+        let legacy = format!(
+            r#"
+manifest_version = 1
+id = "example.legacy"
+name = "Legacy"
+version = "1.0.0"
+min_nagi_version = "{}"
+"#,
+            crate::build_info::BASE_VERSION
+        );
+        assert!(matches!(
+            parse_plugin_manifest(&legacy, std::path::Path::new(".")),
+            Ok(ParsedPluginManifest::Legacy(_))
+        ));
+        let smuggled = format!("{legacy}\nruntime = \"wasi-component\"\n");
+        assert_eq!(
+            parse_plugin_manifest(&smuggled, std::path::Path::new("."))
+                .unwrap_err()
+                .0,
+            "plugin_manifest_parse_failed"
+        );
+    }
+
+    #[test]
+    fn v2_rejects_escaping_entrypoints_and_invalid_capabilities() {
+        let root = tempfile::tempdir().unwrap();
+        let escaping = write_v2(root.path(), "").replace("plugin.wasm", "../plugin.wasm");
+        assert_eq!(
+            parse_plugin_manifest(&escaping, root.path()).unwrap_err().0,
+            "invalid_plugin_v2_entrypoint"
+        );
+        let invalid = write_v2(root.path(), "").replace(
+            "workspace.files.read:changed",
+            "workspace.files.read:../../home",
+        );
+        assert_eq!(
+            parse_plugin_manifest(&invalid, root.path()).unwrap_err().0,
+            "invalid_plugin_capability"
+        );
+    }
+
+    #[test]
+    fn inspector_tabs_require_a_real_command_source_and_mission_read() {
+        let root = tempfile::tempdir().unwrap();
+        let valid = write_v2(
+            root.path(),
+            r#"
+[[contributions.inspector_tabs]]
+id = "risk"
+title = "Risk"
+source = "review-current"
+"#,
+        );
+        let ParsedPluginManifest::V2(manifest) =
+            parse_plugin_manifest(&valid, root.path()).unwrap()
+        else {
+            panic!("expected v2 manifest")
+        };
+        assert_eq!(manifest.contributions.inspector_tabs.len(), 1);
+
+        let missing_source = valid.replace("source = \"review-current\"", "source = \"missing\"");
+        assert_eq!(
+            parse_plugin_manifest(&missing_source, root.path())
+                .unwrap_err()
+                .0,
+            "invalid_plugin_v2_inspector_tab"
+        );
+
+        let missing_capability = valid.replace(
+            "capabilities = [\"mission.read\", \"workspace.files.read:changed\"]",
+            "capabilities = [\"workspace.files.read:changed\"]",
+        );
+        assert_eq!(
+            parse_plugin_manifest(&missing_capability, root.path())
+                .unwrap_err()
+                .0,
+            "plugin_inspector_capability_required"
+        );
+    }
 }

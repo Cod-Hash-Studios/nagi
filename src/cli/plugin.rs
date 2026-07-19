@@ -3,14 +3,20 @@ use std::fmt;
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use sha2::{Digest as _, Sha256};
 
 use crate::api::schema::{
     InstalledPluginInfo, Method, PluginActionInvokeParams, PluginActionListParams,
-    PluginInvocationContext, PluginLinkParams, PluginListParams, PluginLogListParams,
-    PluginPaneCloseParams, PluginPaneFocusParams, PluginPaneOpenParams, PluginPanePlacement,
-    PluginPlatform, PluginSetEnabledParams, PluginSourceInfo, PluginSourceKind, PluginUnlinkParams,
-    Request, ResponseResult, SplitDirection, SuccessResponse,
+    PluginCapabilityApproveParams, PluginInvocationContext, PluginLinkParams, PluginListParams,
+    PluginLogListParams, PluginPaneCloseParams, PluginPaneFocusParams, PluginPaneOpenParams,
+    PluginPanePlacement, PluginPlatform, PluginSetEnabledParams, PluginSourceInfo,
+    PluginSourceKind, PluginUnlinkParams, Request, ResponseResult, SplitDirection, SuccessResponse,
 };
 use crate::popup_size::PopupSize;
 
@@ -23,6 +29,12 @@ pub(super) fn run_plugin_command(args: &[String]) -> std::io::Result<i32> {
     };
 
     match subcommand {
+        "new" => plugin_new(&args[1..]),
+        "validate" => plugin_validate(&args[1..]),
+        "inspect" => plugin_inspect(&args[1..]),
+        "test" => plugin_test(&args[1..]),
+        "pack" => plugin_pack(&args[1..]),
+        "dev" => plugin_dev(&args[1..]),
         "install" => plugin_install(&args[1..]),
         "uninstall" => plugin_uninstall(&args[1..]),
         "link" => plugin_link(&args[1..]),
@@ -31,6 +43,8 @@ pub(super) fn run_plugin_command(args: &[String]) -> std::io::Result<i32> {
         "unlink" => plugin_unlink(&args[1..]),
         "enable" => plugin_set_enabled(&args[1..], true),
         "disable" => plugin_set_enabled(&args[1..], false),
+        "approve" => plugin_capability_approve(&args[1..]),
+        "revoke" => plugin_capability_revoke(&args[1..]),
         "action" => run_plugin_action_command(&args[1..]),
         "log" | "logs" => plugin_log_list(&args[1..]),
         "pane" => run_plugin_pane_command(&args[1..]),
@@ -45,13 +59,1045 @@ pub(super) fn run_plugin_command(args: &[String]) -> std::io::Result<i32> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PluginScaffoldRuntime {
+    Wasi,
+    Native,
+}
+
+fn plugin_new(args: &[String]) -> std::io::Result<i32> {
+    let Some(path_arg) = args.first() else {
+        eprintln!("usage: nagi plugin new <path> [--id ID] [--name NAME] [--runtime wasi|native]");
+        return Ok(2);
+    };
+    let path = PathBuf::from(path_arg);
+    let mut plugin_id = None;
+    let mut plugin_name = None;
+    let mut runtime = PluginScaffoldRuntime::Wasi;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--id" => {
+                let Some(value) = required_value(args, &mut index, "--id") else {
+                    return Ok(2);
+                };
+                plugin_id = Some(value);
+            }
+            "--name" => {
+                let Some(value) = required_value(args, &mut index, "--name") else {
+                    return Ok(2);
+                };
+                plugin_name = Some(value);
+            }
+            "--runtime" => {
+                let Some(value) = required_value(args, &mut index, "--runtime") else {
+                    return Ok(2);
+                };
+                runtime = match value.as_str() {
+                    "wasi" | "wasi-component" => PluginScaffoldRuntime::Wasi,
+                    "native" | "trusted-native" => PluginScaffoldRuntime::Native,
+                    _ => {
+                        eprintln!("--runtime must be wasi or native");
+                        return Ok(2);
+                    }
+                };
+            }
+            other => {
+                eprintln!("unknown option: {other}");
+                return Ok(2);
+            }
+        }
+    }
+    let stem = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("plugin");
+    let slug = scaffold_slug(stem);
+    let plugin_id = plugin_id.unwrap_or_else(|| format!("local.{slug}"));
+    if !valid_scaffold_plugin_id(&plugin_id) {
+        eprintln!("plugin id must use ASCII letters, digits, colon, dot, underscore, or hyphen");
+        return Ok(2);
+    }
+    let plugin_name = plugin_name.unwrap_or_else(|| scaffold_display_name(stem));
+    if !valid_scaffold_name(&plugin_name) {
+        eprintln!("plugin name must be 1 to 80 safe display characters");
+        return Ok(2);
+    }
+    scaffold_plugin(&path, &plugin_id, &plugin_name, runtime)?;
+    println!("Created {} at {}.", plugin_id, path.display());
+    match runtime {
+        PluginScaffoldRuntime::Wasi => {
+            println!("Build: cargo build --target wasm32-wasip2 --release");
+            println!("Validate: nagi plugin validate {}", path.display());
+            println!("Link: nagi plugin link {} --disabled", path.display());
+        }
+        PluginScaffoldRuntime::Native => {
+            println!("Validate: nagi plugin validate {}", path.display());
+            println!("Link: nagi plugin link {} --trust-native", path.display());
+        }
+    }
+    Ok(0)
+}
+
+fn plugin_validate(args: &[String]) -> std::io::Result<i32> {
+    let Some(path_arg) = args.first() else {
+        eprintln!("usage: nagi plugin validate <path> [--json]");
+        return Ok(2);
+    };
+    let mut json = false;
+    for option in &args[1..] {
+        match option.as_str() {
+            "--json" => json = true,
+            other => {
+                eprintln!("unknown option: {other}");
+                return Ok(2);
+            }
+        }
+    }
+    let path = normalize_plugin_path_arg(path_arg)?;
+    let plugin = match load_cli_plugin_manifest(Path::new(&path), false) {
+        Ok(plugin) => plugin,
+        Err(error) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"valid": false, "error": error.to_string()})
+                );
+            } else {
+                eprintln!("Plugin invalid: {error}");
+            }
+            return Ok(1);
+        }
+    };
+    let mut checks = vec!["manifest".to_owned(), "compatibility".to_owned()];
+    if plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
+        if let Err(error) = crate::plugin_capabilities::ensure_runtime_bindings_available(
+            &plugin.requested_capabilities,
+        ) {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "valid": false,
+                        "plugin_id": plugin.plugin_id,
+                        "error": error.to_string()
+                    })
+                );
+            } else {
+                eprintln!("Plugin invalid: {error}");
+            }
+            return Ok(1);
+        }
+        let entrypoint = Path::new(
+            plugin
+                .entrypoint
+                .as_deref()
+                .expect("v2 manifest validation requires an entrypoint"),
+        );
+        if let Err(error) = crate::app::validate_plugin_component(entrypoint) {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "valid": false,
+                        "plugin_id": plugin.plugin_id,
+                        "error": error
+                    })
+                );
+            } else {
+                eprintln!("Plugin invalid: {error}");
+            }
+            return Ok(1);
+        }
+        checks.extend(["runtime_bindings".to_owned(), "component".to_owned()]);
+    } else {
+        checks.push("native_trust_label".to_owned());
+    }
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "valid": true,
+                "plugin_id": plugin.plugin_id,
+                "version": plugin.version,
+                "runtime": plugin.runtime,
+                "capabilities": plugin.requested_capabilities,
+                "checks": checks
+            })
+        );
+    } else {
+        println!(
+            "Valid plugin: {} {} ({:?})",
+            plugin.plugin_id, plugin.version, plugin.runtime
+        );
+        println!("Checks: {}", checks.join(", "));
+    }
+    Ok(0)
+}
+
+fn plugin_inspect(args: &[String]) -> std::io::Result<i32> {
+    let Some(plugin_id) = args.first() else {
+        eprintln!("usage: nagi plugin inspect <plugin_id> [--json]");
+        return Ok(2);
+    };
+    let mut json = false;
+    for option in &args[1..] {
+        match option.as_str() {
+            "--json" => json = true,
+            other => {
+                eprintln!("unknown option: {other}");
+                return Ok(2);
+            }
+        }
+    }
+    let Some(plugin) = installed_plugin_info(plugin_id)? else {
+        eprintln!("plugin not found: {plugin_id}");
+        return Ok(1);
+    };
+    if json {
+        let mut inspection = plugin_inspection(&plugin);
+        inspection["security"] = plugin_security_inspection(&plugin);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&inspection).map_err(std::io::Error::other)?
+        );
+        return Ok(0);
+    }
+
+    println!("{} {}", plugin.name, plugin.version);
+    println!("  id: {}", plugin.plugin_id);
+    println!(
+        "  state: {}",
+        if plugin.enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+    println!("  runtime: {:?}", plugin.runtime);
+    println!("  source: {}", source_display(&plugin));
+    println!("  manifest: {}", plugin.manifest_path);
+    if let Some(entrypoint) = &plugin.entrypoint {
+        println!("  entrypoint: {entrypoint}");
+    }
+    println!(
+        "  capabilities: {}",
+        if plugin.requested_capabilities.is_empty() {
+            "none".to_owned()
+        } else {
+            plugin.requested_capabilities.join(", ")
+        }
+    );
+    println!("  commands: {}", plugin.actions.len());
+    println!("  inspector tabs: {}", plugin.inspector_tabs.len());
+    println!("  native trust: {}", plugin.native_trusted);
+    let security = plugin_security_inspection(&plugin);
+    if let Some(status) = security.get("status").and_then(serde_json::Value::as_str) {
+        println!("  security binding: {status}");
+    }
+    if security["update_diff"]["changed"] == true {
+        println!("  update diff: security-sensitive changes detected");
+    }
+    for warning in &plugin.warnings {
+        println!("  warning: {warning}");
+    }
+    Ok(0)
+}
+
+fn plugin_test(args: &[String]) -> std::io::Result<i32> {
+    let Some(path_arg) = args.first() else {
+        eprintln!(
+            "usage: nagi plugin test <path> [--action ID] [--context-json JSON] [--stdin FILE] [--workspace PATH] [--json]"
+        );
+        return Ok(2);
+    };
+    let mut action_id = None;
+    let mut context_json = "{\"source\":\"nagi-plugin-test\"}".to_owned();
+    let mut stdin_path = None;
+    let mut workspace_path = None;
+    let mut json = false;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--action" => {
+                let Some(value) = required_value(args, &mut index, "--action") else {
+                    return Ok(2);
+                };
+                action_id = Some(value);
+            }
+            "--context-json" => {
+                let Some(value) = required_value(args, &mut index, "--context-json") else {
+                    return Ok(2);
+                };
+                context_json = value;
+            }
+            "--stdin" => {
+                let Some(value) = required_value(args, &mut index, "--stdin") else {
+                    return Ok(2);
+                };
+                stdin_path = Some(PathBuf::from(value));
+            }
+            "--workspace" => {
+                let Some(value) = required_value(args, &mut index, "--workspace") else {
+                    return Ok(2);
+                };
+                workspace_path = Some(PathBuf::from(value));
+            }
+            "--json" => {
+                json = true;
+                index += 1;
+            }
+            other => {
+                eprintln!("unknown option: {other}");
+                return Ok(2);
+            }
+        }
+    }
+    serde_json::from_str::<serde_json::Value>(&context_json).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("--context-json must be valid JSON: {error}"),
+        )
+    })?;
+    let path = normalize_plugin_path_arg(path_arg)?;
+    let plugin = load_cli_plugin_manifest(Path::new(&path), false)?;
+    if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent {
+        eprintln!("plugin test only executes sandboxed manifest v2 WASI components");
+        return Ok(2);
+    }
+    crate::plugin_capabilities::ensure_runtime_bindings_available(&plugin.requested_capabilities)
+        .map_err(std::io::Error::other)?;
+    let capabilities =
+        crate::plugin_capabilities::normalize_capabilities(&plugin.requested_capabilities)
+            .map_err(std::io::Error::other)?;
+    let workspace_readable = capabilities
+        .iter()
+        .any(|capability| capability == "workspace.files.read:worktree");
+    let workspace_writable = capabilities
+        .iter()
+        .any(|capability| capability == "workspace.files.write:worktree");
+    let workspace_path = match workspace_path {
+        Some(path) => {
+            if !workspace_readable && !workspace_writable {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "--workspace requires a workspace.files read or write capability",
+                ));
+            }
+            let path = path.canonicalize().map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("plugin test workspace is unavailable: {error}"),
+                )
+            })?;
+            if !path.is_dir() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "plugin test workspace must be a directory",
+                ));
+            }
+            Some(path)
+        }
+        None => None,
+    };
+    let entrypoint = Path::new(
+        plugin
+            .entrypoint
+            .as_deref()
+            .expect("validated WASI manifest requires an entrypoint"),
+    );
+    let stdin = match stdin_path {
+        Some(path) => std::fs::read(path)?,
+        None => default_plugin_test_stdin(),
+    };
+    let mut result = crate::app::test_plugin_component(
+        entrypoint,
+        &plugin.plugin_id,
+        action_id.as_deref(),
+        &context_json,
+        &stdin,
+        workspace_path.as_deref(),
+        workspace_readable,
+        workspace_writable,
+    );
+    let expects_inspector_document = match action_id.as_deref() {
+        Some(action_id) => plugin
+            .inspector_tabs
+            .iter()
+            .any(|tab| tab.source == action_id),
+        None => !plugin.inspector_tabs.is_empty(),
+    };
+    if result.exit_code == Some(0) && result.error.is_none() && expects_inspector_document {
+        if result.stdout.trim().is_empty() {
+            result.error = Some("plugin inspector action returned no UI document".to_owned());
+        } else if let Err(error) = crate::app::validate_plugin_ui_document(&result.stdout) {
+            result.error = Some(error);
+        }
+    }
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "plugin_id": plugin.plugin_id,
+                "action_id": action_id,
+                "exit_code": result.exit_code,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "error": result.error,
+                "passed": result.exit_code == Some(0) && result.error.is_none(),
+            })
+        );
+    } else {
+        if !result.stdout.is_empty() {
+            print!("{}", result.stdout);
+        }
+        if !result.stderr.is_empty() {
+            eprint!("{}", result.stderr);
+        }
+        match &result.error {
+            Some(error) => eprintln!("Plugin test failed: {error}"),
+            None => println!("Plugin test passed: {}", plugin.plugin_id),
+        }
+    }
+    Ok(if result.exit_code == Some(0) && result.error.is_none() {
+        0
+    } else {
+        1
+    })
+}
+
+fn default_plugin_test_stdin() -> Vec<u8> {
+    br#"{"schema_version":1,"mission":{"schema_version":1,"mission_id":"fixture","title":"Plugin fixture","repository_path":"/workspace","objective":"Exercise the deterministic plugin host contract","criteria":[],"closure_configured":false,"declared_check_count":0,"checks":[],"evidence":[],"details_available":true,"status":"draft","run_history":[],"unresolved_attention_count":0,"updated_at_millis":0}}"#.to_vec()
+}
+
+fn plugin_pack(args: &[String]) -> std::io::Result<i32> {
+    let Some(path_arg) = args.first() else {
+        eprintln!("usage: nagi plugin pack <path> [--out PATH] [--json]");
+        return Ok(2);
+    };
+    let mut output = None;
+    let mut json = false;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--out" => {
+                let Some(value) = required_value(args, &mut index, "--out") else {
+                    return Ok(2);
+                };
+                output = Some(PathBuf::from(value));
+            }
+            "--json" => {
+                json = true;
+                index += 1;
+            }
+            other => {
+                eprintln!("unknown option: {other}");
+                return Ok(2);
+            }
+        }
+    }
+    let path = normalize_plugin_path_arg(path_arg)?;
+    let plugin = load_cli_plugin_manifest(Path::new(&path), false)?;
+    if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent {
+        eprintln!("plugin pack only accepts sandboxed manifest v2 WASI components");
+        return Ok(2);
+    }
+    crate::plugin_capabilities::ensure_runtime_bindings_available(&plugin.requested_capabilities)
+        .map_err(std::io::Error::other)?;
+    crate::app::validate_plugin_component(Path::new(
+        plugin
+            .entrypoint
+            .as_deref()
+            .expect("validated WASI manifest requires an entrypoint"),
+    ))
+    .map_err(std::io::Error::other)?;
+    let output = output.unwrap_or_else(|| {
+        PathBuf::from(format!(
+            "{}-{}.nagi-plugin",
+            scaffold_slug(&plugin.plugin_id),
+            scaffold_slug(&plugin.version)
+        ))
+    });
+    let metadata = pack_plugin(&plugin, &output)?;
+    if json {
+        println!("{metadata}");
+    } else {
+        println!("Packed {} at {}.", plugin.plugin_id, output.display());
+        println!("Package SHA-256: {}", metadata["package_sha256"]);
+        println!("Included: checksums, SPDX SBOM, provenance");
+    }
+    Ok(0)
+}
+
+fn pack_plugin(plugin: &InstalledPluginInfo, output: &Path) -> std::io::Result<serde_json::Value> {
+    if output.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!("refusing to overwrite existing path {}", output.display()),
+        ));
+    }
+    let binding = crate::plugin_capabilities::installed_plugin_binding(plugin)
+        .map_err(std::io::Error::other)?;
+    let entrypoint = Path::new(
+        plugin
+            .entrypoint
+            .as_deref()
+            .ok_or_else(|| std::io::Error::other("plugin entrypoint is missing"))?,
+    );
+    let source_manifest = std::fs::read_to_string(&plugin.manifest_path)?;
+    let mut packaged_manifest = source_manifest
+        .parse::<toml::Value>()
+        .map_err(std::io::Error::other)?;
+    let manifest_table = packaged_manifest
+        .as_table_mut()
+        .ok_or_else(|| std::io::Error::other("plugin manifest root must be a TOML table"))?;
+    manifest_table.insert(
+        "entrypoint".to_owned(),
+        toml::Value::String("component.wasm".to_owned()),
+    );
+    let packaged_manifest = toml::to_string_pretty(&packaged_manifest)
+        .map_err(std::io::Error::other)?
+        .into_bytes();
+    let packaged_manifest_sha256 = Sha256::digest(&packaged_manifest)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    std::fs::create_dir_all(output)?;
+    std::fs::write(output.join("nagi-plugin.toml"), packaged_manifest)?;
+    std::fs::copy(entrypoint, output.join("component.wasm"))?;
+
+    let checksums = serde_json::json!({
+        "schema_version": 1,
+        "algorithm": "sha256",
+        "files": {
+            "nagi-plugin.toml": packaged_manifest_sha256,
+            "component.wasm": binding.package_sha256,
+        }
+    });
+    let namespace = format!(
+        "urn:nagi:plugin:{}:{}:{}",
+        plugin.plugin_id, plugin.version, binding.package_sha256
+    );
+    let sbom = serde_json::json!({
+        "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
+        "SPDXID": "SPDXRef-DOCUMENT",
+        "name": format!("{} {}", plugin.name, plugin.version),
+        "documentNamespace": namespace,
+        "creationInfo": {
+            "creators": [format!("Tool: Nagi-{}", crate::build_info::BASE_VERSION)]
+        },
+        "packages": [{
+            "SPDXID": "SPDXRef-Plugin",
+            "name": plugin.name,
+            "versionInfo": plugin.version,
+            "downloadLocation": "NOASSERTION",
+            "filesAnalyzed": false,
+            "checksums": [{"algorithm": "SHA256", "checksumValue": binding.package_sha256}]
+        }]
+    });
+    let provenance = serde_json::json!({
+        "schema_version": 1,
+        "plugin_id": plugin.plugin_id,
+        "version": plugin.version,
+        "runtime": plugin.runtime,
+        "manifest_sha256": packaged_manifest_sha256,
+        "source_manifest_sha256": binding.manifest_sha256,
+        "package_sha256": binding.package_sha256,
+        "resolved_commit": plugin.source.resolved_commit,
+        "capabilities": binding.capabilities,
+        "generated_by": {"name": "nagi", "version": crate::build_info::BASE_VERSION}
+    });
+    for (name, document) in [
+        ("checksums.json", &checksums),
+        ("sbom.spdx.json", &sbom),
+        ("provenance.json", &provenance),
+    ] {
+        std::fs::write(
+            output.join(name),
+            serde_json::to_vec_pretty(document).map_err(std::io::Error::other)?,
+        )?;
+    }
+    let metadata_bytes = serde_json::to_vec(&provenance).map_err(std::io::Error::other)?;
+    let bundle_sha256 = Sha256::digest(metadata_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Ok(serde_json::json!({
+        "plugin_id": plugin.plugin_id,
+        "version": plugin.version,
+        "output": output,
+        "manifest_sha256": packaged_manifest_sha256,
+        "package_sha256": binding.package_sha256,
+        "metadata_sha256": bundle_sha256,
+    }))
+}
+
+fn plugin_dev(args: &[String]) -> std::io::Result<i32> {
+    let Some(path_arg) = args.first() else {
+        eprintln!(
+            "usage: nagi plugin dev <path> [--once] [--interval-ms N] [--disabled] [--trust-native]"
+        );
+        return Ok(2);
+    };
+    let mut once = false;
+    let mut interval_ms = 750_u64;
+    let mut disabled = false;
+    let mut trust_native = false;
+    let mut index = 1;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--once" => {
+                once = true;
+                index += 1;
+            }
+            "--disabled" => {
+                disabled = true;
+                index += 1;
+            }
+            "--trust-native" => {
+                trust_native = true;
+                index += 1;
+            }
+            "--interval-ms" => {
+                let Some(raw) = required_value(args, &mut index, "--interval-ms") else {
+                    return Ok(2);
+                };
+                let Ok(value) = raw.parse::<u64>() else {
+                    eprintln!("invalid --interval-ms value: {raw}");
+                    return Ok(2);
+                };
+                if !(100..=10_000).contains(&value) {
+                    eprintln!("--interval-ms must be between 100 and 10000");
+                    return Ok(2);
+                }
+                interval_ms = value;
+            }
+            other => {
+                eprintln!("unknown option: {other}");
+                return Ok(2);
+            }
+        }
+    }
+
+    let path = normalize_plugin_path_arg(path_arg)?;
+    let plugin = load_cli_plugin_manifest(Path::new(&path), !disabled)?;
+    if plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
+        crate::plugin_capabilities::ensure_runtime_bindings_available(
+            &plugin.requested_capabilities,
+        )
+        .map_err(std::io::Error::other)?;
+        crate::app::validate_plugin_component(Path::new(
+            plugin
+                .entrypoint
+                .as_deref()
+                .expect("validated WASI manifest requires an entrypoint"),
+        ))
+        .map_err(std::io::Error::other)?;
+        if !plugin.requested_capabilities.is_empty() {
+            disabled = true;
+        }
+    }
+    let link_code = plugin_link(&plugin_dev_link_args(&path, disabled, trust_native))?;
+    if link_code != 0 {
+        return Ok(link_code);
+    }
+    println!("Watching {} for plugin changes.", plugin.plugin_root);
+    if disabled && !plugin.requested_capabilities.is_empty() {
+        println!(
+            "Linked disabled. Review with `nagi plugin inspect {}` then approve and enable it.",
+            plugin.plugin_id
+        );
+    }
+    print_recent_plugin_logs(&plugin.plugin_id);
+    if once {
+        return Ok(0);
+    }
+
+    let running = Arc::new(AtomicBool::new(true));
+    let stop = Arc::clone(&running);
+    ctrlc::set_handler(move || stop.store(false, Ordering::SeqCst))
+        .map_err(std::io::Error::other)?;
+    let mut fingerprint = plugin_dev_snapshot(&plugin)?;
+    while running.load(Ordering::SeqCst) {
+        std::thread::sleep(Duration::from_millis(interval_ms));
+        let next_plugin = match load_cli_plugin_manifest(Path::new(&path), !disabled) {
+            Ok(plugin) => plugin,
+            Err(error) => {
+                eprintln!("Plugin reload skipped: {error}");
+                continue;
+            }
+        };
+        let next_fingerprint = match plugin_dev_snapshot(&next_plugin) {
+            Ok(fingerprint) => fingerprint,
+            Err(error) => {
+                eprintln!("Plugin reload skipped: {error}");
+                continue;
+            }
+        };
+        if next_fingerprint == fingerprint {
+            continue;
+        }
+        if next_plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent {
+            if let Err(error) = crate::app::validate_plugin_component(Path::new(
+                next_plugin
+                    .entrypoint
+                    .as_deref()
+                    .expect("validated WASI manifest requires an entrypoint"),
+            )) {
+                eprintln!("Plugin reload skipped: {error}");
+                continue;
+            }
+        }
+        let code = plugin_link(&plugin_dev_link_args(&path, disabled, trust_native))?;
+        if code == 0 {
+            println!("Reloaded {}.", next_plugin.plugin_id);
+            fingerprint = next_fingerprint;
+            print_recent_plugin_logs(&next_plugin.plugin_id);
+        }
+    }
+    println!("Stopped plugin dev loop.");
+    Ok(0)
+}
+
+fn print_recent_plugin_logs(plugin_id: &str) {
+    let _ = plugin_log_list(&[
+        "list".to_owned(),
+        "--plugin".to_owned(),
+        plugin_id.to_owned(),
+        "--limit".to_owned(),
+        "20".to_owned(),
+    ]);
+}
+
+fn plugin_dev_link_args(path: &str, disabled: bool, trust_native: bool) -> Vec<String> {
+    let mut args = vec![path.to_owned()];
+    if disabled {
+        args.push("--disabled".to_owned());
+    }
+    if trust_native {
+        args.push("--trust-native".to_owned());
+    }
+    args
+}
+
+fn plugin_dev_snapshot(plugin: &InstalledPluginInfo) -> std::io::Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(plugin_dev_fingerprint(Path::new(&plugin.plugin_root))?.as_bytes());
+    if let Some(entrypoint) = &plugin.entrypoint {
+        hasher.update(std::fs::read(entrypoint)?);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn plugin_dev_fingerprint(root: &Path) -> std::io::Result<String> {
+    const MAX_FILES: usize = 10_000;
+    const MAX_BYTES: usize = 64 * 1024 * 1024;
+    let root = root.canonicalize()?;
+    let mut pending = vec![root.clone()];
+    let mut files = Vec::new();
+    while let Some(directory) = pending.pop() {
+        let mut entries = std::fs::read_dir(&directory)?.collect::<Result<Vec<_>, _>>()?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let name = entry.file_name();
+            if name == ".git"
+                || name == "target"
+                || name.to_string_lossy().ends_with(".nagi-plugin")
+            {
+                continue;
+            }
+            let file_type = entry.file_type()?;
+            if file_type.is_dir() {
+                pending.push(entry.path());
+            } else if file_type.is_file() {
+                files.push(entry.path());
+                if files.len() > MAX_FILES {
+                    return Err(std::io::Error::other("plugin dev tree exceeds 10000 files"));
+                }
+            }
+        }
+    }
+    files.sort();
+    let mut bytes = 0_usize;
+    let mut hasher = Sha256::new();
+    for path in files {
+        let content = std::fs::read(&path)?;
+        bytes = bytes.saturating_add(content.len());
+        if bytes > MAX_BYTES {
+            return Err(std::io::Error::other("plugin dev tree exceeds 64 MiB"));
+        }
+        hasher.update(
+            path.strip_prefix(&root)
+                .unwrap_or(&path)
+                .as_os_str()
+                .as_encoded_bytes(),
+        );
+        hasher.update([0]);
+        hasher.update(content);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn plugin_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value {
+    serde_json::json!({
+        "plugin_id": plugin.plugin_id,
+        "name": plugin.name,
+        "version": plugin.version,
+        "enabled": plugin.enabled,
+        "runtime": plugin.runtime,
+        "entrypoint": plugin.entrypoint,
+        "capabilities": plugin.requested_capabilities,
+        "native_trusted": plugin.native_trusted,
+        "source": plugin.source,
+        "manifest_path": plugin.manifest_path,
+        "plugin_root": plugin.plugin_root,
+        "contributions": {
+            "commands": plugin.actions,
+            "inspector_tabs": plugin.inspector_tabs,
+            "panes": plugin.panes,
+            "events": plugin.events,
+            "link_handlers": plugin.link_handlers,
+        },
+        "warnings": plugin.warnings,
+    })
+}
+
+fn plugin_security_inspection(plugin: &InstalledPluginInfo) -> serde_json::Value {
+    use crate::plugin_capabilities::GrantEvaluation;
+
+    if plugin.runtime != crate::api::schema::PluginRuntimeV2::WasiComponent {
+        return serde_json::json!({
+            "status": if plugin.native_trusted { "trusted-native" } else { "native-trust-required" },
+            "update_diff": {"changed": false}
+        });
+    }
+    let binding = match crate::plugin_capabilities::installed_plugin_binding(plugin) {
+        Ok(binding) => binding,
+        Err(error) => return serde_json::json!({"status": "unavailable", "error": error}),
+    };
+    let stored = match crate::persist::plugin_registry::load_security_binding(&plugin.plugin_id) {
+        Ok(stored) => stored,
+        Err(error) => {
+            return serde_json::json!({"status": "unavailable", "error": error.to_string()})
+        }
+    };
+    let Some((lock, grant)) = stored else {
+        return serde_json::json!({
+            "status": "approval-required",
+            "current": {
+                "manifest_sha256": binding.manifest_sha256,
+                "package_sha256": binding.package_sha256,
+                "resolved_commit": binding.resolved_commit,
+                "capabilities": binding.capabilities,
+            },
+            "update_diff": {"changed": true, "reason": "no approved binding"}
+        });
+    };
+    let added_capabilities =
+        crate::plugin_capabilities::added_capabilities(&grant.capabilities, &binding.capabilities)
+            .unwrap_or_default();
+    let evaluation =
+        crate::plugin_capabilities::evaluate_security_binding(&lock, &grant, &binding.as_binding());
+    let status = match evaluation {
+        Ok(GrantEvaluation::Allowed) => "approved",
+        Ok(GrantEvaluation::ApprovalRequired { .. }) => "approval-required",
+        Ok(GrantEvaluation::BindingChanged) => "binding-changed",
+        Ok(GrantEvaluation::Revoked) => "revoked",
+        Err(_) => "unavailable",
+    };
+    let version_changed = lock.plugin_version != binding.plugin_version;
+    let manifest_changed = lock.manifest_sha256 != binding.manifest_sha256;
+    let package_changed = lock.package_sha256 != binding.package_sha256;
+    let commit_changed = lock.resolved_commit != binding.resolved_commit;
+    let changed = version_changed
+        || manifest_changed
+        || package_changed
+        || commit_changed
+        || !added_capabilities.is_empty();
+    serde_json::json!({
+        "status": status,
+        "approved": {
+            "version": lock.plugin_version,
+            "manifest_sha256": lock.manifest_sha256,
+            "package_sha256": lock.package_sha256,
+            "resolved_commit": lock.resolved_commit,
+            "capabilities": grant.capabilities,
+        },
+        "current": {
+            "version": binding.plugin_version,
+            "manifest_sha256": binding.manifest_sha256,
+            "package_sha256": binding.package_sha256,
+            "resolved_commit": binding.resolved_commit,
+            "capabilities": binding.capabilities,
+        },
+        "update_diff": {
+            "changed": changed,
+            "version_changed": version_changed,
+            "manifest_changed": manifest_changed,
+            "package_changed": package_changed,
+            "commit_changed": commit_changed,
+            "added_capabilities": added_capabilities,
+        }
+    })
+}
+
+fn scaffold_plugin(
+    path: &Path,
+    plugin_id: &str,
+    plugin_name: &str,
+    runtime: PluginScaffoldRuntime,
+) -> std::io::Result<()> {
+    if path.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!("refusing to overwrite existing path {}", path.display()),
+        ));
+    }
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::create_dir(path)?;
+    let package = scaffold_package_name(plugin_id);
+    let render = |template: &str| {
+        template
+            .replace("{PLUGIN_ID}", plugin_id)
+            .replace("{PLUGIN_NAME}", plugin_name)
+            .replace("{PLUGIN_PACKAGE}", &package)
+            .replace("{NAGI_VERSION}", crate::build_info::BASE_VERSION)
+    };
+    match runtime {
+        PluginScaffoldRuntime::Wasi => {
+            std::fs::create_dir(path.join("src"))?;
+            std::fs::write(
+                path.join("Cargo.toml"),
+                render(include_str!("../../templates/plugin-wasi/Cargo.toml")),
+            )?;
+            std::fs::write(
+                path.join("src/main.rs"),
+                render(include_str!("../../templates/plugin-wasi/src/main.rs")),
+            )?;
+            std::fs::write(
+                path.join("nagi-plugin.toml"),
+                render(include_str!("../../templates/plugin-wasi/nagi-plugin.toml")),
+            )?;
+        }
+        PluginScaffoldRuntime::Native => {
+            std::fs::write(
+                path.join("plugin.py"),
+                render(include_str!("../../templates/plugin-native/plugin.py")),
+            )?;
+            std::fs::write(
+                path.join("nagi-plugin.toml"),
+                render(include_str!(
+                    "../../templates/plugin-native/nagi-plugin.toml"
+                )),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn scaffold_slug(value: &str) -> String {
+    let slug = value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let normalized = slug
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+        .chars()
+        .take(80)
+        .collect::<String>();
+    if normalized.is_empty() {
+        "plugin".to_owned()
+    } else {
+        normalized
+    }
+}
+
+fn scaffold_display_name(value: &str) -> String {
+    let words = value
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut characters = word.chars();
+            characters
+                .next()
+                .map(|first| first.to_ascii_uppercase().to_string() + characters.as_str())
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
+    if words.is_empty() {
+        "Nagi Plugin".to_owned()
+    } else {
+        words.join(" ")
+    }
+}
+
+fn scaffold_package_name(plugin_id: &str) -> String {
+    let mut package = plugin_id
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '_' {
+                character.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    if !package.starts_with(|character: char| character.is_ascii_alphabetic()) {
+        package.insert_str(0, "plugin_");
+    }
+    package
+}
+
+fn valid_scaffold_plugin_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 120
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'.' | b'_' | b'-'))
+}
+
+fn valid_scaffold_name(value: &str) -> bool {
+    let trimmed = value.trim();
+    !trimmed.is_empty()
+        && trimmed.chars().count() <= 80
+        && trimmed.chars().all(|character| {
+            character.is_ascii_alphanumeric()
+                || character.is_ascii_whitespace()
+                || matches!(character, '-' | '_' | '.')
+        })
+}
+
 fn plugin_link(args: &[String]) -> std::io::Result<i32> {
     let Some(path) = args.first() else {
-        eprintln!("usage: nagi plugin link <path> [--disabled]");
+        eprintln!("usage: nagi plugin link <path> [--disabled] [--trust-native]");
         return Ok(2);
     };
     let path = normalize_plugin_path_arg(path)?;
     let mut enabled = true;
+    let mut trust_native = false;
     let mut index = 1;
     while index < args.len() {
         match args[index].as_str() {
@@ -61,6 +1107,10 @@ fn plugin_link(args: &[String]) -> std::io::Result<i32> {
             }
             "--enabled" => {
                 enabled = true;
+                index += 1;
+            }
+            "--trust-native" => {
+                trust_native = true;
                 index += 1;
             }
             other => {
@@ -73,6 +1123,7 @@ fn plugin_link(args: &[String]) -> std::io::Result<i32> {
         path,
         enabled,
         source: None,
+        trust_native,
     }))
 }
 
@@ -144,7 +1195,9 @@ fn plugin_unlink(args: &[String]) -> std::io::Result<i32> {
 
 fn plugin_install(args: &[String]) -> std::io::Result<i32> {
     let Some(source_arg) = args.first() else {
-        eprintln!("usage: nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]");
+        eprintln!(
+            "usage: nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes] [--trust-native]"
+        );
         return Ok(2);
     };
     let source = match GithubPluginSource::parse(source_arg) {
@@ -156,6 +1209,7 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
     };
     let mut requested_ref = None;
     let mut yes = false;
+    let mut trust_native = false;
     let mut index = 1;
     while index < args.len() {
         match args[index].as_str() {
@@ -169,6 +1223,10 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
                 yes = true;
                 index += 1;
             }
+            "--trust-native" => {
+                trust_native = true;
+                index += 1;
+            }
             other => {
                 eprintln!("unknown option: {other}");
                 return Ok(2);
@@ -180,29 +1238,52 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
         eprintln!("remote plugin install requires --yes when stdin is not interactive");
         return Ok(2);
     }
-
     let temp_root = create_plugin_temp_dir("install")?;
     let checkout = temp_root.join("checkout");
     let install_result = (|| {
         git_checkout(&source, requested_ref.as_deref(), &checkout)?;
         let resolved_commit = git_output(&checkout, ["rev-parse", "HEAD"])?;
         let manifest_root = source.manifest_root(&checkout);
-        let preview_plugin = load_cli_plugin_manifest(&manifest_root, true)?;
+        let mut preview_plugin = load_cli_plugin_manifest(&manifest_root, true)?;
+        if preview_plugin.runtime == crate::api::schema::PluginRuntimeV2::WasiComponent
+            && !preview_plugin.requested_capabilities.is_empty()
+        {
+            preview_plugin.enabled = false;
+        }
         let existing = installed_plugin_info(&preview_plugin.plugin_id)?;
         ensure_replacement_allowed(&preview_plugin, existing.as_ref())?;
 
         let mut source_info =
             source.to_source_info(requested_ref, resolved_commit, None, current_unix_ms());
         print_install_preview(&preview_plugin, &source_info, existing.as_ref());
-        if !yes && !confirm("Install this plugin?")? {
-            eprintln!("plugin install cancelled");
-            return Ok(0);
+        match preview_plugin.runtime {
+            crate::api::schema::PluginRuntimeV2::TrustedNative => {
+                if yes && !trust_native {
+                    eprintln!("non-interactive native plugin install requires --trust-native");
+                    return Ok(2);
+                }
+                if !yes {
+                    if !confirm(
+                        "Trust this native plugin with your OS permissions and install it?",
+                    )? {
+                        eprintln!("plugin install cancelled");
+                        return Ok(0);
+                    }
+                    trust_native = true;
+                }
+            }
+            crate::api::schema::PluginRuntimeV2::WasiComponent => {
+                if trust_native {
+                    eprintln!("sandboxed component plugins do not accept --trust-native");
+                    return Ok(2);
+                }
+            }
         }
         if let Err(err) = run_plugin_build_commands(&preview_plugin, &manifest_root) {
             eprintln!("{err}");
             return Ok(1);
         }
-        let post_build_plugin = load_cli_plugin_manifest(&manifest_root, true)?;
+        let post_build_plugin = load_cli_plugin_manifest(&manifest_root, preview_plugin.enabled)?;
         ensure_manifest_unchanged_after_build(&preview_plugin, &post_build_plugin)?;
 
         let final_checkout = managed_checkout_path(&preview_plugin.plugin_id);
@@ -223,10 +1304,10 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
 
             source_info.managed_path = Some(final_checkout.display().to_string());
             let final_manifest_root = source.manifest_root(&final_checkout);
-            let mut plugin = load_cli_plugin_manifest(&final_manifest_root, true)
+            let mut plugin = load_cli_plugin_manifest(&final_manifest_root, preview_plugin.enabled)
                 .map_err(InstallFailure::Rollback)?;
             plugin.source = source_info.clone();
-            register_installed_plugin(plugin.clone(), source_info.clone())?;
+            register_installed_plugin(plugin.clone(), source_info.clone(), trust_native)?;
             Ok::<InstalledPluginInfo, InstallFailure>(plugin)
         })();
         let plugin = match install_attempt {
@@ -241,6 +1322,12 @@ fn plugin_install(args: &[String]) -> std::io::Result<i32> {
             Err(InstallFailure::KeepCheckout(err)) => return Err(err),
         };
         println!("Installed {} from {}.", plugin.plugin_id, source.display());
+        if !plugin.enabled && !plugin.requested_capabilities.is_empty() {
+            println!(
+                "Disabled pending review. Run `nagi plugin approve {}` then `nagi plugin enable {}`.",
+                plugin.plugin_id, plugin.plugin_id
+            );
+        }
         println!(
             "Config: {}",
             crate::plugin_paths::plugin_config_dir(&plugin.plugin_id).display()
@@ -338,6 +1425,36 @@ fn plugin_set_enabled(args: &[String], enabled: bool) -> std::io::Result<i32> {
     } else {
         print_plugin_response(Method::PluginDisable(params))
     }
+}
+
+fn plugin_capability_approve(args: &[String]) -> std::io::Result<i32> {
+    let Some(plugin_id) = args.first() else {
+        eprintln!("usage: nagi plugin approve <plugin_id>");
+        return Ok(2);
+    };
+    if args.len() != 1 {
+        eprintln!("usage: nagi plugin approve <plugin_id>");
+        return Ok(2);
+    }
+    print_plugin_response(Method::PluginCapabilityApprove(
+        PluginCapabilityApproveParams {
+            plugin_id: plugin_id.clone(),
+        },
+    ))
+}
+
+fn plugin_capability_revoke(args: &[String]) -> std::io::Result<i32> {
+    let Some(plugin_id) = args.first() else {
+        eprintln!("usage: nagi plugin revoke <plugin_id>");
+        return Ok(2);
+    };
+    if args.len() != 1 {
+        eprintln!("usage: nagi plugin revoke <plugin_id>");
+        return Ok(2);
+    }
+    print_plugin_response(Method::PluginCapabilityRevoke(PluginSetEnabledParams {
+        plugin_id: plugin_id.clone(),
+    }))
 }
 
 fn plugin_log_list(args: &[String]) -> std::io::Result<i32> {
@@ -895,6 +2012,7 @@ fn load_cli_plugin_manifest(path: &Path, enabled: bool) -> std::io::Result<Insta
 fn register_installed_plugin(
     plugin: InstalledPluginInfo,
     source: PluginSourceInfo,
+    trust_native: bool,
 ) -> Result<(), InstallFailure> {
     let request = Request {
         id: "cli:plugin".into(),
@@ -902,6 +2020,7 @@ fn register_installed_plugin(
             path: plugin.manifest_path.clone(),
             enabled: plugin.enabled,
             source: Some(source.clone()),
+            trust_native,
         }),
     };
     match super::send_request(&request) {
@@ -1617,14 +2736,26 @@ fn print_plugin_response(method: Method) -> std::io::Result<i32> {
 
 fn print_plugin_help() {
     eprintln!("nagi plugin commands:");
-    eprintln!("  nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]");
+    eprintln!("  nagi plugin new <path> [--id ID] [--name NAME] [--runtime wasi|native]");
+    eprintln!("  nagi plugin validate <path> [--json]");
+    eprintln!("  nagi plugin inspect <plugin_id> [--json]");
+    eprintln!(
+        "  nagi plugin test <path> [--action ID] [--context-json JSON] [--stdin FILE] [--workspace PATH] [--json]"
+    );
+    eprintln!("  nagi plugin pack <path> [--out PATH] [--json]");
+    eprintln!("  nagi plugin dev <path> [--once] [--interval-ms N] [--disabled] [--trust-native]");
+    eprintln!(
+        "  nagi plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes] [--trust-native]"
+    );
     eprintln!("  nagi plugin uninstall <plugin_id|owner/repo[/subdir...]>");
-    eprintln!("  nagi plugin link <path> [--disabled]");
+    eprintln!("  nagi plugin link <path> [--disabled] [--trust-native]");
     eprintln!("  nagi plugin list [--plugin ID] [--json]");
     eprintln!("  nagi plugin config-dir <plugin_id>");
     eprintln!("  nagi plugin unlink <plugin_id>");
     eprintln!("  nagi plugin enable <plugin_id>");
     eprintln!("  nagi plugin disable <plugin_id>");
+    eprintln!("  nagi plugin approve <plugin_id>");
+    eprintln!("  nagi plugin revoke <plugin_id>");
     eprintln!("  nagi plugin action <list|invoke>");
     eprintln!("  nagi plugin log list [--plugin ID] [--limit N]");
     eprintln!("  nagi plugin pane <open|focus|close>");
@@ -1647,6 +2778,165 @@ fn print_plugin_pane_help() {
 mod tests {
     use super::*;
 
+    #[test]
+    fn plugin_scaffolds_are_safe_complete_and_never_overwrite() {
+        let root = tempfile::tempdir().unwrap();
+        let native = root.path().join("native-review");
+        scaffold_plugin(
+            &native,
+            "example.native-review",
+            "Native Review",
+            PluginScaffoldRuntime::Native,
+        )
+        .unwrap();
+        let native_plugin = load_cli_plugin_manifest(&native, false).unwrap();
+        assert_eq!(native_plugin.plugin_id, "example.native-review");
+        assert_eq!(native_plugin.actions.len(), 1);
+        assert!(std::fs::read_to_string(native.join("plugin.py"))
+            .unwrap()
+            .contains("Native Review"));
+        assert_eq!(
+            scaffold_plugin(
+                &native,
+                "example.overwrite",
+                "Overwrite",
+                PluginScaffoldRuntime::Native,
+            )
+            .unwrap_err()
+            .kind(),
+            std::io::ErrorKind::AlreadyExists
+        );
+
+        let wasi = root.path().join("risk-panel");
+        scaffold_plugin(
+            &wasi,
+            "example.risk-panel",
+            "Risk Panel",
+            PluginScaffoldRuntime::Wasi,
+        )
+        .unwrap();
+        let component = wasi.join("target/wasm32-wasip2/release/example_risk_panel.wasm");
+        std::fs::create_dir_all(component.parent().unwrap()).unwrap();
+        std::fs::write(
+            &component,
+            wat::parse_str(
+                r#"
+                (component
+                    (core module $module
+                        (func (export "run") (result i32) i32.const 0))
+                    (core instance $instance (instantiate $module))
+                    (type $result (result))
+                    (type $run (func (result $result)))
+                    (func $run (type $run) (canon lift (core func $instance "run")))
+                    (instance $exports (export "run" (func $run)))
+                    (export "wasi:cli/run@0.2.0" (instance $exports)))
+                "#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let wasi_plugin = load_cli_plugin_manifest(&wasi, false).unwrap();
+        assert_eq!(wasi_plugin.inspector_tabs.len(), 1);
+        assert_eq!(
+            plugin_validate(&[wasi.display().to_string(), "--json".into()]).unwrap(),
+            0
+        );
+        assert_eq!(
+            plugin_test(&[wasi.display().to_string(), "--json".into()]).unwrap(),
+            1
+        );
+        let manifest_path = wasi.join("nagi-plugin.toml");
+        let manifest = std::fs::read_to_string(&manifest_path).unwrap().replace(
+            "capabilities = [\"mission.read\"]",
+            "capabilities = [\"mission.read\", \"workspace.files.read:worktree\"]",
+        );
+        std::fs::write(manifest_path, manifest).unwrap();
+        assert_eq!(
+            plugin_test(&[
+                wasi.display().to_string(),
+                "--workspace".into(),
+                root.path().display().to_string(),
+                "--json".into(),
+            ])
+            .unwrap(),
+            1
+        );
+        let package = root.path().join("risk-panel.nagi-plugin");
+        pack_plugin(&wasi_plugin, &package).unwrap();
+        assert!(package.join("nagi-plugin.toml").is_file());
+        assert!(package.join("component.wasm").is_file());
+        assert!(package.join("checksums.json").is_file());
+        assert!(package.join("sbom.spdx.json").is_file());
+        assert!(package.join("provenance.json").is_file());
+        assert_eq!(
+            plugin_validate(&[package.display().to_string(), "--json".into()]).unwrap(),
+            0
+        );
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(
+                &std::fs::read(package.join("provenance.json")).unwrap()
+            )
+            .unwrap()["plugin_id"],
+            "example.risk-panel"
+        );
+    }
+
+    #[test]
+    fn scaffold_names_are_deterministic_and_manifest_safe() {
+        assert_eq!(scaffold_slug("PR & CI Review"), "pr-ci-review");
+        assert_eq!(scaffold_slug("✨"), "plugin");
+        assert_eq!(scaffold_display_name("pr-ci_review"), "Pr Ci Review");
+        assert_eq!(scaffold_package_name("example.pr-ci"), "example_pr_ci");
+        assert!(valid_scaffold_plugin_id("example.pr-ci"));
+        assert!(!valid_scaffold_plugin_id("../../escape"));
+        assert!(!valid_scaffold_name("unsafe \"name\""));
+    }
+
+    #[test]
+    fn plugin_test_default_fixture_matches_the_inspector_contract() {
+        let fixture: serde_json::Value =
+            serde_json::from_slice(&default_plugin_test_stdin()).unwrap();
+
+        assert_eq!(fixture["schema_version"], 1);
+        assert_eq!(fixture["mission"]["mission_id"], "fixture");
+        assert!(fixture["mission"]["checks"].is_array());
+        assert!(fixture["mission"]["evidence"].is_array());
+    }
+
+    #[test]
+    fn plugin_inspection_includes_authority_and_provenance() {
+        let mut plugin = github_plugin("example.inspect", "codhash", "nagi-plugin", None);
+        plugin.runtime = crate::api::schema::PluginRuntimeV2::WasiComponent;
+        plugin.requested_capabilities = vec!["workspace.files.read:worktree".to_owned()];
+
+        let inspection = plugin_inspection(&plugin);
+
+        assert_eq!(inspection["plugin_id"], "example.inspect");
+        assert_eq!(inspection["runtime"], "wasi-component");
+        assert_eq!(
+            inspection["capabilities"],
+            serde_json::json!(["workspace.files.read:worktree"])
+        );
+        assert_eq!(inspection["source"]["kind"], "github");
+        assert_eq!(inspection["source"]["owner"], "codhash");
+        assert_eq!(inspection["source"]["resolved_commit"], "abc123");
+    }
+
+    #[test]
+    fn plugin_dev_fingerprint_tracks_source_changes_and_ignores_git() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("plugin.py"), "print('one')").unwrap();
+        std::fs::create_dir(root.path().join(".git")).unwrap();
+        std::fs::write(root.path().join(".git/index"), "before").unwrap();
+        let before = plugin_dev_fingerprint(root.path()).unwrap();
+
+        std::fs::write(root.path().join(".git/index"), "after").unwrap();
+        assert_eq!(plugin_dev_fingerprint(root.path()).unwrap(), before);
+
+        std::fs::write(root.path().join("plugin.py"), "print('two')").unwrap();
+        assert_ne!(plugin_dev_fingerprint(root.path()).unwrap(), before);
+    }
+
     fn unique_plugin_id(label: &str) -> String {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1662,6 +2952,7 @@ mod tests {
         subdir: Option<&str>,
     ) -> InstalledPluginInfo {
         InstalledPluginInfo {
+            manifest_version: 1,
             plugin_id: id.to_string(),
             name: "Test Plugin".to_string(),
             version: "0.1.0".to_string(),
@@ -1670,12 +2961,17 @@ mod tests {
             manifest_path: format!("/tmp/{id}/nagi-plugin.toml"),
             plugin_root: format!("/tmp/{id}"),
             enabled: true,
+            runtime: crate::api::schema::PluginRuntimeV2::TrustedNative,
+            entrypoint: None,
+            requested_capabilities: Vec::new(),
+            native_trusted: true,
             platforms: None,
             build: vec![],
             actions: vec![],
             events: vec![],
             panes: vec![],
             link_handlers: vec![],
+            inspector_tabs: vec![],
             source: PluginSourceInfo {
                 kind: PluginSourceKind::Github,
                 owner: Some(owner.to_string()),
