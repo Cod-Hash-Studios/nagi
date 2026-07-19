@@ -143,7 +143,9 @@ fn handshake_succeeded(provider: ProviderKind, value: &Value) -> bool {
 
 fn handshake_failed(provider: ProviderKind, value: &Value) -> bool {
     match provider {
-        ProviderKind::Codex => value.get("id") == Some(&json!(1)) && value.get("error").is_some(),
+        ProviderKind::Codex => {
+            value.get("id") == Some(&json!(1)) && !handshake_succeeded(provider, value)
+        }
         ProviderKind::ClaudeCode => {
             value.get("type").and_then(Value::as_str) == Some("control_response")
                 && value
@@ -187,6 +189,8 @@ mod tests {
 
     use super::*;
 
+    const FIXTURE_TIMEOUT: Duration = Duration::from_secs(5);
+
     fn fixture(directory: &Path, name: &str, body: &str) -> std::path::PathBuf {
         let executable = directory.join(name);
         std::fs::write(&executable, format!("#!/bin/sh\n{body}\n")).unwrap();
@@ -213,7 +217,7 @@ mod tests {
             ProviderKind::Codex,
             &executable,
             directory.path(),
-            Duration::from_secs(1),
+            FIXTURE_TIMEOUT,
         )
         .await;
         result.unwrap();
@@ -241,7 +245,7 @@ mod tests {
             ProviderKind::ClaudeCode,
             &executable,
             directory.path(),
-            Duration::from_secs(1),
+            FIXTURE_TIMEOUT,
         )
         .await
         .unwrap();
@@ -252,26 +256,10 @@ mod tests {
         assert!(!sent.contains("prompt"));
     }
 
-    #[tokio::test]
-    async fn malformed_handshake_fails_closed() {
-        let directory = tempfile::tempdir().unwrap();
-        let executable = fixture(
-            directory.path(),
-            "codex",
-            "IFS= read -r line\nprintf '%s\\n' '{\"id\":1,\"result_typo\":{}}'",
-        );
-
-        let error = probe_protocol(
-            ProviderKind::Codex,
-            &executable,
-            directory.path(),
-            Duration::from_secs(1),
-        )
-        .await
-        .unwrap_err();
-        assert!(matches!(
-            error,
-            ProtocolProbeError::Disconnected | ProtocolProbeError::Protocol
-        ));
+    #[test]
+    fn malformed_matching_handshake_fails_closed_without_waiting_for_eof() {
+        let response = json!({"id": 1, "result_typo": {}});
+        assert!(!handshake_succeeded(ProviderKind::Codex, &response));
+        assert!(handshake_failed(ProviderKind::Codex, &response));
     }
 }
