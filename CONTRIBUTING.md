@@ -16,6 +16,11 @@ those boundaries deserve a discussion before code.
 Before working on a larger change, comment on the relevant issue or discussion
 so effort is not duplicated.
 
+Changes to provider contracts, plugin capabilities, persisted formats, public
+APIs, or authority boundaries need an RFC before implementation. Follow
+[`docs/rfcs/README.md`](docs/rfcs/README.md) and keep the RFC pull request
+separate from its implementation.
+
 ## What makes a good contribution
 
 - It solves one clear problem.
@@ -43,20 +48,41 @@ cargo build --locked
 If Zig 0.15.2 is not the default binary on your machine, set `ZIG` explicitly
 when running Cargo.
 
+## Architecture boundaries
+
+- `src/server/` is the single writer for durable runtime state.
+- `src/mission/` owns mission journals, recovery, evidence, proof, and handoff.
+- `src/managed_provider/` keeps provider-specific behavior behind adapters.
+- `src/project_recipe/` owns bounded setup, services, resources, and cleanup.
+- `src/app/api/plugins/` and `src/plugin_capabilities.rs` enforce plugin runtime
+  and capability boundaries.
+- `src/api/schema/` is the public socket contract; generated schema changes must
+  be committed with their fixtures and docs.
+- `src/ui/` renders projections and collects local consent. It must not become a
+  second source of mission truth.
+
+Read [`docs/architecture/authority.md`](docs/architecture/authority.md) before
+changing consent, proof, handoff, or persistence. Read
+[`docs/architecture/plugin-security.md`](docs/architecture/plugin-security.md)
+before changing plugins or the marketplace.
+
 ## Before opening a pull request
 
 Run the checks relevant to your change. For a broad Rust change, use:
 
 ```bash
 cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked -- --test-threads=1
-python3 -m unittest \
-  scripts.test_brand_isolation \
-  scripts.test_fork_safety
+python3 -m unittest scripts.test_brand_isolation scripts.test_fork_safety
 bun test src/integration/assets/nagi-agent-state.test.ts
+(cd workers/plugin-marketplace && bun test)
 ```
 
-Explain any skipped check in the pull request.
+UI changes also run `python3 scripts/render_ui_goldens.py`. Runtime-boundary
+changes run `python3 scripts/chaos_runtime.py`. Documentation changes run the
+`release-docs-check` recipe in `justfile`. Explain every skipped check in the
+pull request.
 
 Keep commits atomic and use lowercase Conventional Commit subjects in English:
 
@@ -76,3 +102,6 @@ changes. Do not edit historical changelog entries to rewrite fork history.
 
 Contributions are licensed under `AGPL-3.0-or-later`. Nagi is derived from
 Herdr, and the required attribution is recorded in `FORK.md`.
+
+Participation is governed by [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md), and
+maintainer responsibilities are described in [`GOVERNANCE.md`](GOVERNANCE.md).
