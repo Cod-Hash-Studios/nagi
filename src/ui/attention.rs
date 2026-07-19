@@ -30,7 +30,7 @@ pub(super) fn render_attention_inbox_overlay(app: &AppState, frame: &mut Frame) 
         popup,
         tokens.attention,
         tokens.panel,
-        icons.border_set(),
+        icons.border_set(app.theme_components.border),
     ) else {
         return;
     };
@@ -136,7 +136,15 @@ fn render_list(app: &AppState, frame: &mut Frame, area: Rect, tokens: UiTokens, 
             area.width,
             row_height,
         );
-        render_row(frame, rect, item, index == selected, tokens, icons);
+        render_row(
+            frame,
+            rect,
+            item,
+            index == selected,
+            tokens,
+            icons,
+            app.theme_components.selection,
+        );
     }
 }
 
@@ -147,12 +155,13 @@ fn render_row(
     selected: bool,
     tokens: UiTokens,
     icons: IconSet,
+    selection: crate::theme::manifest::ThemeSelectionStyle,
 ) {
     frame.render_widget(Clear, area);
     let (risk, risk_color) = risk_label(item.risk, tokens);
     let state = state_label(&item.state);
     let first = Line::from(vec![
-        focus_rail::span(selected, tokens, icons),
+        focus_rail::span(selected, tokens, icons, selection),
         Span::raw(" "),
         Span::styled(
             format!("{risk:<8} "),
@@ -184,7 +193,10 @@ fn render_row(
             ),
         ]));
     }
-    frame.render_widget(Paragraph::new(lines), area);
+    frame.render_widget(
+        Paragraph::new(lines).style(focus_rail::row_style(selected, tokens, selection)),
+        area,
+    );
 }
 
 fn render_detail(app: &AppState, frame: &mut Frame, area: Rect, tokens: UiTokens, icons: IconSet) {

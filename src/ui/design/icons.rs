@@ -14,19 +14,30 @@ impl From<crate::config::UiIconStyleConfig> for IconSet {
 }
 
 impl IconSet {
-    pub(crate) fn border_set(self) -> ratatui::symbols::border::Set<'static> {
-        match self {
-            Self::Unicode => ratatui::symbols::border::ROUNDED,
-            Self::Ascii => ratatui::symbols::border::Set {
-                top_left: "+",
-                top_right: "+",
-                bottom_left: "+",
-                bottom_right: "+",
-                vertical_left: "|",
-                vertical_right: "|",
-                horizontal_top: "-",
-                horizontal_bottom: "-",
-            },
+    pub(crate) fn border_set(
+        self,
+        preference: crate::theme::manifest::ThemeBorderStyle,
+    ) -> ratatui::symbols::border::Set<'static> {
+        match (self, preference) {
+            (Self::Unicode, crate::theme::manifest::ThemeBorderStyle::Soft)
+            | (Self::Unicode, crate::theme::manifest::ThemeBorderStyle::Rounded) => {
+                ratatui::symbols::border::ROUNDED
+            }
+            (Self::Unicode, crate::theme::manifest::ThemeBorderStyle::Plain) => {
+                ratatui::symbols::border::PLAIN
+            }
+            (Self::Unicode, crate::theme::manifest::ThemeBorderStyle::Ascii) | (Self::Ascii, _) => {
+                ratatui::symbols::border::Set {
+                    top_left: "+",
+                    top_right: "+",
+                    bottom_left: "+",
+                    bottom_right: "+",
+                    vertical_left: "|",
+                    vertical_right: "|",
+                    horizontal_top: "-",
+                    horizontal_bottom: "-",
+                }
+            }
         }
     }
 }
@@ -100,11 +111,45 @@ mod tests {
             assert!(!icon.label().is_empty());
         }
         for symbol in [
-            IconSet::Ascii.border_set().top_left,
-            IconSet::Ascii.border_set().vertical_left,
-            IconSet::Ascii.border_set().horizontal_top,
+            IconSet::Ascii
+                .border_set(crate::theme::manifest::ThemeBorderStyle::Soft)
+                .top_left,
+            IconSet::Ascii
+                .border_set(crate::theme::manifest::ThemeBorderStyle::Soft)
+                .vertical_left,
+            IconSet::Ascii
+                .border_set(crate::theme::manifest::ThemeBorderStyle::Soft)
+                .horizontal_top,
         ] {
             assert!(symbol.is_ascii());
         }
+    }
+
+    #[test]
+    fn theme_border_preferences_select_requested_glyphs() {
+        use crate::theme::manifest::ThemeBorderStyle;
+
+        assert_eq!(
+            IconSet::Unicode.border_set(ThemeBorderStyle::Soft).top_left,
+            "╭"
+        );
+        assert_eq!(
+            IconSet::Unicode
+                .border_set(ThemeBorderStyle::Plain)
+                .top_left,
+            "┌"
+        );
+        assert_eq!(
+            IconSet::Unicode
+                .border_set(ThemeBorderStyle::Ascii)
+                .top_left,
+            "+"
+        );
+        assert_eq!(
+            IconSet::Ascii
+                .border_set(ThemeBorderStyle::Rounded)
+                .top_left,
+            "+"
+        );
     }
 }

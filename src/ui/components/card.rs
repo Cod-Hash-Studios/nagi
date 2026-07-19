@@ -20,13 +20,14 @@ pub(crate) fn render(
     card: Card<'_>,
     tokens: UiTokens,
     icons: IconSet,
+    border_style: crate::theme::manifest::ThemeBorderStyle,
 ) {
     if area.width < 3 || area.height < 3 {
         return;
     }
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_set(icons.border_set())
+        .border_set(icons.border_set(border_style))
         .border_style(Style::default().fg(if card.selected {
             tokens.focus
         } else {

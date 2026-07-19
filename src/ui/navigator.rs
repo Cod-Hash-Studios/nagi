@@ -44,7 +44,7 @@ pub(super) fn render_navigator_overlay(
         popup,
         tokens.focus,
         tokens.panel,
-        icons.border_set(),
+        icons.border_set(app.theme_components.border),
     ) else {
         return;
     };
@@ -208,7 +208,7 @@ fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
             &mut spans,
             crate::detect::AgentState::Blocked,
             true,
-            app.spinner_tick,
+            app.visual_motion_tick(),
             "blocked",
             app,
         ),
@@ -216,7 +216,7 @@ fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
             &mut spans,
             crate::detect::AgentState::Working,
             true,
-            app.spinner_tick,
+            app.visual_motion_tick(),
             "working",
             app,
         ),
@@ -224,7 +224,7 @@ fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
             &mut spans,
             crate::detect::AgentState::Idle,
             true,
-            app.spinner_tick,
+            app.visual_motion_tick(),
             "idle",
             app,
         ),
@@ -232,7 +232,7 @@ fn render_search(app: &AppState, frame: &mut Frame, area: Rect) {
             &mut spans,
             crate::detect::AgentState::Idle,
             false,
-            app.spinner_tick,
+            app.visual_motion_tick(),
             "done",
             app,
         ),
@@ -354,7 +354,11 @@ fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow,
     } else {
         SurfaceKind::Panel
     };
-    let base_style = surface::style(tokens, surface_kind);
+    let base_style = surface::style(tokens, surface_kind).patch(focus_rail::row_style(
+        selected,
+        tokens,
+        app.theme_components.selection,
+    ));
     let row_background = base_style.bg.unwrap_or(tokens.panel);
     let dim_style = Style::default().fg(tokens.text_muted).bg(row_background);
     let text_style = if selected {
@@ -368,7 +372,7 @@ fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow,
         Style::default().fg(tokens.text_muted).bg(row_background)
     };
     let (status_icon, status_style) =
-        agent_icon_with_set(row.status, row.seen, app.spinner_tick, p, icons);
+        agent_icon_with_set(row.status, row.seen, app.visual_motion_tick(), p, icons);
     let status_style = status_style.bg(row_background);
 
     let prefix = if row.is_workspace {
@@ -403,7 +407,7 @@ fn render_row(app: &AppState, frame: &mut Frame, rect: Rect, row: &NavigatorRow,
     let title = truncate_end(&row.label, left_budget);
 
     let spans = vec![
-        focus_rail::span(selected, tokens, icons),
+        focus_rail::span(selected, tokens, icons, app.theme_components.selection),
         Span::styled(navigation_prefix, dim_style),
         Span::styled(status_icon, status_style),
         Span::raw(" "),
@@ -522,6 +526,7 @@ fn render_detail(
             },
             tokens,
             IconSet::from(app.icon_style),
+            app.theme_components.border,
         );
         return;
     }
@@ -583,8 +588,13 @@ fn compact_detail_line(app: &AppState, row: &NavigatorRow, width: u16) -> Line<'
             )
         }
         _ => {
-            let (icon, style) =
-                agent_icon_with_set(row.status, row.seen, app.spinner_tick, &app.palette, icons);
+            let (icon, style) = agent_icon_with_set(
+                row.status,
+                row.seen,
+                app.visual_motion_tick(),
+                &app.palette,
+                icons,
+            );
             (
                 vec![
                     Span::styled(icon, style.add_modifier(Modifier::BOLD)),
@@ -675,7 +685,7 @@ fn render_inspector(
         (crate::detect::AgentState::Working, _) => vec![
             skeleton::line(
                 area.width.saturating_sub(4),
-                app.spinner_tick,
+                app.visual_motion_tick(),
                 tokens,
                 icons,
             ),

@@ -54,6 +54,7 @@ mod tests {
                 },
                 tokens,
                 IconSet::Ascii,
+                crate::theme::manifest::ThemeBorderStyle::Soft,
             );
             inspector::render(
                 frame,
@@ -97,6 +98,7 @@ mod tests {
                 },
                 tokens,
                 IconSet::Unicode,
+                crate::theme::manifest::ThemeBorderStyle::Soft,
             );
             inspector::render(
                 frame,

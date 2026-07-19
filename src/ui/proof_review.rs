@@ -27,7 +27,7 @@ pub(super) fn render_proof_review_overlay(app: &AppState, frame: &mut Frame) {
         popup,
         tokens.focus,
         tokens.panel,
-        icons.border_set(),
+        icons.border_set(app.theme_components.border),
     ) else {
         return;
     };
@@ -188,7 +188,7 @@ fn render_checks(
         let (label, color) = check_status(check.status, tokens);
         frame.render_widget(
             Paragraph::new(Line::from(vec![
-                focus_rail::span(selected_row, tokens, icons),
+                focus_rail::span(selected_row, tokens, icons, app.theme_components.selection),
                 Span::raw(" "),
                 Span::styled(format!("{label:<10}"), Style::default().fg(color)),
                 Span::styled(
@@ -209,7 +209,12 @@ fn render_checks(
                     },
                     Style::default().fg(tokens.text_muted),
                 ),
-            ])),
+            ]))
+            .style(focus_rail::row_style(
+                selected_row,
+                tokens,
+                app.theme_components.selection,
+            )),
             row,
         );
     }

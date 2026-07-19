@@ -27,7 +27,7 @@ pub(super) fn render_new_mission_overlay(app: &AppState, frame: &mut Frame) {
         popup,
         tokens.focus,
         tokens.panel,
-        icons.border_set(),
+        icons.border_set(app.theme_components.border),
     ) else {
         return;
     };

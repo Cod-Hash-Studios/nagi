@@ -1729,6 +1729,13 @@ pub struct AppState {
 }
 
 impl AppState {
+    pub(crate) fn visual_motion_tick(&self) -> u32 {
+        match self.theme_components.motion {
+            crate::theme::manifest::ThemeMotion::None => 0,
+            crate::theme::manifest::ThemeMotion::Subtle => self.spinner_tick,
+        }
+    }
+
     pub(crate) fn mark_session_dirty(&mut self) {
         self.session_dirty = true;
     }
@@ -2559,6 +2566,16 @@ mod tests {
                 "theme should resolve: {name}"
             );
         }
+    }
+
+    #[test]
+    fn theme_motion_none_freezes_visual_ticks() {
+        let mut state = AppState::test_new();
+        state.spinner_tick = 17;
+
+        assert_eq!(state.visual_motion_tick(), 17);
+        state.theme_components.motion = crate::theme::manifest::ThemeMotion::None;
+        assert_eq!(state.visual_motion_tick(), 0);
     }
 
     #[test]

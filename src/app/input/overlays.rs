@@ -319,8 +319,14 @@ impl AppState {
 
     pub(crate) fn navigator_popup_rect(&self) -> Rect {
         let area = self.onboarding_full_area();
-        let margin_x = (area.width / 16).max(2);
-        let margin_y = (area.height / 10).max(1);
+        let (margin_x, margin_y) = match self.theme_components.density {
+            crate::theme::manifest::ThemeDensity::Comfortable => {
+                ((area.width / 16).max(2), (area.height / 10).max(1))
+            }
+            crate::theme::manifest::ThemeDensity::Compact => {
+                ((area.width / 32).max(1), (area.height / 20).max(1))
+            }
+        };
         let width = area.width.saturating_sub(margin_x.saturating_mul(2));
         let height = area.height.saturating_sub(margin_y.saturating_mul(2));
         Rect::new(
@@ -869,6 +875,21 @@ mod tests {
             assert!(detail.x > body.x.saturating_add(body.width));
             assert_eq!(detail.y, app.state.navigator_search_rect().y);
         }
+    }
+
+    #[test]
+    fn compact_theme_density_expands_the_cockpit_working_area() {
+        let mut app = app_for_mouse_test();
+        set_terminal_size(&mut app, 120, 32);
+        let comfortable = app.state.navigator_popup_rect();
+
+        app.state.theme_components.density = crate::theme::manifest::ThemeDensity::Compact;
+        let compact = app.state.navigator_popup_rect();
+
+        assert!(compact.width > comfortable.width);
+        assert!(compact.height > comfortable.height);
+        assert!(compact.x < comfortable.x);
+        assert!(compact.y < comfortable.y);
     }
 
     #[test]

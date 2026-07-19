@@ -85,7 +85,7 @@ pub(crate) fn render_command_palette_overlay(app: &AppState, frame: &mut Frame) 
         popup,
         tokens.focus,
         tokens.panel,
-        icons.border_set(),
+        icons.border_set(app.theme_components.border),
     ) else {
         return;
     };
@@ -207,6 +207,7 @@ fn render_commands(
             selected,
             tokens,
             icons,
+            app.theme_components.selection,
         );
     }
 }
@@ -218,6 +219,7 @@ fn render_command(
     selected: bool,
     tokens: UiTokens,
     icons: IconSet,
+    selection: crate::theme::manifest::ThemeSelectionStyle,
 ) {
     if area.width < 4 || area.height < 2 {
         return;
@@ -241,7 +243,7 @@ fn render_command(
             Modifier::empty()
         });
     let title_line = Line::from(vec![
-        focus_rail::span(selected, tokens, icons),
+        focus_rail::span(selected, tokens, icons, selection),
         Span::raw(" "),
         Span::styled(title, main_style),
         Span::raw(" ".repeat(gap)),
@@ -267,7 +269,8 @@ fn render_command(
                     detail_style,
                 ),
             ]),
-        ]),
+        ])
+        .style(focus_rail::row_style(selected, tokens, selection)),
         area,
     );
 }
