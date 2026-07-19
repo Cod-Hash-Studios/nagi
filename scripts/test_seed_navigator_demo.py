@@ -23,16 +23,19 @@ class SeedNavigatorDemoTests(unittest.TestCase):
 
         self.bin_dir = self.root / "bin"
         self.bin_dir.mkdir()
-        dirname = shutil.which("dirname")
-        if dirname is None:
-            self.fail("dirname is required to run the demo script tests")
-        (self.bin_dir / "dirname").symlink_to(dirname)
+        for command in ("cat", "dirname"):
+            executable = shutil.which(command)
+            if executable is None:
+                self.fail(f"{command} is required to run the demo script tests")
+            (self.bin_dir / command).symlink_to(executable)
 
     def tearDown(self) -> None:
         self.server.close()
         self.temp_dir.cleanup()
 
-    def run_script(self, socket_path: Path) -> subprocess.CompletedProcess[str]:
+    def run_script(
+        self, socket_path: Path, extra_env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env.update(
             {
@@ -42,6 +45,8 @@ class SeedNavigatorDemoTests(unittest.TestCase):
                 "NAGI_NAV_SOCKET_PATH": str(socket_path),
             }
         )
+        if extra_env is not None:
+            env.update(extra_env)
         return subprocess.run(
             ["/bin/bash", str(SCRIPT)],
             cwd=ROOT,
@@ -80,6 +85,44 @@ class SeedNavigatorDemoTests(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("required command not found: jq", result.stderr)
+
+    def test_demo_coding_provider_states_only_name_codex_and_claude(self) -> None:
+        dev_socket = self.config_home / "nagi-dev" / "nagi.sock"
+        dev_socket.parent.mkdir(parents=True)
+        dev_server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(dev_server.close)
+        dev_server.bind(str(dev_socket))
+
+        jq = self.bin_dir / "jq"
+        jq.write_text(
+            "#!/bin/sh\n"
+            "case \"$*\" in\n"
+            "  *workspace.workspace_id*) echo 'workspace pane tab' ;;\n"
+            "  *result.tab.tab_id*) echo 'tab pane' ;;\n"
+            "  *) echo 'pane' ;;\n"
+            "esac\n"
+        )
+        jq.chmod(0o755)
+
+        call_log = self.root / "nagi-calls.log"
+        fake_nagi = self.bin_dir / "nagi"
+        fake_nagi.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$NAGI_FAKE_LOG"\n')
+        fake_nagi.chmod(0o755)
+
+        result = self.run_script(
+            dev_socket,
+            {
+                "NAGI_NAV_BIN": str(fake_nagi),
+                "NAGI_FAKE_LOG": str(call_log),
+            },
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        calls = call_log.read_text()
+        self.assertIn("--agent codex", calls)
+        self.assertIn("--agent claude", calls)
+        self.assertNotIn("--agent pi", calls)
+        self.assertNotIn("--agent hermes", calls)
 
 
 if __name__ == "__main__":

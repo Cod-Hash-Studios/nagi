@@ -127,16 +127,16 @@ report "$API_CLAUDE" claude working "refactor api" 1
 report "$API_SHELL" shell idle ready 1
 report "$API_LOGS" deploy working "tail logs" 1
 
-read WEB_WS WEB_PI WEB_TAB < <(mkws web)
+read WEB_WS WEB_BUILD WEB_TAB < <(mkws web)
 run tab rename "$WEB_TAB" agents >/dev/null
-WEB_CLAUDE="$(split "$WEB_PI" down)"
-WEB_CODEX="$(split "$WEB_PI" right)"
+WEB_CLAUDE="$(split "$WEB_BUILD" down)"
+WEB_CODEX="$(split "$WEB_BUILD" right)"
 read WEB_PREVIEW_TAB WEB_PREVIEW < <(mktab "$WEB_WS" preview)
-rename_sparse "$WEB_PI" "pi ui build"
+rename_sparse "$WEB_BUILD" "claude ui build"
 rename_sparse "$WEB_CODEX" "codex css review"
 rename_sparse "$WEB_CLAUDE" "claude approval"
 rename_sparse "$WEB_PREVIEW" "preview server"
-report "$WEB_PI" pi working "build ui" 1
+report "$WEB_BUILD" claude working "build ui" 1
 report "$WEB_CLAUDE" claude blocked "tool approval" 1
 report "$WEB_PREVIEW" server idle "preview ready" 1
 report "$WEB_CODEX" codex working "css pass" 1
@@ -149,12 +149,12 @@ rename_sparse "$DOCS_COPY" "codex release copy"
 report "$DOCS_COPY" codex working "release copy" 1
 report "$DOCS_NOTES" codex working "checking notes" 1
 
-read INFRA_WS INFRA_HERMES INFRA_TAB < <(mkws infra)
+read INFRA_WS INFRA_CLAUDE INFRA_TAB < <(mkws infra)
 run tab rename "$INFRA_TAB" ops >/dev/null
-INFRA_SSH="$(split "$INFRA_HERMES" right)"
-rename_sparse "$INFRA_HERMES" "hermes ssh prompt"
+INFRA_SSH="$(split "$INFRA_CLAUDE" right)"
+rename_sparse "$INFRA_CLAUDE" "claude ssh prompt"
 rename_sparse "$INFRA_SSH" "ssh monitor"
-report "$INFRA_HERMES" hermes blocked "ssh prompt" 1
+report "$INFRA_CLAUDE" claude blocked "ssh prompt" 1
 report "$INFRA_SSH" ssh idle connected 1
 
 run workspace focus "$API_WS" >/dev/null
@@ -166,9 +166,9 @@ Seeded agent cockpit demo data via $NAGI_SOCKET_PATH
 
 Workspaces:
   $API_WS api     agents: blocked codex, working claude, idle shell; logs: working deploy
-  $WEB_WS web     agents: working pi, done codex, blocked claude; preview: idle server
+  $WEB_WS web     agents: working claude, done codex, blocked claude; preview: idle server
   $DOCS_WS docs   release: done codex, working codex
-  $INFRA_WS infra ops: blocked hermes, idle ssh
+  $INFRA_WS infra ops: blocked claude, idle ssh
 
 Open the cockpit with Ctrl+B, then G. Filter with b, w, i, d, a, or search with /.
 EOF

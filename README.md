@@ -129,8 +129,8 @@ cargo run
 
 Open the cockpit with `Ctrl+B`, then `G`. Use `b`, `w`, `i`, `d`, and `a` to
 filter by state. The script inserts simulated status data into real Nagi
-workspaces and panes, and refuses to touch the main socket unless explicitly
-allowed.
+workspaces and panes, features only Codex and Claude as coding providers, and
+refuses to touch the main socket unless explicitly allowed.
 
 ## API
 
