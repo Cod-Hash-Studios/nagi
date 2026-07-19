@@ -3,7 +3,7 @@
 # theme: custom-ume
 # size: 120x32
 # palette: Palette { accent: Rgb(214, 107, 143), panel_bg: Rgb(23, 19, 27), surface0: Rgb(48, 36, 50), surface1: Rgb(71, 49, 72), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(255, 244, 237), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(143, 207, 155), yellow: Rgb(239, 196, 107), red: Rgb(240, 112, 120), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
-# style-sha256: 4acb2f42df26226f47af58c4a3591f2c1e3a9f07d424bcf754c35d7268126c9b
+# style-sha256: 00ef48ece8f6d12874487b20f4b6ba54c239b4676fa5dd40a32464ca16447373
 # ---
  spaces                  │ 1       +
                          │
@@ -26,12 +26,12 @@
        │                                                                                                        │
        │                                                                                                        │
        │                                                                                                        │
-       │                                                                                                        │
-       │                                                                                                        │
        │SELECTED EVIDENCE  ─                                                                                    │
-       │Workspace  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc                             │
-       │Artifacts  1   Recorded  110                                                                            │
-       │                                                                                                        │
+       │Command log  exit 0 · 1.24 s                                                                            │
+       │Artifacts    2 captured                                                                                 │
+       │Recorded     2026-07-20 09:42 UTC                                                                       │
+       │Workspace    cccccccc…cccccccc                                                                          │
+       │Proof pack   eeeeeeee…eeeeeeee                                                                          │
        │j/k select  c recheck + close  esc mission                                                              │
        ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                          │

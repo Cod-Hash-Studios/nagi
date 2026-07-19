@@ -3,7 +3,7 @@
 # theme: nagi-night
 # size: 200x48
 # palette: Palette { accent: Rgb(121, 167, 216), panel_bg: Rgb(16, 22, 31), surface0: Rgb(25, 36, 52), surface1: Rgb(43, 58, 78), surface_dim: Rgb(12, 17, 24), overlay0: Rgb(154, 164, 175), overlay1: Rgb(184, 191, 199), text: Rgb(243, 235, 221), subtext0: Rgb(168, 176, 185), mauve: Rgb(184, 160, 201), green: Rgb(126, 185, 154), yellow: Rgb(212, 180, 106), red: Rgb(230, 101, 90), blue: Rgb(110, 159, 209), teal: Rgb(114, 201, 187), peach: Rgb(213, 161, 91) }
-# style-sha256: cf10ef4fc3234ebe1f5a1ec333bb4054e245e3b5240282563a682faf7e4e7239
+# style-sha256: b3af8befd51412c83a544d7afeacdc00115c72b6b77828c0cdd08f2c34f3731f
 # ---
  spaces                  │ 1       +
                          │
@@ -41,12 +41,12 @@
             │                                                                                                                                                                              │
             │                                                                                                                                                                              │
             │                                                                                                                                                                              │
-            │                                                                                                                                                                              │
-            │                                                                                                                                                                              │
             │SELECTED EVIDENCE  ─                                                                                                                                                          │
-            │Workspace  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc                                                                                                   │
-            │Artifacts  1   Recorded  110                                                                                                                                                  │
-            │                                                                                                                                                                              │
+            │Command log  exit 0 · 1.24 s                                                                                                                                                  │
+            │Artifacts    2 captured                                                                                                                                                       │
+            │Recorded     2026-07-20 09:42 UTC                                                                                                                                             │
+            │Workspace    cccccccc…cccccccc                                                                                                                                                │
+            │Proof pack   eeeeeeee…eeeeeeee                                                                                                                                                │
             │j/k select  c recheck + close  esc mission                                                                                                                                    │
             ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                          │

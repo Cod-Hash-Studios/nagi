@@ -3,7 +3,7 @@
 # theme: terminal-16
 # size: 80x24
 # palette: Palette { accent: Blue, panel_bg: Reset, surface0: Reset, surface1: DarkGray, surface_dim: DarkGray, overlay0: Gray, overlay1: White, text: Reset, subtext0: Gray, mauve: Gray, green: Green, yellow: Yellow, red: LightRed, blue: Blue, teal: Cyan, peach: Yellow }
-# style-sha256: 4b41d33e6c30778cc85311004bd89c15442291fe984fc9657f86ac31dc18002e
+# style-sha256: 0030aa4d4451fe5bb7df93567fd6606f6376858886b40d99d670034dad5a9d93
 # ---
  spaces                  │ 1       +
                          │
@@ -19,12 +19,12 @@
  new |                                                                    |
 ─────|                                                                    |
  agen|                                                                    |
-     |                                                                    |
-     |                                                                    |
      |SELECTED EVIDENCE  -                                                |
-     |Workspace  ccccccccccccccccccccccccccc…cccccccccccccccccccccccccccc |
-     |Artifacts  1   Recorded  110                                        |
-     |                                                                    |
+     |Command log  exit 0 · 1.24 s                                        |
+     |Artifacts    2 captured                                             |
+     |Recorded     2026-07-20 09:42 UTC                                   |
+     |Workspace    cccccccc…cccccccc                                      |
+     |Proof pack   eeeeeeee…eeeeeeee                                      |
      |j/k select  c recheck + close  esc mission                          |
      +--------------------------------------------------------------------+
                          │
