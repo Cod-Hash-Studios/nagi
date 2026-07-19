@@ -252,6 +252,33 @@ yellow = "#f9e2af"
 
 Color values accept hex, named colors, `rgb(r,g,b)`, or reset aliases like `reset`, `default`, `none`, and `transparent`.
 
+A custom theme is a strict TOML file in the `themes/` directory beside
+`config.toml`. Its filename is the theme id. For example,
+`themes/quiet-focus.toml` is selected with `name = "quiet-focus"`.
+
+Besides semantic colors, themes can change the cockpit's component behavior:
+
+```toml
+[components]
+border = "plain"          # soft, rounded, plain, or ascii
+selection = "fill"        # rail or fill
+density = "compact"       # compact or comfortable
+motion = "none"           # none or subtle
+```
+
+`density = "compact"` gives the cockpit more working area. `motion = "none"`
+freezes spinners while keeping text state labels intact. These preferences
+follow manual selection, live config reload, and automatic light/dark switching.
+Invalid names, unknown fields, unsupported values, and low-contrast color
+combinations fail closed while the last valid theme stays active.
+
+Importing a Ghostty theme creates a safe color-only Nagi theme with conservative
+component defaults:
+
+```bash
+nagi config import-ghostty-theme /path/to/ghostty-theme --name quiet-focus
+```
+
 ## UI and sidebar
 
 The sidebar is the main Nagi dashboard. Search `ui.` in the [Config reference](/docs/config-reference/) for sizing, collapsed mode, Agent panel ordering, mouse behavior, pane borders, and other presentation settings.
