@@ -64,17 +64,20 @@ and the public release security gates are not finished.
 
 ## Agent compatibility
 
-| Agent | Runs in Nagi | Managed mission path |
-|---|:---:|---|
-| Codex | yes | guided local launch, read-only socket launch |
-| Claude Code | yes | guided local launch, read-only socket launch |
-| OpenCode | yes | guided local launch, read-only socket launch |
-| Any local ACP agent | yes | guided local launch after explicit write consent |
+| Agent | Runs in Nagi | Managed mission path | Tested version |
+|---|:---:|---|---:|
+| Codex | yes | guided local launch, read-only socket launch | `0.144.5` |
+| Claude Code | yes | guided local launch, read-only socket launch | `2.1.212` |
+| OpenCode | yes | guided local launch, read-only socket launch | `1.18.3` |
+| Any local ACP agent | yes | guided local launch after explicit write consent | contract v1 |
 
 Any terminal program can run in a pane. Managed launches add a mission contract,
 an isolated worktree, durable attention, and proof. The public socket cannot
 approve workspace writes or answer permission prompts: those decisions stay
-with the human in the local TUI.
+with the human in the local TUI. `nagi doctor` reports an installed provider as
+ready only when its version matches the tested managed runtime above. Other
+versions still run as ordinary terminal processes, but are not advertised as a
+supported managed mission path.
 
 ## Build from source
 
