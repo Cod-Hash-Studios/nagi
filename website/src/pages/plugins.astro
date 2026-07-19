@@ -1,25 +1,110 @@
 ---
 import MarketingLayout from '../components/MarketingLayout.astro';
+
+const plugins = [
+  {
+    id: 'nagi.github-lifecycle',
+    name: 'GitHub PR + CI',
+    description: 'Turns mission checks and evidence into one calm PR and CI lifecycle view.',
+    capability: 'mission.read',
+    path: 'github-lifecycle',
+    mark: 'GH',
+  },
+  {
+    id: 'nagi.dev-services',
+    name: 'Local dev services',
+    description: 'Shows declared services and preview URLs without starting unapproved processes.',
+    capability: 'mission.read · workspace.read',
+    path: 'dev-services',
+    mark: '↗',
+  },
+  {
+    id: 'nagi.evidence-exporter',
+    name: 'Evidence exporter',
+    description: 'Exports portable mission proof as readable Markdown and structured JSON.',
+    capability: 'mission.read · workspace.write',
+    path: 'evidence-exporter',
+    mark: '✓',
+  },
+];
 ---
 
 <MarketingLayout
-  title="Nagi plugins"
-  description="The Nagi plugin registry is being rebuilt under the Nagi trust model."
+  title="Nagi plugins · small powers, explicit trust"
+  description="Official and metadata-verified Nagi plugins with immutable source, visible capabilities, scans, and revocable grants."
   canonicalPath="/plugins/"
 >
-  <main class="plugins-page">
-    <section class="section plugins-hero">
-      <p class="section-kicker"># plugins</p>
-      <h2>Local plugins work. The public registry comes later.</h2>
-      <p class="plugins-lede">
-        Nagi keeps the inherited local plugin engine, but it does not claim an
-        upstream marketplace or list unverified repositories as Nagi plugins.
-      </p>
-      <p class="plugins-trust">
-        Read the <a href="/nagi/docs/plugins/">local plugin documentation</a>, or
-        follow registry work on
-        <a href="https://github.com/Cod-Hash-Studios/nagi/issues">GitHub</a>.
-      </p>
+  <main class="registry-page">
+    <section class="registry-hero section">
+      <div class="registry-hero-copy">
+        <p class="section-kicker"># plugin registry · preview</p>
+        <h1>Small powers.<br /><em>Explicit trust.</em></h1>
+        <p class="registry-lede">
+          Extend the cockpit without handing over your machine. Every listed version is
+          pinned, scanned, and honest about the authority it asks for.
+        </p>
+        <div class="registry-actions">
+          <a class="button button-primary" href="/nagi/docs/plugins/">Build a plugin</a>
+          <a class="registry-text-link" href="https://github.com/Cod-Hash-Studios/nagi/issues/new">Submit yours ↗</a>
+        </div>
+      </div>
+      <div class="registry-proof" aria-label="Registry trust pipeline">
+        <div class="registry-proof-head"><span>registry check</span><span class="proof-live">● live</span></div>
+        <ol>
+          <li><span>01</span><strong>Immutable commit</strong><b>pass</b></li>
+          <li><span>02</span><strong>Manifest v2</strong><b>pass</b></li>
+          <li><span>03</span><strong>WASI sandbox</strong><b>pass</b></li>
+          <li><span>04</span><strong>Secret + artifact scan</strong><b>pass</b></li>
+        </ol>
+        <p>Stars are shown as popularity, never as trust.</p>
+      </div>
+    </section>
+
+    <section class="registry-catalog section" aria-labelledby="official-plugins">
+      <div class="registry-section-head">
+        <div>
+          <p class="section-kicker">Official collection</p>
+          <h2 id="official-plugins">Useful on day one.</h2>
+        </div>
+        <p>Three narrow plugins. No mystery permissions. No native runtime.</p>
+      </div>
+      <div class="registry-grid">
+        {plugins.map((plugin) => (
+          <article class="registry-card">
+            <div class="registry-card-top">
+              <span class="registry-mark" aria-hidden="true">{plugin.mark}</span>
+              <span class="registry-badge">official</span>
+            </div>
+            <div>
+              <p class="registry-id">{plugin.id}</p>
+              <h3>{plugin.name}</h3>
+              <p class="registry-description">{plugin.description}</p>
+            </div>
+            <div class="registry-card-foot">
+              <span class="registry-cap">{plugin.capability}</span>
+              <code>nagi plugin install Cod-Hash-Studios/nagi/examples/plugins/{plugin.path}</code>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    <section class="registry-contract section">
+      <p class="section-kicker">What “listed” means</p>
+      <div class="registry-contract-grid">
+        <h2>A directory that refuses to cosplay as a security audit.</h2>
+        <div class="registry-contract-copy">
+          <p>
+            <strong>Official</strong> means maintained with Nagi. <strong>Verified metadata</strong>
+            means the version, checksum, runtime and automated scans were reproduced by the registry.
+            It does not mean a human reviewed every line.
+          </p>
+          <p>
+            Capability changes stay visible and disable the plugin until you approve the new grant.
+            Reports can emergency-disable a repository without rewriting the last good snapshot.
+          </p>
+        </div>
+      </div>
     </section>
   </main>
 </MarketingLayout>
