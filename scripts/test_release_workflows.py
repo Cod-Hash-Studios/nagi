@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE = ROOT / ".github" / "workflows" / "release.yml"
 SECURITY = ROOT / ".github" / "workflows" / "security.yml"
+CI = ROOT / ".github" / "workflows" / "ci.yml"
 AUDIT_POLICY = ROOT / ".cargo" / "audit.toml"
 
 
@@ -12,6 +13,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.workflow = RELEASE.read_text(encoding="utf-8")
         self.security_workflow = SECURITY.read_text(encoding="utf-8")
+        self.ci_workflow = CI.read_text(encoding="utf-8")
+
+    def test_supported_unix_platforms_run_the_complete_nextest_suite(self) -> None:
+        self.assertGreaterEqual(self.ci_workflow.count("nextest_filter: all()"), 2)
+        self.assertNotIn("not binary(live_handoff)", self.ci_workflow)
 
     def test_cross_builds_install_the_required_platform_toolchains(self) -> None:
         self.assertIn("Install Linux build tools", self.workflow)
