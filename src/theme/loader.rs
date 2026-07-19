@@ -3,7 +3,7 @@ use std::path::Path;
 
 use ratatui::style::Color;
 
-use super::manifest::{ThemeAppearance, ThemeManifestV1};
+use super::manifest::{ThemeAppearance, ThemeComponents, ThemeManifestV1};
 use crate::app::state::Palette;
 
 const MAX_THEME_BYTES: u64 = 64 * 1024;
@@ -13,6 +13,7 @@ pub(crate) struct LoadedTheme {
     pub name: String,
     pub appearance: ThemeAppearance,
     pub palette: Palette,
+    pub components: ThemeComponents,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,6 +140,7 @@ pub(crate) fn load_manifest_str(
     Ok(LoadedTheme {
         name: manifest.meta.name,
         appearance: manifest.meta.appearance,
+        components: manifest.components.into(),
         palette: Palette {
             accent: focus,
             panel_bg: canvas,
@@ -407,6 +409,7 @@ pub(crate) fn import_ghostty_color_source(
         theme: LoadedTheme {
             name: name.to_string(),
             appearance,
+            components: ThemeComponents::default(),
             palette: Palette {
                 accent: focus,
                 panel_bg: background,
@@ -486,10 +489,10 @@ done = "done"
 caution = "caution"
 
 [components]
-border = "soft"
-selection = "rail"
-density = "comfortable"
-motion = "subtle"
+border = "{}"
+selection = "{}"
+density = "{}"
+motion = "{}"
 "#,
         color("canvas", palette.panel_bg)?,
         color("panel", palette.surface0)?,
@@ -507,6 +510,10 @@ motion = "subtle"
         color("special", palette.mauve)?,
         color("done", palette.green)?,
         color("caution", palette.yellow)?,
+        theme.components.border.as_str(),
+        theme.components.selection.as_str(),
+        theme.components.density.as_str(),
+        theme.components.motion.as_str(),
     ))
 }
 
@@ -550,37 +557,6 @@ fn validate_manifest(manifest: &ThemeManifestV1, source_name: &str) -> Result<()
             source_name,
             "theme meta.name must contain 1 to 64 printable characters",
         ));
-    }
-    for (field, value, allowed) in [
-        (
-            "components.border",
-            manifest.components.border.as_deref(),
-            &["soft", "rounded", "plain", "ascii"][..],
-        ),
-        (
-            "components.selection",
-            manifest.components.selection.as_deref(),
-            &["rail", "fill"][..],
-        ),
-        (
-            "components.density",
-            manifest.components.density.as_deref(),
-            &["compact", "comfortable"][..],
-        ),
-        (
-            "components.motion",
-            manifest.components.motion.as_deref(),
-            &["none", "subtle"][..],
-        ),
-    ] {
-        if let Some(value) = value {
-            if !allowed.contains(&value) {
-                return Err(ThemeLoadError::new(
-                    source_name,
-                    format!("invalid {field} value '{value}'"),
-                ));
-            }
-        }
     }
     Ok(())
 }
@@ -781,6 +757,23 @@ proof_stale = "amber"
         assert_eq!(loaded.palette.text, Color::Rgb(245, 240, 232));
         assert_eq!(loaded.palette.accent, Color::Rgb(124, 168, 216));
         assert_eq!(loaded.palette.teal, Color::Rgb(120, 204, 185));
+    }
+
+    #[test]
+    fn custom_theme_preserves_typed_component_preferences() {
+        use crate::theme::manifest::{
+            ThemeBorderStyle, ThemeDensity, ThemeMotion, ThemeSelectionStyle,
+        };
+
+        let source = format!(
+            "{VALID_THEME}\n[components]\nborder = \"plain\"\nselection = \"fill\"\ndensity = \"compact\"\nmotion = \"none\"\n"
+        );
+        let loaded = load_manifest_str(&source, "components.toml").unwrap();
+
+        assert_eq!(loaded.components.border, ThemeBorderStyle::Plain);
+        assert_eq!(loaded.components.selection, ThemeSelectionStyle::Fill);
+        assert_eq!(loaded.components.density, ThemeDensity::Compact);
+        assert_eq!(loaded.components.motion, ThemeMotion::None);
     }
 
     #[test]
