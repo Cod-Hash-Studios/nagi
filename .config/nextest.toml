@@ -1,0 +1,7 @@
+nextest-version = "0.9.137"
+
+# The OpenCode process fixtures start a local Python HTTP server. Run them with
+# the complete slot budget so loaded macOS runners cannot starve process startup.
+[[profile.default.overrides]]
+filter = 'test(/^(managed_provider::conformance::lifecycle::first_party_adapters_|server::headless::tests::(managed_mission_start_wires_the_registered_opencode_adapter|managed_handoff_starts_the_target_provider_from_the_inspected_artifact|new_mission_launch_creates_an_isolated_worktree_before_provider_start))/)'
+threads-required = "num-cpus"
