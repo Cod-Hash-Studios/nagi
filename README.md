@@ -83,6 +83,33 @@ For Codex and Claude Code, `nagi doctor --probe-providers` also performs the
 real initialize handshake and exits before creating a thread or sending a user
 turn. It verifies the installed protocol without spending a model turn.
 
+## Claude Code, supervised from prompt to proof
+
+Choose Claude Code without changing the workflow. Nagi binds the run to a
+mission, keeps write consent local, and carries the same mission across a
+provider handoff without transferring hidden reasoning.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="assets/screenshots/nagi-claude-mission.png" alt="Nagi mission wizard with Claude Code selected as the runtime" />
+    </td>
+    <td width="50%">
+      <img src="assets/screenshots/nagi-claude-handoff.png" alt="Nagi handing a bound mission from Codex to Claude Code" />
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Start with Claude.</strong><br /><sub>One outcome, explicit checks, isolated worktree.</sub></td>
+    <td><strong>Hand off to Claude.</strong><br /><sub>Same mission, digest-bound snapshot, fresh proof required.</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="assets/screenshots/nagi-proof-review.png" alt="Nagi proof review showing fresh evidence before mission closure" width="80%" />
+</p>
+
+<p align="center"><strong>Claude can finish the work. Nagi proves it finished.</strong><br /><sub>Rendered by the real Ratatui UI from deterministic state. No browser mock.</sub></p>
+
 ## Build from source
 
 The mission runtime currently targets Unix systems. You need Rust `1.96.1` and
