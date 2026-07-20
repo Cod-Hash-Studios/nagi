@@ -177,4 +177,17 @@ mod tests {
 
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepare_socket_path_rejects_overlong_path() {
+        let max_len = crate::ipc::max_unix_socket_path_len();
+        let overlong = PathBuf::from(format!("/tmp/{}", "a".repeat(max_len)));
+
+        let err = prepare_socket_path(&overlong).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err
+            .to_string()
+            .contains("set a shorter NAGI_CONFIG_PATH or XDG_CONFIG_HOME"));
+    }
 }

@@ -246,6 +246,7 @@ fn build_server_daemon_command(exe: PathBuf) -> Command {
 /// or the timeout elapses. Returns an error if the server doesn't become
 /// ready within the timeout.
 pub fn wait_for_server_socket(socket_path: &Path, timeout: Duration) -> io::Result<()> {
+    crate::ipc::validate_socket_path(socket_path)?;
     let deadline = std::time::Instant::now() + timeout;
 
     while std::time::Instant::now() < deadline {
@@ -289,7 +290,10 @@ pub fn wait_for_server_socket(socket_path: &Path, timeout: Duration) -> io::Resu
 /// 2. If no server → spawn server daemon → wait for socket readiness
 /// 3. Run the thin client (which connects to the server)
 pub fn auto_detect_launch() -> io::Result<()> {
+    let api_path = crate::api::socket_path();
     let socket_path = client_socket_path();
+    crate::ipc::validate_socket_path(&api_path)?;
+    crate::ipc::validate_socket_path(&socket_path)?;
     info!(path = %socket_path.display(), "auto-detect launch starting");
 
     if is_server_listening_at(&socket_path) {
@@ -579,5 +583,18 @@ test "$sid" = "$$"
         std::env::remove_var(crate::api::SOCKET_PATH_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_for_server_socket_fails_fast_on_overlong_path() {
+        let max_len = crate::ipc::max_unix_socket_path_len();
+        let path = PathBuf::from(format!("/tmp/{}", "a".repeat(max_len)));
+
+        let err = wait_for_server_socket(&path, Duration::from_secs(15)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err
+            .to_string()
+            .contains("set a shorter NAGI_CONFIG_PATH or XDG_CONFIG_HOME"));
     }
 }

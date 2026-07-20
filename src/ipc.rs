@@ -27,6 +27,8 @@ pub(crate) struct SocketFileIdentity {
 }
 
 pub(crate) fn connect_local_stream(path: &Path) -> io::Result<LocalStream> {
+    validate_socket_path(path)?;
+
     #[cfg(unix)]
     {
         use interprocess::local_socket::{prelude::*, GenericFilePath};
@@ -46,6 +48,8 @@ pub(crate) fn connect_local_stream(path: &Path) -> io::Result<LocalStream> {
 }
 
 pub(crate) fn bind_local_listener(path: &Path) -> io::Result<LocalListener> {
+    validate_socket_path(path)?;
+
     #[cfg(unix)]
     {
         use interprocess::local_socket::{prelude::*, GenericFilePath, ListenerOptions};
@@ -76,6 +80,8 @@ pub(crate) fn prepare_socket_path(
     path: &Path,
     busy_message: impl FnOnce(&Path) -> String,
 ) -> io::Result<()> {
+    validate_socket_path(path)?;
+
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -274,6 +280,42 @@ fn windows_socket_marker() -> String {
 }
 
 #[cfg(unix)]
+pub(crate) fn max_unix_socket_path_len() -> usize {
+    let un: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+    std::mem::size_of_val(&un.sun_path) - 1
+}
+
+pub(crate) fn validate_socket_path_with_limit(path: &Path, max_len: usize) -> io::Result<()> {
+    #[cfg(unix)]
+    let len = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str()).len();
+    #[cfg(not(unix))]
+    let len = path.to_string_lossy().len();
+
+    if len > max_len {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "socket path exceeds Unix domain socket limit ({len} bytes > {max_len} bytes): {}; set a shorter NAGI_CONFIG_PATH or XDG_CONFIG_HOME",
+                path.display()
+            ),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_socket_path(path: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        validate_socket_path_with_limit(path, max_unix_socket_path_len())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
 pub(crate) fn restrict_socket_permissions(path: &Path, mode: u32) -> io::Result<()> {
     let mut permissions = fs::metadata(path)?.permissions();
     permissions.set_mode(mode);
@@ -292,6 +334,39 @@ mod tests {
     use interprocess::local_socket::traits::Listener as _;
     #[cfg(windows)]
     use std::path::PathBuf;
+
+    #[test]
+    fn validate_socket_path_with_limit_rejects_overlong_path() {
+        let path = Path::new("/tmp/some/very/long/nested/path/that/exceeds/the/unix/domain/socket/limit/nagi.sock");
+        let err = validate_socket_path_with_limit(path, 103).unwrap_err();
+        let message = err.to_string();
+
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(message.contains("socket path exceeds Unix domain socket limit"));
+        assert!(message.contains(path.to_str().unwrap()));
+        assert!(message.contains("set a shorter NAGI_CONFIG_PATH or XDG_CONFIG_HOME"));
+    }
+
+    #[test]
+    fn validate_socket_path_with_limit_accepts_short_path() {
+        let path = Path::new("/tmp/nagi.sock");
+        assert!(validate_socket_path_with_limit(path, 103).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn validate_socket_path_enforces_platform_limit() {
+        let max_len = max_unix_socket_path_len();
+        let valid_path_str = format!("/tmp/{}", "a".repeat(max_len - 5));
+        assert!(validate_socket_path(Path::new(&valid_path_str)).is_ok());
+
+        let overlong_path_str = format!("/tmp/{}", "a".repeat(max_len));
+        let err = validate_socket_path(Path::new(&overlong_path_str)).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert!(err
+            .to_string()
+            .contains("set a shorter NAGI_CONFIG_PATH or XDG_CONFIG_HOME"));
+    }
 
     #[test]
     fn stale_socket_connect_errors_keep_unix_would_block_strict() {
